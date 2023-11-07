@@ -1,0 +1,37 @@
+# python
+__pycache__/
+*.py[cod]
+*$py.class
+
+# pyenv
+.python-version
+
+# experiment tracking
+wandb_logs/
+runs/
+
+# vscode
+.vscode/
+
+# notebooks
+*.ipynb
+
+# datasets
+data/
+
+# secrets
+.env
+
+# latex figures
+report/assets
+
+# latex build outputs
+report/build
+*.log
+
+# eval outputs
+/eval
+/cache
+
+# tensorboard logs
+tb_logs/

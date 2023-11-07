@@ -1,0 +1,160 @@
+% Main document
+
+\begin{abstract}
+    % Write an ``elevator pitch''. In other words what's the
+    % problem, why is it important or interesting, and what's your approach. (100 words)
+    \noindent Prior to recent progress, \gls{ol} have mostly been tackled with rule-based methods which scale poorly. Recent work by \citet{llms4ol} demonstrated potential for applying \gls{llm} to several subtasks of \gls{ol}. This project aims to extend this idea to build a complete system for \gls{ol} of Wikipedia by leveraging the flexibility of \gls{llm}s, bypassing the needs for manual labour. If successful, this approach, by the virtue of the generality of \gls{llm}s, will be applicable to other corpuses (e.g. other domains/languages) with minimal modifications.
+\end{abstract}
+
+\section*{Introduction, approach and outcomes}
+
+% Provide an introduction to your project or essay. In particular, try to motivate the work and explain the relevant context (general background, as well as sufficient detail about any related work).
+
+% What's the basic idea and approach? What are you thinking of doing, and how is it going to solve the problem (or need) you've identified. What are you going to ``produce''? A project will typically produce one (or perhaps more) of the following: a piece of software, an evaluation of a published result, a proof, or the design (and perhaps the construction of) a new piece of hardware. An essay will typically either review and critique a particular area of the academic literature, or evaluate a published result or proof. Try to name the specific things (and describe them) in this part of the proposal -- this will allow you to refer to them in the next.
+
+\subsection*{What is an Ontology?}
+
+Generally speaking, an ontology is a structured representation of widely-accepted concepts. It aims to capture knowledge in a more rigorous form to aid automated processing. More concretely, a minimal ontology is composed of \emph{classes} and \emph{relations}. Classes are concepts of the ontology. Relations are links that connect two concepts. The basic relation is a \emph{taxonomic relation}, which represent the \emph{is-a}/\emph{subclass-of} relationship. For example, \emph{chatbots} and \emph{artificial intelligence} can be classes of an ontology that are related by a \emph{subclass-of} relation. \gls{ol} is the process of building an ontology in an automatic or semi-automatic way.
+
+\subsection*{The state of \gls{ol}}
+
+The current techniques for \gls{ol} fall into two categories: linguistic-based and machine learning-based. The linguistic approach relies on manually curated lexico-syntactic patterns \citep{hearst,kietz}. For example, it searches for literal occurrences of `\emph{[A] is a [B]}' to construct the \emph{is-a} relation between \emph{[A]} and \emph{[B]}. This method suffers from both limited coverage and scalability.
+
+More recently, deep learning methods have been applied to \gls{ol}. Pioneering work by \citet{rnn-dl,ol-as-translation} formulated the task as a neural translation problem from natural language to Description Logic formulae. They demonstrated strong performance but was only able to do so on mostly synthetic data due to the immense labour required to create natural language-formula pairs.
+
+\subsection*{Research questions}
+
+The core contribution of this project is to apply \gls{llm}s to build a complete ontology. The main question we aim to answer is: \emph{Are \gls{llm}s good ontologists?} This goal is further broken down into smaller questions:
+
+\begin{note}
+    What counts as `applying \gls{llm}s'? I don't think it counts if we just treat \gls{llm}s as generic sequence models (I think it needs to be natural-language based, but can we define this more concretely?)
+
+    Do these sub-goals make sense?
+    \begin{itemize}
+        \item Is verifying the syntatic-soundness of an ontology really meaningful?
+        \item Will it be too much work to compare against non-LLM baselines?
+    \end{itemize}
+\end{note}
+
+\begin{itemize}
+    \item Can \gls{llm}s build \emph{complete} ontologies? Can \gls{llm}s build a full ontology (consists at least of classes and relations) that is structurally sound? (e.g. the \emph{is-a} relation should be antisymmetric.)
+    \item How good is the resultant ontology? How do they compare to the results of existing methods?
+\end{itemize}
+
+\begin{note}
+    Am I missing any possible extension?
+\end{note}
+
+Extensions of the project might aim to shed light on:
+\begin{itemize}
+    \item Can downstream tasks (e.g. document clustering) benefit from the resultant ontology?
+    \item \emph{How} do \gls{llm}s perform \gls{ol}? For example, how are relations represented in the attention mechanism?
+\end{itemize}
+
+\subsection*{Method}
+
+\begin{note}
+    \begin{itemize}
+        \item Are we actually just focusing on classes and taxonomic relations? Does the Wikipedia dataset allow us to do more?
+        \item Am I correct that we would likely develop new metrics for evaluation (since we are trying to evaluate end-to-end)?
+    \end{itemize}
+\end{note}
+
+This project will take pretrained \gls{llm}s and apply them to \gls{ol} by zero-shot prompting (baseline), few-shot prompting, and fine-tuning. Specifically, we will focus on building minimal ontologies with just classes and taxonomic relations which consists of two sub-tasks: Class discovery followed by taxonomy discovery. We will employ \gls{llm}s to solve both tasks and combine the outputs for the final result.
+
+To train and evaluate the models, we will construct a target ontology from Wikipedia categories. A suitable test set for the models might be arXiv papers. Evaluating ontologies is a research area in its own right \citep{khadir2021ontology,ontology-eval} and innovation is likely required to develop suitable metrics for this project.
+
+To summarise, this project aims to make the following core contributions:
+\begin{itemize}
+    \item Construct and share a dataset for \gls{ol} based on Wikipedia (and potentially arXiv).
+    \item Be the first to apply \gls{llm}s to build a complete ontology and evaluate its performance.
+\end{itemize}
+
+\section*{Workplan}
+% Project students have approximately 26 weeks between the approval of
+% the proposal by the Head of Department, and the submission of the dissertation. This section
+% should account for what you intend to do during that time. You should divide the time into two-week chunks including dates, and
+% describe the work to be done (and, as relevant, milestones to be
+% achieved) in each chunk. You should leave two
+% chunks for writing a project dissertation. You should leave 1 chunk for contingencies.
+
+\subsection*{Christmas}
+\textbf{Week 1-2}
+\begin{itemize}
+    \item Setup access to compute resources (Lab GPUs \& HPC).
+    \item Construct the initial Wikipedia \gls{ol} dataset.
+    \item Implement prompting-based baselines (following \citet{llms4ol}).
+    \item \textbf{Milestone}: Constructed train and evaluation dataset.
+\end{itemize}
+
+\textbf{Week 3-4}
+\begin{itemize}
+    \item Run the baseline methods and obtain basic metrics on the sub-tasks (e.g. precision and recall).
+    \item Construct the dataset and implement the code for fine-tuning. Run small-scale experiments on the HPC.
+    \item \textbf{Milestone}: Established baselines.
+\end{itemize}
+
+\textbf{Week 5-6}
+\begin{itemize}
+    \item Reserved time for holiday and other course works.
+\end{itemize}
+
+\subsection*{Lent}
+\textbf{Week 1-2}
+\begin{itemize}
+    \item Full-scale fine-tuning runs.
+    \item Construct the test dataset (e.g. from arXiv).
+    \item \textbf{Milestone}: Constructed test dataset.
+\end{itemize}
+
+\textbf{Week 3-4}
+\begin{itemize}
+    \item Create and develop original evaluation metrics. Might involve application to downstream tasks.
+    \item Evaluate the fine-tuned model.
+\end{itemize}
+
+\textbf{Week 5-6}
+\begin{itemize}
+    \item Review progress so far: Make appropriate changes to the project plan if necessary and plan for extensions.
+    \item Continue on developing suitable evaluation metrics.
+    \item \textbf{Milestone}: Achieved core goals.
+\end{itemize}
+
+\textbf{Week 7-8}
+\begin{itemize}
+    \item Buffer/work on extensions.
+    \item Other course work deadlines.
+\end{itemize}
+
+\subsection*{Easter break}
+\textbf{Week 1-2}
+\begin{itemize}
+    \item Buffer/work on extensions.
+\end{itemize}
+
+\textbf{Week 3-5}
+\begin{itemize}
+    \item Work on extensions.
+    \item Begin writing the dissertation: Focus on the introduction and implementation section.
+    \item \textbf{Milestone}: Achieved extension goals.
+\end{itemize}
+
+\subsection*{Easter}
+\textbf{Week 1-2}
+\begin{itemize}
+    \item Continue writing the dissertation: Complete the remaining core sections (preparation, evaluation).
+\end{itemize}
+
+\textbf{Week 3-4}
+\begin{itemize}
+    \item Review (and possibly rewrite) some sections of the dissertation.
+    \item Complete first draft of dissertation.
+    \item \textbf{Milestone}: First draft of dissertation.
+\end{itemize}
+
+\textbf{Week 5-6}
+\begin{itemize}
+    \item Revise the dissertation based on feedback from the supervisors. Have further discussions about specific issues if necessary.
+    \item \textbf{Deadline}: 20/05/2024 Project title deadline.
+    \item \textbf{Deadline}: 28/05/2024 Dissertation and source code submission deadline.
+\end{itemize}
