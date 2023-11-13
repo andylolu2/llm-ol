@@ -3,7 +3,7 @@
 \begin{abstract}
     % Write an ``elevator pitch''. In other words what's the
     % problem, why is it important or interesting, and what's your approach. (100 words)
-    \noindent Prior to recent progress, \gls{ol} have mostly been tackled with rule-based methods which scale poorly. Recent work by \citet{llms4ol} demonstrated potential for applying \gls{llm} to several subtasks of \gls{ol}. This project aims to extend this idea to build a complete system for \gls{ol} of Wikipedia by leveraging the flexibility of \gls{llm}s, bypassing the needs for manual labour. If successful, this approach, by the virtue of the generality of \gls{llm}s, will be applicable to other corpuses (e.g. other domains/languages) with minimal re-training and modifications.
+    \noindent Prior to recent progress, \gls{ol} has mostly been tackled with rule-based methods which scale poorly. Recent work by \citet{llms4ol} demonstrated potential for applying \gls{llm} to several sub-tasks of \gls{ol}. This project aims to extend this idea to build a complete system for \gls{ol} of Wikipedia by leveraging the flexibility of \gls{llm}s, bypassing the needs for specialist models and large training datasets. If successful, this approach, by the virtue of the generality of \gls{llm}s, will be applicable to corpuses other than Wikipedia with minimal re-training and modifications.
 \end{abstract}
 
 \section*{Introduction, approach and outcomes}
@@ -14,53 +14,49 @@
 
 \subsection*{What is an Ontology?}
 
-An ontology is a structured representation of widely-accepted concepts. It aims to capture knowledge in a more rigorous form to aid automated processing. A minimal ontology is composed of \emph{classes} and \emph{relations}. Classes are concepts of the ontology. Relations are links that connect two concepts. The basic relation is a \emph{taxonomic relation}, which represent the \emph{is-a}/\emph{subclass-of} relationship. For example, \emph{chatbots} and \emph{artificial intelligence} can be classes of an ontology that are related by a \emph{subclass-of} relation. \gls{ol} is the process of building an ontology in an automatic or semi-automatic way.
+An ontology is a structured representation of widely-accepted concepts. It aims to capture knowledge in a more rigorous form to aid automated processing. A minimal ontology is composed of \emph{classes} and \emph{relations}. Classes are concepts of the ontology. Relations are links that connect two concepts. The basic relation is a \emph{taxonomic relation} which represents the \emph{is-a}/\emph{subclass-of} relationship. For example, \emph{chatbots} and \emph{artificial intelligence} can be classes of an ontology that are related by a \emph{subclass-of} relation. \gls{ol} is the process of building an ontology in an automatic or semi-automatic way.
 
 In this project, we focus on the categories of Wikipedia which is a simplistic ontology. Other notable examples of ontologies include Gene Ontology \citep{gene-ontology} and Unified Medical Language System \citep{umls}. The standard way to encode ontologies is by \gls{owl} which we will use for the datasets constructed in this project.
 
 \subsection*{Motivation}
 
-\gls{ol} is a complex process. Existing works typically break down the problem into several sub-tasks and employ specialist models to solve each of them individually. On the other hand, \gls{llm}s have been shown to be general problem solvers \citep{gpt3} and encapsulates much world knowledge \citep{llm-knowledge-base}. This makes \gls{llm}s a good candidate for improving the core logic for \gls{ol} while making the process simpler (only one model required).
+\gls{ol} is a complex process. It is typically broken down into several sub-tasks, and specialist models are employed to solve each of them individually. On the other hand, \gls{llm}s have been shown to be general problem solvers \citep{gpt3} and to encapsulate vast amount of world knowledge \citep{llm-knowledge-base}. This makes \gls{llm}s a good candidate for improving the core logic for \gls{ol} while making the process simpler (only one model required).
 
-Most prior work in this area do not evaluate on the complete process of building an ontology from scratch. Instead, they mostly focus on sub-tasks of \gls{ol} or Knowledge Graph Completion \citep{llms4ol,yao2023exploring,cabot2021rebel}. This project will instead build a complete system capable of building ontologies from scratch. We expect to draw inspiration from prior work but also make improvements upon them based on the change in perspective.
+Prior works in this area do not evaluate the complete process of building an ontology from scratch. Instead, they focus on using \gls{llm}s for sub-tasks of \gls{ol} \citep{llms4ol} or Knowledge Graph Completion \citep{yao2023exploring,cabot2021rebel}. In many cases, solutions to such sub-tasks are insufficient by themselves to build a full \gls{ol} system and existing works often neglect the additional, non-trivial steps required to do so. For example, taxonomy discovery is often treated as a binary classification task given two classes. However, many works do not consider how such two candidate classes are sampled in practice to construct an ontology. This project aims to show that such gaps can be effectively closed by using \gls{llm}s for \gls{ol}.
 
 \subsection*{Research questions}
 
-The core contribution of this project is to apply \gls{llm}s to build ontology(ies) from scratch. The main question we aim to answer is: \emph{How can we use \gls{llm}s for \gls{ol}?} We plan to do so by:
+The core contribution of this project is to apply \gls{llm}s to build ontologies from scratch. The main question we will answer is: \emph{How can we use \gls{llm}s for \gls{ol}?} We plan to do so by:
 \begin{enumerate}
     \item Proposing and implementing a system for \gls{ol} where \gls{llm}s plays a central role; and
     \item Demonstrating the effectiveness of the implementation by comparing against existing methods.
 \end{enumerate}
 
-Extensions of the project might shed light on:
+Extensions of the project might focus on:
 \begin{itemize}
     \item Can downstream tasks benefit from the resultant ontology?
     \item Can we use \gls{llm}s to discover other components of an ontology?
-    \item \emph{How} do \gls{llm}s perform \gls{ol}? For example, do the embeddings/internal activations already form the structure of the ontology?
+    \item How do \gls{llm}s perform \gls{ol}? For example, do the embeddings/internal activations already form the structure of the ontology?
 \end{itemize}
 
 \subsection*{Methodology}
 
 \subsubsection*{Implementation}
 
-The basic implementation of this project will build a minimal ontology in two steps:
-\begin{enumerate}
-    \item Class discovery: Generate all the `nodes' of the ontology graph. A possible strategy would be to first generate a large set of candidate nodes and classify each of them individually for whether it should be present or not.
-    \item Taxonomy discovery: Predict whether a taxonomic relation is present between every pair of nodes. A possible strategy is to iterate through all pairs of nodes and perform a binary classification.
-\end{enumerate}
+By leveraging the generative nature of \gls{llm}s, we propose a method that performs \emph{class discovery} (generating the `nodes') and \emph{taxonomy discovery} (generating the `edges') as a joint process rather than separate sub-tasks. The basic idea is to construct the ontology `bottom-up', where at each step we recursively prompt a pre-trained \gls{llm} to generate the parent for the current node until we reach the root node.
 
-We will employ a pretrained \gls{llm} to solve both sub-tasks by zero-shot prompting (baseline), few-shot prompting, and fine-tuning based on Wikipedia categories. We expect there to be more thoughtful approaches to \gls{ol} than the method described above --- Part of the project's goals is to discover and evaluate such methods.
+We will experiment with zero-shot prompting, few-shot prompting, and fine-tuning a \gls{llm} based on Wikipedia categories. We expect to refine the above approach throughout the project.
 
 \subsubsection*{Evaluation}
 
-We will use a hold-out set from Wikipedia categories for in-distribution validation and arXiv categories for out-of-distribution testing.
+Evaluation will be done on a hold-out set from Wikipedia categories for in-distribution validation and arXiv categories for out-of-distribution testing.
 
-Standard metrics such as precision and recall will be used to evaluate the system's performance on individual sub-tasks. To evaluate the ontology as a whole, we can compare its similarity with the ground truth. Unfortunately, there is no standard method to compare ontologies though there are vast amounts of literature for reference \citep{ontology-matching}. An alternative method will be to evaluate base on downstream (e.g. document clustering) performance, akin to how typical unsupervised learning methods are evaluated.
+To evaluate the ontology as a whole, we can compare its similarity with the ground truth. Unfortunately, there is no standard method to compare ontologies, though there are vast amounts of literature for reference \citep{ontology-matching}. Part of the work is to choose a suitable metric. An alternative method will be to evaluate base on downstream (e.g., document clustering) performance, akin to how typical unsupervised learning methods are evaluated.
 
 To summarise, this project aims to make the following core contributions:
 \begin{itemize}
     \item Construct and share a dataset for \gls{ol} based on Wikipedia and arXiv categories.
-    \item Be the first to apply \gls{llm}s to build ontologies from scratch and evaluate its end-to-end performance.
+    \item Be the first to apply \gls{llm}s to build ontologies from scratch and evaluate the method's end-to-end performance.
 \end{itemize}
 
 \section*{Workplan}
@@ -73,20 +69,23 @@ To summarise, this project aims to make the following core contributions:
 
 \subsection*{Work content}
 
-Core:
+\subsubsection*{Core}
 \begin{itemize}
     \item Construct the Wikipedia and arXiv categories dataset in \gls{owl} by aggregating data from the public APIs.
-    \item Implement a baseline for reference, such as by Named Entity Recognition and Hearst patterns \citep{hearst}.
-    \item Propose methods for \gls{ol} using \gls{llm}s, starting with the basic approach described in the previous section. Solve the tasks by zero-shot prompting, few-shot prompting and fine-tuning.
+    \item Implement a simple baseline for reference, such as by Named Entity Recognition and Hearst patterns \citep{hearst}.
+    \item Propose methods for \gls{ol} using \gls{llm}s, starting with the approach described in the previous section.
     \item Develop suitable evaluation metrics for computing ontology similarity. Evaluate the resultant ontologies for each method above.
 \end{itemize}
 
-Extension:
+\subsubsection*{Extensions}
 \begin{itemize}
-    \item Apply the learnt ontology for downstream tasks like document clustering and compare the performance against the ground truth and baseline standard (e.g. by embedding similarity).
+    \item Apply the learnt ontology for downstream tasks like document clustering and compare the performance against the ground truth and baseline standard (e.g., by embedding similarity).
     \item Use \gls{llm}s to discover additional components of an ontology, such as defining which classes are mutually exclusive.
-    \item Inspect the internal activations of \gls{llm}s and probe for structures resembling an ontology. (e.g. is there a direction for "general" vs "specific" concepts?)
+    \item Inspect the internals of \gls{llm}s and probe for structures resembling an ontology. (e.g., are the internal representations for the categories hierarchically structured?)
 \end{itemize}
+
+\subsubsection*{Backup plan}
+The most risky part of this project is the proposed novel approach to \gls{ol} (doing class and taxonomy discovery jointly). The backup plan is to revert to the standard approach of solving the sub-tasks independently. This is the safer option since \citet{llms4ol} have already shown promising results for the two sub-tasks.
 
 \subsection*{Success criteria}
 
@@ -99,89 +98,88 @@ We aim to demonstrate the success of the project by:
 \subsection*{Timeline}
 
 \subsubsection*{Christmas}
-\textbf{Week 1-2} \emph{(04/12-18/12)}
+\textbf{Week 1-2} (04/12-18/12) \hfill \textbf{Risk: Low}
 \begin{itemize}
     \item Setup access to compute resources (Lab GPUs \& HPC).
-    \item Construct the initial Wikipedia \gls{ol} dataset.
-    \item Implement prompting-based baselines (following \citet{llms4ol}).
-    \item \textbf{Milestone}: Constructed train and evaluation dataset.
+    \item Construct the Wikipedia categories and arXiv categories datasets in \gls{owl} format.
+    \item \textbf{Milestone}: Constructed train, evaluation and test dataset.
 \end{itemize}
 
-\textbf{Week 3-4} \emph{(18/12-01/01)}
+\textbf{Week 3-4} (18/12-01/01) \hfill \textbf{Risk: Low}
 \begin{itemize}
-    \item Run the baseline methods and obtain basic metrics on the sub-tasks (e.g. precision and recall).
-    \item Construct the dataset and implement the code for fine-tuning. Run small-scale experiments on the HPC.
-    \item \textbf{Milestone}: Established baselines.
+    \item Implement the NER + Hearst pattern baseline.
+    \item Implement an (initial) evaluation metric for comparing ontologies. More reading is likely required.
+    \item Evaluate the baseline with the metric.
+    \item \textbf{Milestone}: Established baseline.
 \end{itemize}
 
-\textbf{Week 5-6} \emph{(01/01-15/01)}
+\textbf{Week 5-6} (01/01-15/01)
 \begin{itemize}
     \item Reserved time for holiday and other course works.
 \end{itemize}
 
 \subsubsection*{Lent}
-\textbf{Week 1-2} \emph{(15/01-29/01)}
+\textbf{Week 1-2} (15/01-29/01) \hfill \textbf{Risk: Medium}
 \begin{itemize}
-    \item Full-scale fine-tuning runs.
-    \item Construct the test dataset (e.g. from arXiv).
-    \item \textbf{Milestone}: Constructed test dataset.
+    \item Implement the zero-shot and few-shot approaches specified in \textbf{Methodology} with a pre-trained \gls{llm} such as Zephyr-7B-$\beta$.
+    \item Evaluate the prompting-based approaches.
 \end{itemize}
 
-\textbf{Week 3-4} \emph{(29/01-12/02)}
+\textbf{Week 3-4} (29/01-12/02) \hfill \textbf{Risk: Medium}
 \begin{itemize}
-    \item Create and develop original evaluation metrics. Might involve application to downstream tasks.
+    \item Construct the dataset and implement the code for fine-tuning. Kick off fine-tuning runs.
+    \item While fine-tuning experiments are running, review more literature and re-evaluate the suitability of the current evaluation metric. Implement more evaluation metrics if needed.
+\end{itemize}
+
+\textbf{Week 5-6} (12/02-26/02) \hfill \textbf{Risk: Medium}
+\begin{itemize}
     \item Evaluate the fine-tuned model.
-\end{itemize}
-
-\textbf{Week 5-6} \emph{(12/02-26/02)}
-\begin{itemize}
     \item Review progress so far: Make appropriate changes to the project plan if necessary and plan for extensions.
-    \item Continue on developing suitable evaluation metrics.
+    \item Continue on developing suitable evaluation metrics, such as by application of the learnt ontology to downstream tasks.
     \item \textbf{Milestone}: Achieved core goals.
 \end{itemize}
 
-\textbf{Week 7-8} \emph{(26/02-11/03)}
+\textbf{Week 7-8} (26/02-11/03)
 \begin{itemize}
     \item Buffer/work on extensions.
     \item Other course work deadlines.
 \end{itemize}
 
 \subsubsection*{Easter break}
-\textbf{Week 1-2} \emph{(11/03-18/03)}
+\textbf{Week 1-2} (11/03-18/03)
 \begin{itemize}
     \item Buffer/work on extensions.
 \end{itemize}
 
-\textbf{Week 3-4} \emph{(18/03-01/04)}
+\textbf{Week 3-4} (18/03-01/04)
 \begin{itemize}
     \item Work on extensions.
     \item Begin writing the dissertation: Focus on the introduction and implementation section.
-    \item \textbf{Milestone}: Achieved extension goals.
 \end{itemize}
 
-\textbf{Week 5-6} \emph{(01/04-15/04)}
+\textbf{Week 5-6} (01/04-15/04)
 \begin{itemize}
     \item Work on extensions.
-    \item Begin writing the dissertation: Focus on the introduction and implementation section.
-    \item \textbf{Milestone}: Achieved extension goals.
+    \item \textbf{Milestone}: Completed extensions.
 \end{itemize}
 
 \subsubsection*{Easter}
-\textbf{Week 1-2} \emph{(15/04-29/04)}
+\textbf{Week 1-2} (15/04-29/04) \hfill \textbf{Risk: Low}
 \begin{itemize}
     \item Continue writing the dissertation: Complete the remaining core sections (preparation, evaluation).
 \end{itemize}
 
-\textbf{Week 3-4} \emph{(29/04-13/05)}
+\textbf{Week 3-4} (29/04-13/05) \hfill \textbf{Risk: Low}
 \begin{itemize}
     \item Review (and possibly rewrite) some sections of the dissertation.
     \item Complete first draft of dissertation.
     \item \textbf{Milestone}: First draft of dissertation.
 \end{itemize}
 
-\textbf{Week 5-6} \emph{(13/05-28/05)}
+\textbf{Week 5-6} (13/05-28/05) \hfill \textbf{Risk: Low}
 \begin{itemize}
     \item Revise the dissertation based on feedback from the supervisors. Have further discussions about specific issues if necessary.
     \item \textbf{Deadline}: 20/05/2024 Project title deadline.
     \item \textbf{Deadline}: 28/05/2024 Dissertation and source code submission deadline.
+    \item \textbf{Milestone}: Submission of dissertation.
 \end{itemize}
