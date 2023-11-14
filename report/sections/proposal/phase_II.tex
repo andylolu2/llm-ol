@@ -14,9 +14,9 @@
 
 \subsection*{What is an Ontology?}
 
-An ontology is a structured representation of widely-accepted concepts. It aims to capture knowledge in a more rigorous form to aid automated processing. A minimal ontology is composed of \emph{classes} and \emph{relations}. Classes are concepts of the ontology. Relations are links that connect two concepts. The basic relation is a \emph{taxonomic relation} which represents the \emph{is-a}/\emph{subclass-of} relationship. For example, \emph{chatbots} and \emph{artificial intelligence} can be classes of an ontology that are related by a \emph{subclass-of} relation. \gls{ol} is the process of building an ontology in an automatic or semi-automatic way.
+An ontology is a structured representation of widely-accepted concepts that aids automated processing. A minimal ontology is composed of \emph{classes} (concepts) and \emph{relations} (links between concepts). The basic relation is a \emph{taxonomic relation} which represents the \emph{is-a}/\emph{subclass-of} relationship\footnote{For example, \emph{chatbots} and \emph{artificial intelligence} can be classes of an ontology that are related by a \emph{subclass-of} relation.}. \gls{ol} aims to automate the process of building an ontology.
 
-In this project, we focus on the categories of Wikipedia which is a simplistic ontology. Other notable examples of ontologies include Gene Ontology \citep{gene-ontology} and Unified Medical Language System \citep{umls}. The standard way to encode ontologies is by \gls{owl} which we will use for the datasets constructed in this project.
+In this project, we focus on the categories of Wikipedia which is a simplistic ontology.\footnote{Other notable examples of ontologies include Gene Ontology \citep{gene-ontology} and Unified Medical Language System \citep{umls}.} The standard format to encode ontologies is by \gls{owl} which we will use for the datasets constructed in this project.
 
 \subsection*{Motivation}
 
@@ -26,10 +26,10 @@ Prior works in this area do not evaluate the complete process of building an ont
 
 \subsection*{Research questions}
 
-The core contribution of this project is to apply \gls{llm}s to build ontologies from scratch. The main question we will answer is: \emph{How can we use \gls{llm}s for \gls{ol}?} We plan to do so by:
+This project aims to answer: \emph{How can we use \gls{llm}s for \gls{ol}?} We plan to do so by:
 \begin{enumerate}
-    \item Proposing and implementing a system for \gls{ol} where \gls{llm}s plays a central role; and
-    \item Demonstrating the effectiveness of the implementation by comparing against existing methods.
+    \item Proposing a system for \gls{ol} where \gls{llm}s plays a central role; and
+    \item Demonstrating the system's effectiveness by comparing against existing methods.
 \end{enumerate}
 
 Extensions of the project might focus on:
@@ -38,6 +38,7 @@ Extensions of the project might focus on:
     \item Can we use \gls{llm}s to discover other components of an ontology?
     \item How do \gls{llm}s perform \gls{ol}? For example, do the embeddings/internal activations already form the structure of the ontology?
 \end{itemize}
+
 
 \subsection*{Methodology}
 
@@ -51,7 +52,7 @@ We will experiment with zero-shot prompting, few-shot prompting, and fine-tuning
 
 Evaluation will be done on a hold-out set from Wikipedia categories for in-distribution validation and arXiv categories for out-of-distribution testing.
 
-To evaluate the ontology as a whole, we can compare its similarity with the ground truth. Unfortunately, there is no standard method to compare ontologies, though there are vast amounts of literature for reference \citep{ontology-matching}. Part of the work is to choose a suitable metric. An alternative method will be to evaluate base on downstream (e.g., document clustering) performance, akin to how typical unsupervised learning methods are evaluated.
+To evaluate the ontology as a whole, we can compare its similarity with the ground truth. Unfortunately, there is no standard method to compare ontologies, though there are vast amounts of literature for reference \citep{ontology-matching}. Part of the work is to choose a suitable metric. An alternative will be to evaluate base on downstream (e.g., document clustering) performance, akin to how typical unsupervised learning methods are evaluated.
 
 To summarise, this project aims to make the following core contributions:
 \begin{itemize}
