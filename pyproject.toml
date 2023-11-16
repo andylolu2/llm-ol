@@ -1,0 +1,19 @@
+[tool.poetry]
+name = "llm-ol"
+version = "0.1.0"
+description = ""
+authors = ["Andy Lo <andylolu24@gmail.com>"]
+readme = "README.md"
+
+[tool.poetry.dependencies]
+python = "^3.11"
+beautifulsoup4 = "^4.12.2"
+pydantic = "^2.5.1"
+requests = "^2.31.0"
+absl-py = "^2.0.0"
+aiohttp = "^3.8.6"
+
+
+[build-system]
+requires = ["poetry-core"]
+build-backend = "poetry.core.masonry.api"
