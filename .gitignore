@@ -6,32 +6,18 @@ __pycache__/
 # pyenv
 .python-version
 
-# experiment tracking
-wandb_logs/
-runs/
-
 # vscode
 .vscode/
 
 # notebooks
 *.ipynb
 
-# datasets
-data/
+# outputs
+out/
 
 # secrets
 .env
 
-# latex figures
-report/assets
-
-# latex build outputs
+# Core latex build outputs
 report/build
-*.log
 
-# eval outputs
-/eval
-/cache
-
-# tensorboard logs
-tb_logs/
