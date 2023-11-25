@@ -1,13 +1,16 @@
-from absl import app, flags
+from pathlib import Path
+from shutil import rmtree
+
+from absl import app, flags, logging
 from arxiv.taxonomy.definitions import ARCHIVES_ACTIVE as ARCHIVES
 from arxiv.taxonomy.definitions import CATEGORIES_ACTIVE as CATEGORIES
 from arxiv.taxonomy.definitions import CATEGORY_ALIASES, GROUPS
 
-from llm_ol.dataset.data_model import Category
+from llm_ol.dataset.data_model import Category, save_categories
 
 FLAGS = flags.FLAGS
 flags.DEFINE_string(
-    "output_file", None, "Path to output JSONL file", required=True, short_name="o"
+    "output_dir", None, "Directory to save output files", required=True, short_name="o"
 )
 
 
@@ -30,6 +33,15 @@ def main(_):
 
     The taxonomy is hard-coded in the arxiv.taxonomy.definitions module.
     """
+
+    # Set up
+    out_dir = Path(FLAGS.output_dir)
+    if out_dir.exists():
+        rmtree(out_dir)
+    out_dir.mkdir(parents=True)
+    logging.get_absl_handler().use_absl_log_file("build", out_dir)
+
+    # Build the tree
     node_names = {"root": "Root"}  # node_id -> name
     node_to_children = {"root": set()}  # node_id -> set(child_id)
 
@@ -56,22 +68,43 @@ def main(_):
 
     # Post-processing: Shorten all paths with repeated entries
     # E.g. A -> B -> B -> C becomes A -> B -> C
-    pruned = set()
-    for node_id, children in node_to_children.items():
-        new_children = children.copy()
-        for child_id in children:
-            if node_names[node_id] == node_names[child_id]:
-                new_children |= node_to_children[child_id]
-                pruned.add(child_id)
-        node_to_children[node_id] = new_children
-    nodes = set(node_to_children.keys()) - pruned
+    def contract(root: str, seen: set[str]) -> None:
+        children = node_to_children[root].copy()
+        for child in children:
+            if child not in seen:
+                seen.add(child)
+                contract(child, seen)
 
-    with open(FLAGS.output_file, "w") as f:
-        for node_id in nodes:
-            name = node_names[node_id]
-            children = list(node_to_children[node_id])
-            category = Category(id_=node_id, name=name, children=children)
-            f.write(category.model_dump_json() + "\n")
+            if node_names[root] == node_names[child]:
+                logging.info(
+                    "Contracting %s -> %s (Name: %s)", child, root, node_names[root]
+                )
+                node_to_children[root] |= node_to_children[child]
+                node_to_children[root].remove(child)
+
+    contract("root", set())
+
+    # Post-processing: Remove unreachable nodes
+    def find_reachable(node: str, reachable: set[str]):
+        reachable.add(node)
+        for child in node_to_children[node]:
+            if child not in reachable:
+                find_reachable(child, reachable)
+
+    reachable = set()
+    find_reachable("root", reachable)
+
+    unreachable = set(node_to_children.keys()) - reachable
+    logging.info("Found %d unreachable nodes: %s", len(unreachable), unreachable)
+
+    categories = [
+        Category(id_=node, name=node_names[node], children=list(children))
+        for node, children in node_to_children.items()
+        if node in reachable
+    ]
+
+    save_categories(categories, out_dir, "jsonl")
+    save_categories(categories, out_dir, "owl")
 
 
 if __name__ == "__main__":

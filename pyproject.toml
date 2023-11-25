@@ -15,6 +15,7 @@ aiohttp = "^3.9.0"
 graphviz = "^0.20.1"
 arxiv-base = "^0.17.8"
 urllib3 = "<2"             # Resolution hint
+owlready2 = "^0.45"
 
 
 [build-system]

@@ -1,11 +1,13 @@
 import asyncio
 from collections import deque
+from pathlib import Path
+from shutil import rmtree
 
 import aiohttp
 from absl import app, flags, logging
 from bs4 import BeautifulSoup
 
-from llm_ol.dataset.data_model import Category
+from llm_ol.dataset.data_model import Category, save_categories
 
 WIKIPEDIA_API_URL = "https://en.wikipedia.org/w/api.php"
 ROOT_CATEGORY_ID = "Main_topic_classifications"
@@ -13,7 +15,7 @@ ROOT_CATEGORY_NAME = "Main topic classifications"
 
 FLAGS = flags.FLAGS
 flags.DEFINE_string(
-    "output_file", None, "Path to output JSONL file", required=True, short_name="o"
+    "output_dir", None, "Directory to save output files", required=True, short_name="o"
 )
 flags.DEFINE_integer("depth", 2, "Depth of categories to fetch", short_name="d")
 flags.DEFINE_float("rate", 100, "Max number of requests per second", short_name="r")
@@ -168,11 +170,54 @@ def get_wiki_categories(
 
 
 def main(_):
-    assert FLAGS.output_file.endswith(".jsonl")
+    # Set up
+    out_dir = Path(FLAGS.output_dir)
+    if out_dir.exists():
+        rmtree(out_dir)
+    out_dir.mkdir(parents=True)
+    logging.get_absl_handler().use_absl_log_file("build", out_dir)
 
-    with open(FLAGS.output_file, "w") as f:
-        for category in get_wiki_categories(depth=FLAGS.depth):
-            f.write(category.model_dump_json() + "\n")
+    # Build the tree
+    categories = list(get_wiki_categories(depth=FLAGS.depth))
+
+    # Post processing: Remove all cycles
+    id_to_category = {category.id_: category for category in categories}
+
+    def find_cycles(node: str, path: tuple[str, ...], cycles: list[tuple[str, ...]]):
+        if node in path:
+            return cycles + [path[path.index(node) :]]
+        else:
+            children = id_to_category[node].children if node in id_to_category else []
+            for child in children:
+                if any(child in cycle for cycle in cycles):
+                    continue
+                cycles = find_cycles(child, path + (node,), cycles)
+            return cycles
+
+    cycles = find_cycles(ROOT_CATEGORY_ID, (), [])
+
+    for cycle in cycles:
+        logging.info("Found cycle: %s", " -> ".join(cycle))
+        for node, next_node in zip(cycle, cycle[1:] + cycle[:1]):
+            id_to_category[node].children.remove(next_node)
+
+    # Post-processing: Remove unreachable nodes
+    def find_reachable(node: str, reachable: set[str]):
+        reachable.add(node)
+        children = id_to_category[node].children if node in id_to_category else []
+        for child in children:
+            if child not in reachable:
+                find_reachable(child, reachable)
+
+    reachable = set()
+    find_reachable(ROOT_CATEGORY_ID, reachable)
+    unreachable = set(id_to_category.keys()) - reachable
+    logging.info("Found %d unreachable nodes: %s", len(unreachable), unreachable)
+
+    categories = list(filter(lambda category: category.id_ in reachable, categories))
+
+    save_categories(categories, FLAGS.output_dir, format="jsonl")
+    save_categories(categories, FLAGS.output_dir, format="owl")
 
 
 if __name__ == "__main__":
