@@ -1,9 +1,11 @@
 import asyncio
+import json
 from collections import deque
 from pathlib import Path
-from shutil import rmtree
+from typing import Coroutine
 
 import aiohttp
+import requests
 from absl import app, flags, logging
 from bs4 import BeautifulSoup
 
@@ -25,6 +27,58 @@ flags.DEFINE_integer("retries", 3, "Number of retries per request")
 def make_url(base_url: str, params: dict[str, str]) -> str:
     params_str = "&".join([f"{k}={v}" for k, v in params.items()])
     return f"{base_url}?{params_str}"
+
+
+def all_categories(last_continue=None):
+    """Get all categories on Wikipedia.
+
+    API reference: https://www.mediawiki.org/wiki/API:Allcategories
+    """
+    last_continue = last_continue or {}
+    while True:
+        logging.info("Continuing from %s", last_continue)
+
+        params = {
+            "action": "query",
+            "generator": "allcategories",
+            "format": "json",
+            "formatversion": "2",
+            "gacmin": 1,
+            "gaclimit": "max",
+            **last_continue,
+        }
+        result = requests.get(WIKIPEDIA_API_URL, params).json()
+
+        if "error" in result:
+            raise RuntimeError(result["error"])
+        if "warnings" in result:
+            logging.warning(result["warnings"])
+        if "query" in result:
+            for page in result["query"]["pages"]:
+                if "missing" in page:
+                    continue
+                try:
+                    yield {
+                        "id": page["pageid"],
+                        "title": page["title"],
+                        "name": page["title"].removeprefix("Category:"),
+                    }
+                except Exception as e:
+                    logging.error("Error processing page: %s (%s)", page, repr(e))
+                    raise e
+        if "continue" not in result:
+            break
+        last_continue = result["continue"]
+
+
+async def gather_with_concurrency(n: int, *coros: Coroutine):
+    semaphore = asyncio.Semaphore(n)
+
+    async def sem_coro(coro):
+        async with semaphore:
+            return await coro
+
+    return await asyncio.gather(*(sem_coro(c) for c in coros))
 
 
 async def make_requests(
@@ -63,6 +117,54 @@ async def make_requests(
         time_per_request = 0 if rate is None else 1 / rate
         tasks = [task(url, i * time_per_request) for i, url in enumerate(urls)]
         return await asyncio.gather(*tasks)
+
+
+async def get_pages_and_subcats_of(category_id: str, session: aiohttp.ClientSession):
+    last_continue = {}
+    pages = []
+    sub_categories = set()
+    while True:
+        params = {
+            "action": "query",
+            "list": "categorymembers",
+            "cmpageid": category_id,
+            "cmtype": "page|subcat",
+            "cmprop": "ids|title|type",
+            "format": "json",
+            "formatversion": "2",
+            "cmlimit": "max",
+            **last_continue,
+        }
+        response = await session.get(WIKIPEDIA_API_URL, params=params)
+        result = await response.json()
+
+        if "error" in result:
+            raise RuntimeError(result["error"])
+        if "warnings" in result:
+            logging.warning(result["warnings"])
+        if "query" in result:
+            for page in result["query"]["categorymembers"]:
+                if page.get("missing", False):
+                    continue
+                try:
+                    if page["type"] == "page":
+                        pages.append({"id": page["pageid"], "title": page["title"]})
+                    elif page["type"] == "subcat":
+                        sub_categories.add(page["pageid"])
+                    else:
+                        raise ValueError(f"Invalid page type: {page['type']}")
+                except Exception as e:
+                    logging.error("Error processing page: %s (%s)", page, repr(e))
+                    raise e
+        if "continue" not in result:
+            return pages, sub_categories
+        last_continue = result["continue"]
+
+
+async def get_pages_and_subcats(category_ids):
+    async with aiohttp.ClientSession() as session:
+        tasks = map(lambda id_: get_pages_and_subcats_of(id_, session), category_ids)
+        return await gather_with_concurrency(50, *tasks)
 
 
 def process_result(
@@ -172,52 +274,84 @@ def get_wiki_categories(
 def main(_):
     # Set up
     out_dir = Path(FLAGS.output_dir)
-    if out_dir.exists():
-        rmtree(out_dir)
-    out_dir.mkdir(parents=True)
-    logging.get_absl_handler().use_absl_log_file("build", out_dir)
+    out_dir.mkdir(parents=True, exist_ok=True)
+
+    logging.set_verbosity(logging.INFO)
+    logging.get_absl_handler().use_absl_log_file(log_dir=out_dir)
+
+    if (out_dir / "all_categories.jsonl").exists():
+        logging.info("Skipping fetching categories")
+    else:
+        with open(out_dir / "all_categories.jsonl", "w") as f:
+            for i, category in enumerate(all_categories(), start=1):
+                f.write(json.dumps(category) + "\n")
+                if i % 10_000 == 0:
+                    print(f"Processed {i:_} categories")
+
+    with open(out_dir / "all_categories.jsonl") as f:
+        categories = [json.loads(line) for line in f]
+    categories = {item["id"]: item for item in categories}
 
     # Build the tree
-    categories = list(get_wiki_categories(depth=FLAGS.depth))
+    full_categories = []
+    pages = []
+    results = asyncio.run(get_pages_and_subcats(list(categories.keys())[:5]))
+    for category_id, (sub_pages, sub_categories) in zip(
+        list(categories.keys())[:5], results
+    ):
+        # print(categories[category_id]["name"])
+        # print([categories[id_]["name"] for id_ in sub_categories])
+        # print([page["title"] for page in sub_pages])
+        full_categories.append(
+            Category(
+                id_=category_id,
+                name=categories[category_id]["name"],
+                children=list(sub_categories),
+            )
+        )
+        pages.append({"id": category_id, "pages": sub_pages})
 
-    # Post processing: Remove all cycles
-    id_to_category = {category.id_: category for category in categories}
+    # # Build the tree
+    # categories = list(get_wiki_categories(depth=FLAGS.depth))
 
-    def find_cycles(node: str, path: tuple[str, ...], cycles: list[tuple[str, ...]]):
-        if node in path:
-            return cycles + [path[path.index(node) :]]
-        else:
-            children = id_to_category[node].children if node in id_to_category else []
-            for child in children:
-                if any(child in cycle for cycle in cycles):
-                    continue
-                cycles = find_cycles(child, path + (node,), cycles)
-            return cycles
+    # # Post processing: Remove all cycles
+    # id_to_category = {category.id_: category for category in categories}
 
-    cycles = find_cycles(ROOT_CATEGORY_ID, (), [])
+    # def find_cycles(node: str, path: tuple[str, ...], cycles: list[tuple[str, ...]]):
+    #     if node in path:
+    #         return cycles + [path[path.index(node) :]]
+    #     else:
+    #         children = id_to_category[node].children if node in id_to_category else []
+    #         for child in children:
+    #             if any(child in cycle for cycle in cycles):
+    #                 continue
+    #             cycles = find_cycles(child, path + (node,), cycles)
+    #         return cycles
 
-    for cycle in cycles:
-        logging.info("Found cycle: %s", " -> ".join(cycle))
-        for node, next_node in zip(cycle, cycle[1:] + cycle[:1]):
-            id_to_category[node].children.remove(next_node)
+    # cycles = find_cycles(ROOT_CATEGORY_ID, (), [])
 
-    # Post-processing: Remove unreachable nodes
-    def find_reachable(node: str, reachable: set[str]):
-        reachable.add(node)
-        children = id_to_category[node].children if node in id_to_category else []
-        for child in children:
-            if child not in reachable:
-                find_reachable(child, reachable)
+    # for cycle in cycles:
+    #     logging.info("Found cycle: %s", " -> ".join(cycle))
+    #     for node, next_node in zip(cycle, cycle[1:] + cycle[:1]):
+    #         id_to_category[node].children.remove(next_node)
 
-    reachable = set()
-    find_reachable(ROOT_CATEGORY_ID, reachable)
-    unreachable = set(id_to_category.keys()) - reachable
-    logging.info("Found %d unreachable nodes: %s", len(unreachable), unreachable)
+    # # Post-processing: Remove unreachable nodes
+    # def find_reachable(node: str, reachable: set[str]):
+    #     reachable.add(node)
+    #     children = id_to_category[node].children if node in id_to_category else []
+    #     for child in children:
+    #         if child not in reachable:
+    #             find_reachable(child, reachable)
 
-    categories = list(filter(lambda category: category.id_ in reachable, categories))
+    # reachable = set()
+    # find_reachable(ROOT_CATEGORY_ID, reachable)
+    # unreachable = set(id_to_category.keys()) - reachable
+    # logging.info("Found %d unreachable nodes: %s", len(unreachable), unreachable)
 
-    save_categories(categories, FLAGS.output_dir, format="jsonl")
-    save_categories(categories, FLAGS.output_dir, format="owl")
+    # categories = list(filter(lambda category: category.id_ in reachable, categories))
+
+    # save_categories(categories, FLAGS.output_dir, format="jsonl")
+    # save_categories(categories, FLAGS.output_dir, format="owl")
 
 
 if __name__ == "__main__":
