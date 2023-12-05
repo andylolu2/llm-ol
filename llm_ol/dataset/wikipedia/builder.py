@@ -1,32 +1,32 @@
 import asyncio
 import json
-from collections import deque
+import traceback
 from pathlib import Path
 from typing import Coroutine
 
 import aiohttp
 import requests
 from absl import app, flags, logging
-from bs4 import BeautifulSoup
+from tqdm.asyncio import tqdm
 
 from llm_ol.dataset.data_model import Category, save_categories
+from llm_ol.dataset.post_process import (
+    add_missing_leaves,
+    contract_repeated_paths,
+    remove_cycles,
+    remove_unreachable,
+)
 
 WIKIPEDIA_API_URL = "https://en.wikipedia.org/w/api.php"
-ROOT_CATEGORY_ID = "Main_topic_classifications"
+ROOT_CATEGORY_ID = 7345184
 ROOT_CATEGORY_NAME = "Main topic classifications"
 
 FLAGS = flags.FLAGS
+flags.DEFINE_integer("max_depth", 2, "Max depth to traverse", short_name="d")
 flags.DEFINE_string(
     "output_dir", None, "Directory to save output files", required=True, short_name="o"
 )
-flags.DEFINE_integer("depth", 2, "Depth of categories to fetch", short_name="d")
-flags.DEFINE_float("rate", 100, "Max number of requests per second", short_name="r")
-flags.DEFINE_integer("retries", 3, "Number of retries per request")
-
-
-def make_url(base_url: str, params: dict[str, str]) -> str:
-    params_str = "&".join([f"{k}={v}" for k, v in params.items()])
-    return f"{base_url}?{params_str}"
+flags.DEFINE_integer("concurrency", 50, "Max number of concurrent requests")
 
 
 def all_categories(last_continue=None):
@@ -40,11 +40,11 @@ def all_categories(last_continue=None):
 
         params = {
             "action": "query",
-            "generator": "allcategories",
+            "list": "allcategories",
             "format": "json",
             "formatversion": "2",
-            "gacmin": 1,
-            "gaclimit": "max",
+            "acmin": 1,
+            "aclimit": "max",
             **last_continue,
         }
         result = requests.get(WIKIPEDIA_API_URL, params).json()
@@ -71,207 +71,138 @@ def all_categories(last_continue=None):
         last_continue = result["continue"]
 
 
-async def gather_with_concurrency(n: int, *coros: Coroutine):
+async def gather_with_concurrency(*coros: Coroutine, n: int = 10):
     semaphore = asyncio.Semaphore(n)
 
     async def sem_coro(coro):
         async with semaphore:
             return await coro
 
-    return await asyncio.gather(*(sem_coro(c) for c in coros))
+    return await tqdm.gather(*(sem_coro(c) for c in coros))
 
 
-async def make_requests(
-    urls: list[str], rate: float | None = None, retries: int = 1
-) -> list[dict]:
-    """Make requests to the given URLs in parallel.
-
-    Args:
-        urls: List of URLs to make requests to.
-        rate: Max number of requests per second. If None, no rate limit is applied.
-
-    Returns:
-        List of JSON responses.
-    """
-    async with aiohttp.ClientSession() as session:
-
-        async def task(url: str, delay: float = 0):
-            attempts = 0
-            while attempts < retries:
-                try:
-                    await asyncio.sleep(delay)
-                    logging.debug(f"Making request to {url}")
-                    async with session.get(url) as response:
-                        return await response.json()
-                except Exception as e:
-                    logging.warning(
-                        "Retry %d: Error making request to %s: %s", attempts, url, e
-                    )
-                    attempts += 1
-                    delay *= 2
-
-            logging.error(
-                "Failed to make request to %s after %d attempts", url, retries
-            )
-
-        time_per_request = 0 if rate is None else 1 / rate
-        tasks = [task(url, i * time_per_request) for i, url in enumerate(urls)]
-        return await asyncio.gather(*tasks)
-
-
-async def get_pages_and_subcats_of(category_id: str, session: aiohttp.ClientSession):
-    last_continue = {}
-    pages = []
-    sub_categories = set()
-    while True:
-        params = {
-            "action": "query",
-            "list": "categorymembers",
-            "cmpageid": category_id,
-            "cmtype": "page|subcat",
-            "cmprop": "ids|title|type",
-            "format": "json",
-            "formatversion": "2",
-            "cmlimit": "max",
-            **last_continue,
-        }
-        response = await session.get(WIKIPEDIA_API_URL, params=params)
-        result = await response.json()
-
-        if "error" in result:
-            raise RuntimeError(result["error"])
-        if "warnings" in result:
-            logging.warning(result["warnings"])
-        if "query" in result:
-            for page in result["query"]["categorymembers"]:
-                if page.get("missing", False):
-                    continue
-                try:
-                    if page["type"] == "page":
-                        pages.append({"id": page["pageid"], "title": page["title"]})
-                    elif page["type"] == "subcat":
-                        sub_categories.add(page["pageid"])
-                    else:
-                        raise ValueError(f"Invalid page type: {page['type']}")
-                except Exception as e:
-                    logging.error("Error processing page: %s (%s)", page, repr(e))
-                    raise e
-        if "continue" not in result:
-            return pages, sub_categories
-        last_continue = result["continue"]
-
-
-async def get_pages_and_subcats(category_ids):
-    async with aiohttp.ClientSession() as session:
-        tasks = map(lambda id_: get_pages_and_subcats_of(id_, session), category_ids)
-        return await gather_with_concurrency(50, *tasks)
-
-
-def process_result(
-    category_id: str,
-    category_name: str,
-    result: dict,
-) -> tuple[Category, list[str], list[str]]:
-    # Sample request
-    # https://en.wikipedia.org/w/api.php?action=categorytree&format=json&category=Category:Contents&options={"depth":2}
-
-    html = result["categorytree"]["*"]
-    soup = BeautifulSoup(html, "html.parser")
-
-    """
-    Sample html
-    <div class="CategoryTreeSection">
-        <div class="CategoryTreeItem">
-            <span class="CategoryTreeBullet">
-                <span class="CategoryTreeToggle" data-ct-title="Academic_disciplines" data-ct-loaded="1" data-ct-state="expanded"></span> 
-            </span>
-            <a href="/wiki/Category:Academic_disciplines" title="Category:Academic disciplines">Academic disciplines</a>
-        </div>
-        <div class="CategoryTreeChildren">
-            <div class="CategoryTreeSection">
-            <div class="CategoryTreeItem">
-                <span class="CategoryTreeBullet">
-                    <span class="CategoryTreeToggle" data-ct-title="Subfields_by_academic_discipline" data-ct-state="collapsed"></span>
-                </span>
-                <a href="/wiki/Category:Subfields_by_academic_discipline" title="Category:Subfields by academic discipline">Subfields by academic discipline</a>
-            </div>
-            <div class="CategoryTreeChildren" style="display:none"></div>
-        </div>
-    </div>
-    """
-
-    children_ids = []
-    children_names = []
-    # Find all top-level `CategoryTreeSection`s
-    for category_tree_section in soup.find_all(
-        "div", class_="CategoryTreeSection", recursive=False
-    ):
-        # Find all `CategoryTreeItem`s
-        for category_tree_item in category_tree_section.find_all(
-            "div", class_="CategoryTreeItem", recursive=False
-        ):
-            # Get the <a> tag
-            category_tree_link = category_tree_item.find("a")
-            id_ = category_tree_link["href"].removeprefix("/wiki/Category:")
-            name = category_tree_link.text
-            children_ids.append(id_)
-            children_names.append(name)
-
-    return (
-        Category(id_=category_id, name=category_name, children=children_ids),
-        children_ids,
-        children_names,
-    )
-
-
-def get_wiki_categories(
-    category_id: str = ROOT_CATEGORY_ID,
-    category_name: str = ROOT_CATEGORY_NAME,
-    depth: int = 1,
+async def get_pages_and_subcats(
+    root_category_id: int, out_file: Path, concurrency: int = 10, max_depth: int = 0
 ):
-    queue = deque([(category_id, category_name)])
-    seen_ids = {category_id}
+    queue = asyncio.Queue()
+    seen = set()
+    prev_results = {}
 
-    for d in range(depth):
-        # Make requests for all items in the queue
-        category_ids = []
-        category_names = []
-        urls = []
-        while len(queue) > 0:
-            category_id, category_name = queue.popleft()
-            category_ids.append(category_id)
-            category_names.append(category_name)
-            urls.append(
-                make_url(
-                    base_url=WIKIPEDIA_API_URL,
-                    params={
-                        "action": "categorytree",
-                        "format": "json",
-                        "category": f"Category:{category_id}",
-                    },
+    if out_file.exists():
+        with open(out_file, "r") as f:
+            for line in f:
+                item = json.loads(line)
+                prev_results[item["id"]] = item
+    logging.info("Loaded %s seen categories", len(prev_results))
+
+    seen.add(root_category_id)
+    await queue.put((0, root_category_id))
+
+    async def worker():
+        async def get_category_members(category_id: int):
+            """API reference: https://www.mediawiki.org/wiki/Special:MyLanguage/API:Categorymembers"""
+
+            if category_id in prev_results:
+                return (
+                    prev_results[category_id]["pages"],
+                    prev_results[category_id]["sub_categories"],
                 )
-            )
-        logging.info("Making %d requests for depth %d", len(urls), d)
-        results = asyncio.run(
-            make_requests(urls, rate=FLAGS.rate, retries=FLAGS.retries)
-        )
 
-        # Process results
-        for category_id, category_name, result in zip(
-            category_ids, category_names, results
-        ):
-            category, children_ids, children_names = process_result(
-                category_id, category_name, result
-            )
-            for child_id, child_name in zip(children_ids, children_names):
-                if child_id not in seen_ids:
-                    queue.append((child_id, child_name))
-                    seen_ids.add(child_id)
+            pages = []
+            sub_categories = []
 
-            yield category
+            last_continue = {}
+            for _ in range(10):  # Get at most 10x500 items
+                params = {
+                    "action": "query",
+                    "list": "categorymembers",
+                    "cmpageid": category_id,
+                    "cmtype": "page|subcat",
+                    "cmprop": "ids|title|type",
+                    "format": "json",
+                    "formatversion": "2",
+                    "cmlimit": "max",
+                    **last_continue,
+                }
+                async with session.get(WIKIPEDIA_API_URL, params=params) as response:
+                    result = await response.json()
+
+                if "error" in result:
+                    raise RuntimeError(result["error"])
+                if "warnings" in result:
+                    logging.warning(result["warnings"])
+                if "query" in result:
+                    for page in result["query"]["categorymembers"]:
+                        if page.get("missing", False):
+                            continue
+                        if page["type"] == "page":
+                            pages.append({"id": page["pageid"], "title": page["title"]})
+                        elif page["type"] == "subcat":
+                            sub_categories.append(
+                                {
+                                    "id": page["pageid"],
+                                    "title": page["title"].removeprefix("Category:"),
+                                }
+                            )
+                        else:
+                            raise RuntimeError("Unknown page type: %s", page["type"])
+
+                if "continue" not in result:
+                    break
+                last_continue = result["continue"]
+
+            return pages, sub_categories
+
+        async def process_item(item):
+            depth, category_id = item
+
+            pages, sub_categories = await get_category_members(category_id)
+
+            if category_id not in prev_results:
+                with open(out_file, "a") as f:
+                    item = {
+                        "id": category_id,
+                        "pages": pages,
+                        "sub_categories": sub_categories,
+                    }
+                    f.write(json.dumps(item) + "\n")
+
+            for item in sub_categories:
+                subcategory_id = item["id"]
+                if subcategory_id not in seen and depth + 1 <= max_depth:
+                    seen.add(subcategory_id)
+                    await queue.put((depth + 1, subcategory_id))
+
+        async with aiohttp.ClientSession(
+            timeout=aiohttp.ClientTimeout(total=10)
+        ) as session:
+            while True:
+                item = await queue.get()
+                try:
+                    await process_item(item)
+                except asyncio.TimeoutError:
+                    logging.error(
+                        "Received timeout error on (%s), requeuing job.", item
+                    )
+                    await queue.put(item)
+                except Exception as e:
+                    trace = traceback.format_exc()
+                    logging.error("Error processing item: %s\n%s", item, trace)
+                    raise e
+                finally:
+                    queue.task_done()
+
+    workers = [asyncio.create_task(worker()) for _ in range(concurrency)]
+
+    # Wait until no more items in queue
+    await queue.join()
+
+    # Release workers
+    for w in workers:
+        w.cancel()
 
 
-def main(_):
+async def async_main(_):
     # Set up
     out_dir = Path(FLAGS.output_dir)
     out_dir.mkdir(parents=True, exist_ok=True)
@@ -279,79 +210,57 @@ def main(_):
     logging.set_verbosity(logging.INFO)
     logging.get_absl_handler().use_absl_log_file(log_dir=out_dir)
 
-    if (out_dir / "all_categories.jsonl").exists():
-        logging.info("Skipping fetching categories")
-    else:
-        with open(out_dir / "all_categories.jsonl", "w") as f:
-            for i, category in enumerate(all_categories(), start=1):
-                f.write(json.dumps(category) + "\n")
-                if i % 10_000 == 0:
-                    print(f"Processed {i:_} categories")
+    raw_file = out_dir / "raw_results.jsonl"
 
-    with open(out_dir / "all_categories.jsonl") as f:
-        categories = [json.loads(line) for line in f]
-    categories = {item["id"]: item for item in categories}
+    await get_pages_and_subcats(
+        ROOT_CATEGORY_ID,
+        raw_file,
+        concurrency=FLAGS.concurrency,
+        max_depth=FLAGS.max_depth,
+    )
 
-    # Build the tree
-    full_categories = []
-    pages = []
-    results = asyncio.run(get_pages_and_subcats(list(categories.keys())[:5]))
-    for category_id, (sub_pages, sub_categories) in zip(
-        list(categories.keys())[:5], results
-    ):
-        # print(categories[category_id]["name"])
-        # print([categories[id_]["name"] for id_ in sub_categories])
-        # print([page["title"] for page in sub_pages])
-        full_categories.append(
-            Category(
-                id_=category_id,
-                name=categories[category_id]["name"],
-                children=list(sub_categories),
+    # Parse raw results
+    with open(raw_file, "r") as f:
+        results = [json.loads(line) for line in f]
+
+    id_to_title = {ROOT_CATEGORY_ID: ROOT_CATEGORY_NAME}
+    for result in results:
+        for page in result["pages"]:
+            id_to_title[page["id"]] = page["title"]
+        for page in result["sub_categories"]:
+            id_to_title[page["id"]] = page["title"]
+
+    categories = []
+    with open(out_dir / "pages.jsonl", "w") as f:
+        for result in results:
+            category_id = result["id"]
+            sub_category_ids = [page["id"] for page in result["sub_categories"]]
+            categories.append(
+                Category(
+                    id_=category_id,
+                    name=id_to_title[category_id],
+                    children=sub_category_ids,
+                )
             )
-        )
-        pages.append({"id": category_id, "pages": sub_pages})
 
-    # # Build the tree
-    # categories = list(get_wiki_categories(depth=FLAGS.depth))
+            page = {"id": category_id, "pages": result["pages"]}
+            f.write(json.dumps(page) + "\n")
 
-    # # Post processing: Remove all cycles
-    # id_to_category = {category.id_: category for category in categories}
+    categories = add_missing_leaves(categories, lambda x: id_to_title[x])
+    categories = remove_cycles(categories, lambda x: id_to_title[x])
+    categories = contract_repeated_paths(
+        categories, ROOT_CATEGORY_ID, lambda x: id_to_title[x]
+    )
+    categories = remove_unreachable(
+        categories, ROOT_CATEGORY_ID, lambda x: id_to_title[x]
+    )
 
-    # def find_cycles(node: str, path: tuple[str, ...], cycles: list[tuple[str, ...]]):
-    #     if node in path:
-    #         return cycles + [path[path.index(node) :]]
-    #     else:
-    #         children = id_to_category[node].children if node in id_to_category else []
-    #         for child in children:
-    #             if any(child in cycle for cycle in cycles):
-    #                 continue
-    #             cycles = find_cycles(child, path + (node,), cycles)
-    #         return cycles
+    save_categories(categories, out_dir, format="jsonl")
+    save_categories(categories, out_dir, format="owl")
 
-    # cycles = find_cycles(ROOT_CATEGORY_ID, (), [])
 
-    # for cycle in cycles:
-    #     logging.info("Found cycle: %s", " -> ".join(cycle))
-    #     for node, next_node in zip(cycle, cycle[1:] + cycle[:1]):
-    #         id_to_category[node].children.remove(next_node)
-
-    # # Post-processing: Remove unreachable nodes
-    # def find_reachable(node: str, reachable: set[str]):
-    #     reachable.add(node)
-    #     children = id_to_category[node].children if node in id_to_category else []
-    #     for child in children:
-    #         if child not in reachable:
-    #             find_reachable(child, reachable)
-
-    # reachable = set()
-    # find_reachable(ROOT_CATEGORY_ID, reachable)
-    # unreachable = set(id_to_category.keys()) - reachable
-    # logging.info("Found %d unreachable nodes: %s", len(unreachable), unreachable)
-
-    # categories = list(filter(lambda category: category.id_ in reachable, categories))
-
-    # save_categories(categories, FLAGS.output_dir, format="jsonl")
-    # save_categories(categories, FLAGS.output_dir, format="owl")
+def main(_):
+    asyncio.run(async_main(_))
 
 
 if __name__ == "__main__":

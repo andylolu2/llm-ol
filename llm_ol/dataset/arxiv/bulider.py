@@ -7,6 +7,11 @@ from arxiv.taxonomy.definitions import CATEGORIES_ACTIVE as CATEGORIES
 from arxiv.taxonomy.definitions import CATEGORY_ALIASES, GROUPS
 
 from llm_ol.dataset.data_model import Category, save_categories
+from llm_ol.dataset.post_process import (
+    contract_repeated_paths,
+    remove_cycles,
+    remove_unreachable,
+)
 
 FLAGS = flags.FLAGS
 flags.DEFINE_string(
@@ -66,42 +71,14 @@ def main(_):
         node_names[category_id(key)] = value["name"]
         node_to_children[category_id(key)] = set()
 
-    # Post-processing: Shorten all paths with repeated entries
-    # E.g. A -> B -> B -> C becomes A -> B -> C
-    def contract(root: str, seen: set[str]) -> None:
-        children = node_to_children[root].copy()
-        for child in children:
-            if child not in seen:
-                seen.add(child)
-                contract(child, seen)
-
-            if node_names[root] == node_names[child]:
-                logging.info(
-                    "Contracting %s -> %s (Name: %s)", child, root, node_names[root]
-                )
-                node_to_children[root] |= node_to_children[child]
-                node_to_children[root].remove(child)
-
-    contract("root", set())
-
-    # Post-processing: Remove unreachable nodes
-    def find_reachable(node: str, reachable: set[str]):
-        reachable.add(node)
-        for child in node_to_children[node]:
-            if child not in reachable:
-                find_reachable(child, reachable)
-
-    reachable = set()
-    find_reachable("root", reachable)
-
-    unreachable = set(node_to_children.keys()) - reachable
-    logging.info("Found %d unreachable nodes: %s", len(unreachable), unreachable)
-
     categories = [
         Category(id_=node, name=node_names[node], children=list(children))
         for node, children in node_to_children.items()
-        if node in reachable
     ]
+
+    categories = remove_cycles(categories, "root", lambda x: node_names[x])
+    categories = contract_repeated_paths(categories, "root", lambda x: node_names[x])
+    categories = remove_unreachable(categories, "root", lambda x: node_names[x])
 
     save_categories(categories, out_dir, "jsonl")
     save_categories(categories, out_dir, "owl")

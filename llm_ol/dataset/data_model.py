@@ -7,9 +7,9 @@ from pydantic import BaseModel
 
 
 class Category(BaseModel):
-    id_: str
+    id_: str | int
     name: str
-    children: list[str] = []
+    children: list[str | int] = []
 
 
 def save_categories(
@@ -44,20 +44,20 @@ def save_categories_owl(categories: list[Category], save_dir: Path):
     with onto:
         node_to_class = {}
 
-        def build_onto(node: str):
+        def build_onto(node):
             if node in node_to_class:
                 return
 
             parents = node_to_parents.get(node, set())
             if len(parents) == 0:
-                node_class = types.new_class(node, (owlready2.Thing,))
+                node_class = types.new_class(str(node), (owlready2.Thing,))
             else:
                 for parent in parents:
                     if parent not in node_to_class:
-                        # print(node, parent)
+                        print(node, parent)
                         build_onto(parent)
                 parent_classes = tuple(node_to_class[parent] for parent in parents)
-                node_class = types.new_class(node, parent_classes)
+                node_class = types.new_class(str(node), parent_classes)
             node_to_class[node] = node_class
 
         for category in categories:

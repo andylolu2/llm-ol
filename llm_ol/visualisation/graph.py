@@ -1,7 +1,10 @@
-import graphviz
-from absl import app, flags, logging
+from pathlib import Path
+
+import networkx as nx
+from absl import app, flags
 
 from llm_ol.dataset.data_model import Category
+from llm_ol.dataset.post_process import categories_to_graph
 
 FLAGS = flags.FLAGS
 flags.DEFINE_string(
@@ -22,21 +25,16 @@ def main(_):
     with open(FLAGS.graph_file, "r") as f:
         categories = [Category.model_validate_json(line) for line in f]
 
-    graph = graphviz.Digraph()
+    G = categories_to_graph(categories)
+    G = G.subgraph([category.id_ for category in categories[: FLAGS.num_categories]])
+    G = nx.relabel_nodes(G, {category.id_: category.name for category in categories})
 
-    include = set()
-
-    for category in categories[: FLAGS.num_categories]:
-        graph.node(category.id_, label=category.name)
-        include.add(category.id_)
-
-    for category in categories:
-        for child in category.children:
-            if category.id_ in include and child in include:
-                graph.edge(category.id_, child)
-
-    graph.attr(overlap="false", overlap_scaling=f"-{FLAGS.scale}")
-    graph.render(directory=FLAGS.output_dir, format="pdf", engine="sfdp")
+    A = nx.nx_agraph.to_agraph(G)
+    A.draw(
+        Path(FLAGS.output_dir, "graph.pdf"),
+        prog="sfdp",
+        args="-Goverlap=false -Goverlap_scaling=-5",
+    )
 
 
 if __name__ == "__main__":
