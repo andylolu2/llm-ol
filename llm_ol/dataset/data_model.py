@@ -1,15 +1,24 @@
 import types
 from pathlib import Path
-from typing import Literal
+from typing import Literal, TypeAlias
 
 import owlready2
 from pydantic import BaseModel
 
+ID: TypeAlias = str | int
+
+
+class Page(BaseModel):
+    id_: ID
+    title: str
+    text: str
+
 
 class Category(BaseModel):
-    id_: str | int
-    name: str
-    children: list[str | int] = []
+    id_: ID
+    title: str
+    subcategories: list[ID] = []
+    pages: list[ID] = []
 
 
 def save_categories(
@@ -37,7 +46,7 @@ def save_categories_jsonl(categories: list[Category], save_dir: Path):
 def save_categories_owl(categories: list[Category], save_dir: Path):
     node_to_parents = {}
     for category in categories:
-        for child in category.children:
+        for child in category.subcategories:
             node_to_parents.setdefault(child, set()).add(category.id_)
 
     onto = owlready2.get_ontology("http://arxiv.org/ontology/")

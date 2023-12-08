@@ -1,21 +1,16 @@
 import asyncio
 import json
-import traceback
+from datetime import timedelta
 from pathlib import Path
-from typing import Coroutine
+from typing import Iterable
 
 import aiohttp
-import requests
 from absl import app, flags, logging
-from tqdm.asyncio import tqdm
 
 from llm_ol.dataset.data_model import Category, save_categories
-from llm_ol.dataset.post_process import (
-    add_missing_leaves,
-    contract_repeated_paths,
-    remove_cycles,
-    remove_unreachable,
-)
+from llm_ol.dataset.post_process import post_process
+from llm_ol.dataset.utils.miscellaneous import batch
+from llm_ol.dataset.utils.rate_limit import Resource
 
 WIKIPEDIA_API_URL = "https://en.wikipedia.org/w/api.php"
 ROOT_CATEGORY_ID = 7345184
@@ -26,65 +21,37 @@ flags.DEFINE_integer("max_depth", 2, "Max depth to traverse", short_name="d")
 flags.DEFINE_string(
     "output_dir", None, "Directory to save output files", required=True, short_name="o"
 )
-flags.DEFINE_integer("concurrency", 50, "Max number of concurrent requests")
+
+wikipedia_api_limit = Resource(period=timedelta(seconds=1), limit=100)
 
 
-def all_categories(last_continue=None):
-    """Get all categories on Wikipedia.
-
-    API reference: https://www.mediawiki.org/wiki/API:Allcategories
-    """
-    last_continue = last_continue or {}
-    while True:
-        logging.info("Continuing from %s", last_continue)
-
-        params = {
-            "action": "query",
-            "list": "allcategories",
-            "format": "json",
-            "formatversion": "2",
-            "acmin": 1,
-            "aclimit": "max",
-            **last_continue,
-        }
-        result = requests.get(WIKIPEDIA_API_URL, params).json()
-
-        if "error" in result:
-            raise RuntimeError(result["error"])
-        if "warnings" in result:
-            logging.warning(result["warnings"])
-        if "query" in result:
-            for page in result["query"]["pages"]:
-                if "missing" in page:
-                    continue
-                try:
-                    yield {
-                        "id": page["pageid"],
-                        "title": page["title"],
-                        "name": page["title"].removeprefix("Category:"),
-                    }
-                except Exception as e:
-                    logging.error("Error processing page: %s (%s)", page, repr(e))
-                    raise e
-        if "continue" not in result:
-            break
-        last_continue = result["continue"]
-
-
-async def gather_with_concurrency(*coros: Coroutine, n: int = 10):
-    semaphore = asyncio.Semaphore(n)
-
-    async def sem_coro(coro):
-        async with semaphore:
-            return await coro
-
-    return await tqdm.gather(*(sem_coro(c) for c in coros))
+async def api_request(session: aiohttp.ClientSession, params: dict, retries: int = 3):
+    for i in range(retries):
+        try:
+            await wikipedia_api_limit.acquire()
+            async with session.get(WIKIPEDIA_API_URL, params=params) as response:
+                if response.status == 429:  # Too many requests
+                    raise RuntimeError("Too many requests")
+                result = await response.json()
+                return result
+        except Exception as e:
+            if i == retries - 1:
+                raise e
+            else:
+                logging.error("Request failed: %s. %d retries left", e, retries - i - 1)
+                await asyncio.sleep(2**i)
+    assert False  # Unreachable
 
 
 async def get_pages_and_subcats(
-    root_category_id: int, out_file: Path, concurrency: int = 10, max_depth: int = 0
+    root_category_id: int, out_file: Path, max_depth: int = 0
 ):
-    queue = asyncio.Queue()
+    """Recursively get all pages and subcategories of a category.
+
+    API reference: https://www.mediawiki.org/wiki/Special:MyLanguage/API:Categorymembers
+    """
+
+    # queue = asyncio.Queue()
     seen = set()
     prev_results = {}
 
@@ -96,110 +63,149 @@ async def get_pages_and_subcats(
     logging.info("Loaded %s seen categories", len(prev_results))
 
     seen.add(root_category_id)
-    await queue.put((0, root_category_id))
+    # await queue.put((0, root_category_id))
 
-    async def worker():
-        async def get_category_members(category_id: int):
-            """API reference: https://www.mediawiki.org/wiki/Special:MyLanguage/API:Categorymembers"""
+    async def get_category_members(category_id: int, session: aiohttp.ClientSession):
+        if category_id in prev_results:
+            return (
+                prev_results[category_id]["pages"],
+                prev_results[category_id]["sub_categories"],
+            )
 
-            if category_id in prev_results:
-                return (
-                    prev_results[category_id]["pages"],
-                    prev_results[category_id]["sub_categories"],
+        pages = []
+        sub_categories = []
+
+        last_continue = {}
+        for _ in range(10):  # Get at most 10x500 items
+            params = {
+                "action": "query",
+                "list": "categorymembers",
+                "cmpageid": category_id,
+                "cmtype": "page|subcat",
+                "cmprop": "ids|title|type",
+                "format": "json",
+                "formatversion": "2",
+                "cmlimit": "max",
+                **last_continue,
+            }
+            result = await api_request(session, params)
+
+            if "error" in result:
+                raise RuntimeError(result["error"])
+            if "warnings" in result:
+                logging.warning(result["warnings"])
+            if "query" in result:
+                for page in result["query"]["categorymembers"]:
+                    if page.get("missing", False):
+                        continue
+                    if page["type"] == "page":
+                        pages.append({"id": page["pageid"], "title": page["title"]})
+                    elif page["type"] == "subcat":
+                        sub_categories.append(
+                            {
+                                "id": page["pageid"],
+                                "title": page["title"].removeprefix("Category:"),
+                            }
+                        )
+                    else:
+                        raise RuntimeError("Unknown page type: %s", page["type"])
+
+            if "continue" not in result:
+                break
+            last_continue = result["continue"]
+
+        return pages, sub_categories
+
+    async def task(
+        depth: int,
+        category_id: int,
+        session: aiohttp.ClientSession,
+        task_group: asyncio.TaskGroup,
+    ):
+        pages, sub_categories = await get_category_members(category_id, session)
+
+        if category_id not in prev_results:
+            with open(out_file, "a") as f:
+                item = {
+                    "id": category_id,
+                    "pages": pages,
+                    "sub_categories": sub_categories,
+                }
+                f.write(json.dumps(item) + "\n")
+
+        for item in sub_categories:
+            subcategory_id = item["id"]
+            if subcategory_id not in seen and depth + 1 <= max_depth:
+                seen.add(subcategory_id)
+                task_group.create_task(
+                    task(depth + 1, subcategory_id, session, task_group)
                 )
 
-            pages = []
-            sub_categories = []
+    async with aiohttp.ClientSession(
+        timeout=aiohttp.ClientTimeout(total=10)
+    ) as session, asyncio.TaskGroup() as task_group:
+        await task(0, root_category_id, session, task_group)
 
-            last_continue = {}
-            for _ in range(10):  # Get at most 10x500 items
-                params = {
-                    "action": "query",
-                    "list": "categorymembers",
-                    "cmpageid": category_id,
-                    "cmtype": "page|subcat",
-                    "cmprop": "ids|title|type",
-                    "format": "json",
-                    "formatversion": "2",
-                    "cmlimit": "max",
-                    **last_continue,
-                }
-                async with session.get(WIKIPEDIA_API_URL, params=params) as response:
-                    result = await response.json()
 
-                if "error" in result:
-                    raise RuntimeError(result["error"])
-                if "warnings" in result:
-                    logging.warning(result["warnings"])
-                if "query" in result:
-                    for page in result["query"]["categorymembers"]:
+async def get_pages_abstract(page_ids: Iterable[int], out_file: Path):
+    """Get summaries of pages.
+
+    API reference: https://www.mediawiki.org/w/api.php?action=help&modules=query%2Bextracts
+    """
+
+    async def get_pages_summary(
+        page_ids_batch: Iterable[int], session: aiohttp.ClientSession
+    ):
+        last_continue = {}
+        while True:
+            params = {
+                "action": "query",
+                "pageids": "|".join(map(str, page_ids_batch)),
+                "prop": "extracts",
+                "format": "json",
+                "formatversion": "2",
+                "explaintext": "true",
+                "exintro": "true",
+                **last_continue,
+            }
+            result = await api_request(session, params)
+            if "error" in result:
+                raise RuntimeError(result["error"])
+            if "warnings" in result:
+                logging.warning(result["warnings"])
+            if "query" in result:
+                with open(out_file, "a") as f:
+                    for page in result["query"]["pages"]:
                         if page.get("missing", False):
                             continue
-                        if page["type"] == "page":
-                            pages.append({"id": page["pageid"], "title": page["title"]})
-                        elif page["type"] == "subcat":
-                            sub_categories.append(
-                                {
-                                    "id": page["pageid"],
-                                    "title": page["title"].removeprefix("Category:"),
-                                }
-                            )
-                        else:
-                            raise RuntimeError("Unknown page type: %s", page["type"])
+                        if page.get("extract", "") == "":
+                            continue
+                        item = {
+                            "id": page["pageid"],
+                            "title": page["title"],
+                            "abstract": page["extract"],
+                        }
+                        f.write(json.dumps(item) + "\n")
+            if "continue" not in result:
+                return
+            last_continue = result["continue"]
 
-                if "continue" not in result:
-                    break
-                last_continue = result["continue"]
+    prev_results = set()
+    if out_file.exists():
+        with open(out_file, "r") as f:
+            for line in f:
+                item = json.loads(line)
+                prev_results.add(item["id"])
+    logging.info("Loaded %s seen pages", len(prev_results))
+    page_ids = set(page_ids) - prev_results
 
-            return pages, sub_categories
-
-        async def process_item(item):
-            depth, category_id = item
-
-            pages, sub_categories = await get_category_members(category_id)
-
-            if category_id not in prev_results:
-                with open(out_file, "a") as f:
-                    item = {
-                        "id": category_id,
-                        "pages": pages,
-                        "sub_categories": sub_categories,
-                    }
-                    f.write(json.dumps(item) + "\n")
-
-            for item in sub_categories:
-                subcategory_id = item["id"]
-                if subcategory_id not in seen and depth + 1 <= max_depth:
-                    seen.add(subcategory_id)
-                    await queue.put((depth + 1, subcategory_id))
-
-        async with aiohttp.ClientSession(
-            timeout=aiohttp.ClientTimeout(total=10)
-        ) as session:
-            while True:
-                item = await queue.get()
-                try:
-                    await process_item(item)
-                except asyncio.TimeoutError:
-                    logging.error(
-                        "Received timeout error on (%s), requeuing job.", item
-                    )
-                    await queue.put(item)
-                except Exception as e:
-                    trace = traceback.format_exc()
-                    logging.error("Error processing item: %s\n%s", item, trace)
-                    raise e
-                finally:
-                    queue.task_done()
-
-    workers = [asyncio.create_task(worker()) for _ in range(concurrency)]
-
-    # Wait until no more items in queue
-    await queue.join()
-
-    # Release workers
-    for w in workers:
-        w.cancel()
+    async with aiohttp.ClientSession(
+        timeout=aiohttp.ClientTimeout(total=10)
+    ) as session:
+        tasks = []
+        for page_ids_batch in batch(page_ids, 50):
+            tasks.append(get_pages_summary(page_ids_batch, session))
+        await asyncio.gather(*tasks)
 
 
 async def async_main(_):
@@ -210,14 +216,11 @@ async def async_main(_):
     logging.set_verbosity(logging.INFO)
     logging.get_absl_handler().use_absl_log_file(log_dir=out_dir)
 
+    asyncio.create_task(wikipedia_api_limit.replenish())
+
     raw_file = out_dir / "raw_results.jsonl"
 
-    await get_pages_and_subcats(
-        ROOT_CATEGORY_ID,
-        raw_file,
-        concurrency=FLAGS.concurrency,
-        max_depth=FLAGS.max_depth,
-    )
+    await get_pages_and_subcats(ROOT_CATEGORY_ID, raw_file, max_depth=FLAGS.max_depth)
 
     # Parse raw results
     with open(raw_file, "r") as f:
@@ -231,32 +234,30 @@ async def async_main(_):
             id_to_title[page["id"]] = page["title"]
 
     categories = []
-    with open(out_dir / "pages.jsonl", "w") as f:
-        for result in results:
-            category_id = result["id"]
-            sub_category_ids = [page["id"] for page in result["sub_categories"]]
-            categories.append(
-                Category(
-                    id_=category_id,
-                    name=id_to_title[category_id],
-                    children=sub_category_ids,
-                )
+    for result in results:
+        category_id = result["id"]
+        categories.append(
+            Category(
+                id_=category_id,
+                title=id_to_title[category_id],
+                subcategories=[page["id"] for page in result["sub_categories"]],
+                pages=[page["id"] for page in result["pages"]],
             )
+        )
 
-            page = {"id": category_id, "pages": result["pages"]}
-            f.write(json.dumps(page) + "\n")
-
-    categories = add_missing_leaves(categories, lambda x: id_to_title[x])
-    categories = remove_cycles(categories, lambda x: id_to_title[x])
-    categories = contract_repeated_paths(
-        categories, ROOT_CATEGORY_ID, lambda x: id_to_title[x]
-    )
-    categories = remove_unreachable(
-        categories, ROOT_CATEGORY_ID, lambda x: id_to_title[x]
-    )
+    categories = post_process(categories, ROOT_CATEGORY_ID, lambda x: id_to_title[x])
 
     save_categories(categories, out_dir, format="jsonl")
     save_categories(categories, out_dir, format="owl")
+
+    # Get summaries
+    page_ids = set()
+    for category in categories:
+        page_ids.update(category.pages)
+
+    logging.info("Getting summaries for %s pages", len(page_ids))
+
+    await get_pages_abstract(page_ids, out_dir / "pages.jsonl")
 
 
 def main(_):

@@ -20,6 +20,8 @@ networkx = "^3.2.1"
 matplotlib = "^3.8.2"
 scipy = "^1.11.4"
 pygraphviz = "^1.11"
+pandas = "^2.1.3"
+datasets = "^2.15.0"
 
 
 [build-system]

@@ -27,7 +27,7 @@ def main(_):
 
     G = categories_to_graph(categories)
     G = G.subgraph([category.id_ for category in categories[: FLAGS.num_categories]])
-    G = nx.relabel_nodes(G, {category.id_: category.name for category in categories})
+    G = nx.relabel_nodes(G, {category.id_: category.title for category in categories})
 
     A = nx.nx_agraph.to_agraph(G)
     A.draw(

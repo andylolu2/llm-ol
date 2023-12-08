@@ -7,11 +7,7 @@ from arxiv.taxonomy.definitions import CATEGORIES_ACTIVE as CATEGORIES
 from arxiv.taxonomy.definitions import CATEGORY_ALIASES, GROUPS
 
 from llm_ol.dataset.data_model import Category, save_categories
-from llm_ol.dataset.post_process import (
-    contract_repeated_paths,
-    remove_cycles,
-    remove_unreachable,
-)
+from llm_ol.dataset.post_process import post_process
 
 FLAGS = flags.FLAGS
 flags.DEFINE_string(
@@ -72,13 +68,11 @@ def main(_):
         node_to_children[category_id(key)] = set()
 
     categories = [
-        Category(id_=node, name=node_names[node], children=list(children))
+        Category(id_=node, title=node_names[node], subcategories=list(children))
         for node, children in node_to_children.items()
     ]
 
-    categories = remove_cycles(categories, "root", lambda x: node_names[x])
-    categories = contract_repeated_paths(categories, "root", lambda x: node_names[x])
-    categories = remove_unreachable(categories, "root", lambda x: node_names[x])
+    categories = post_process(categories, "root", lambda x: node_names[x])
 
     save_categories(categories, out_dir, "jsonl")
     save_categories(categories, out_dir, "owl")

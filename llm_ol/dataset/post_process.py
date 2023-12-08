@@ -9,8 +9,8 @@ from llm_ol.dataset.data_model import Category
 def categories_to_graph(categories: list[Category]) -> nx.DiGraph:
     G = nx.DiGraph()
     for category in categories:
-        G.add_node(category.id_, name=category.name)
-        for child in category.children:
+        G.add_node(category.id_, title=category.title, pages=category.pages)
+        for child in category.subcategories:
             G.add_edge(category.id_, child)
     return G
 
@@ -20,7 +20,12 @@ def graph_to_categories(G: nx.DiGraph) -> list[Category]:
     for node in nx.topological_sort(G):
         children = list(G.successors(node))
         categories.append(
-            Category(id_=node, name=G.nodes[node]["name"], children=children)
+            Category(
+                id_=node,
+                title=G.nodes[node]["title"],
+                subcategories=children,
+                pages=G.nodes[node]["pages"],
+            )
         )
     return categories
 
@@ -79,7 +84,7 @@ def contract_repeated_paths(
     id_to_category = {category.id_: category for category in categories}
 
     def contract(root, seen: set) -> None:
-        children = id_to_category[root].children.copy()
+        children = id_to_category[root].subcategories.copy()
         for child in children:
             if child not in seen:
                 seen.add(child)
@@ -89,10 +94,10 @@ def contract_repeated_paths(
                 logging.info(
                     "Contracting %s -> %s (Name: %s)", child, root, id_to_title(root)
                 )
-                id_to_category[root].children = list(
+                id_to_category[root].subcategories = list(
                     (
-                        set(id_to_category[root].children)
-                        | set(id_to_category[child].children)
+                        set(id_to_category[root].subcategories)
+                        | set(id_to_category[child].subcategories)
                     )
                     - {child}
                 )
@@ -109,9 +114,21 @@ def add_missing_leaves(
     id_to_category = {category.id_: category for category in categories}
 
     for category in categories:
-        for child in category.children:
+        for child in category.subcategories:
             if child not in id_to_category:
                 logging.info("Adding missing leaf: %s (%s)", id_to_title(child), child)
-                id_to_category[child] = Category(id_=child, name=id_to_title(child))
+                id_to_category[child] = Category(id_=child, title=id_to_title(child))
 
     return list(id_to_category.values())
+
+
+def post_process(
+    categories: list[Category],
+    root_category_id,
+    id_to_title: Callable[[Any], str] = lambda x: str(x),
+):
+    categories = add_missing_leaves(categories, id_to_title)
+    categories = remove_cycles(categories, id_to_title)
+    categories = remove_unreachable(categories, root_category_id, id_to_title)
+    categories = contract_repeated_paths(categories, root_category_id, id_to_title)
+    return categories
