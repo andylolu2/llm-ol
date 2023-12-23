@@ -1,13 +1,13 @@
 from pathlib import Path
-from shutil import rmtree
 
-from absl import app, flags, logging
+from absl import app, flags
 from arxiv.taxonomy.definitions import ARCHIVES_ACTIVE as ARCHIVES
 from arxiv.taxonomy.definitions import CATEGORIES_ACTIVE as CATEGORIES
 from arxiv.taxonomy.definitions import CATEGORY_ALIASES, GROUPS
 
 from llm_ol.dataset.data_model import Category, save_categories
 from llm_ol.dataset.post_process import post_process
+from llm_ol.dataset.utils.miscellaneous import setup_loggging
 
 FLAGS = flags.FLAGS
 flags.DEFINE_string(
@@ -37,10 +37,8 @@ def main(_):
 
     # Set up
     out_dir = Path(FLAGS.output_dir)
-    if out_dir.exists():
-        rmtree(out_dir)
-    out_dir.mkdir(parents=True)
-    logging.get_absl_handler().use_absl_log_file("build", out_dir)
+    out_dir.mkdir(parents=True, exist_ok=True)
+    setup_loggging(out_dir)
 
     # Build the tree
     node_names = {"root": "Root"}  # node_id -> name

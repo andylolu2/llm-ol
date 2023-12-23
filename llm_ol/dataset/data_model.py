@@ -43,6 +43,14 @@ def save_categories_jsonl(categories: list[Category], save_dir: Path):
             f.write(category.model_dump_json() + "\n")
 
 
+def load_categories_jsonl(save_dir: Path) -> list[Category]:
+    categories = []
+    with open(save_dir / "ontology.jsonl", "r") as f:
+        for line in f:
+            categories.append(Category.model_validate_json(line))
+    return categories
+
+
 def save_categories_owl(categories: list[Category], save_dir: Path):
     node_to_parents = {}
     for category in categories:
