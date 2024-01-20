@@ -26,7 +26,7 @@ def main(_):
 
     with open(FLAGS.categories_file, "r") as f:
         categories = [json.loads(line) for line in f]
-    logging.info("Total of %s categories", len(categories))
+    logging.info("Total of %s non-leaf categories", len(categories))
 
     pages = {}
     with open(FLAGS.pages_file, "r") as f:
@@ -46,8 +46,11 @@ def main(_):
             pages[page_id] for page_id in category["pages"] if page_id in pages
         ]
         G.add_node(category["id"], title=category["title"], pages=pages_in_category)
+
+    for category in categories:
         for subcategory in category["sub_categories"]:
-            G.add_edge(category["id"], subcategory["id"])
+            if category["id"] in G and subcategory["id"] in G:
+                G.add_edge(category["id"], subcategory["id"])
     data_model.save_graph(G, out_dir / "full_graph.json")
 
 
