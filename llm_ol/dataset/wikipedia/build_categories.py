@@ -1,16 +1,14 @@
 import asyncio
 import json
-from datetime import timedelta
 from pathlib import Path
 
 import aiohttp
+import networkx as nx
 from absl import app, flags, logging
 
-from llm_ol.dataset.data_model import Category, save_categories
-from llm_ol.dataset.post_process import post_process
-from llm_ol.dataset.utils.rate_limit import Resource
+from llm_ol.dataset import data_model, wikipedia
+from llm_ol.dataset.utils.miscellaneous import setup_loggging
 
-WIKIPEDIA_API_URL = "https://en.wikipedia.org/w/api.php"
 ROOT_CATEGORY_ID = 7345184
 ROOT_CATEGORY_NAME = "Main topic classifications"
 
@@ -20,58 +18,33 @@ flags.DEFINE_string(
     "output_dir", None, "Directory to save output files", required=True, short_name="o"
 )
 
-wikipedia_api_limit = Resource(period=timedelta(seconds=1), limit=100)
 
-
-async def api_request(session: aiohttp.ClientSession, params: dict, retries: int = 3):
-    for i in range(retries):
-        try:
-            await wikipedia_api_limit.acquire()
-            async with session.get(WIKIPEDIA_API_URL, params=params) as response:
-                if response.status == 429:  # Too many requests
-                    raise RuntimeError("Too many requests")
-                result = await response.json()
-                return result
-        except Exception as e:
-            if i == retries - 1:
-                raise e
-            else:
-                logging.error("Request failed: %s. %d retries left", e, retries - i - 1)
-                await asyncio.sleep(2**i)
-    assert False  # Unreachable
-
-
-async def get_pages_and_subcats(
-    root_category_id: int, out_file: Path, max_depth: int = 0
-):
+async def get_pages_and_subcats(out_categories_file: Path, max_depth: int = 0):
     """Recursively get all pages and subcategories of a category.
 
     API reference: https://www.mediawiki.org/wiki/Special:MyLanguage/API:Categorymembers
     """
 
-    # queue = asyncio.Queue()
     seen = set()
-    prev_results = {}
 
-    if out_file.exists():
-        with open(out_file, "r") as f:
+    prev_categories: dict[int, dict] = {}
+    if out_categories_file.exists():
+        with open(out_categories_file, "r") as f:
             for line in f:
                 item = json.loads(line)
-                prev_results[item["id"]] = item
-    logging.info("Loaded %s seen categories", len(prev_results))
+                prev_categories[item["id"]] = item
+    logging.info("Loaded %s seen categories", len(prev_categories))
 
-    seen.add(root_category_id)
-    # await queue.put((0, root_category_id))
+    async def get_category_members(
+        category_id: int, category_name: str, session: aiohttp.ClientSession
+    ) -> dict:
+        if category_id in prev_categories:
+            return prev_categories[category_id]
 
-    async def get_category_members(category_id: int, session: aiohttp.ClientSession):
-        if category_id in prev_results:
-            return (
-                prev_results[category_id]["pages"],
-                prev_results[category_id]["sub_categories"],
-            )
+        logging.info("Getting category members for %s (%s)", category_name, category_id)
 
-        pages = []
-        sub_categories = []
+        pages: list[int] = []
+        sub_categories: list[dict] = []
 
         last_continue = {}
         for _ in range(10):  # Get at most 10x500 items
@@ -86,7 +59,7 @@ async def get_pages_and_subcats(
                 "cmlimit": "max",
                 **last_continue,
             }
-            result = await api_request(session, params)
+            result = await wikipedia.api_request(session, params)
 
             if "error" in result:
                 raise RuntimeError(result["error"])
@@ -97,12 +70,7 @@ async def get_pages_and_subcats(
                     if page.get("missing", False):
                         continue
                     if page["type"] == "page":
-                        pages.append(
-                            {
-                                "id": page["pageid"],
-                                # "title": page["title"],
-                            }
-                        )
+                        pages.append(page["pageid"])
                     elif page["type"] == "subcat":
                         sub_categories.append(
                             {
@@ -117,80 +85,53 @@ async def get_pages_and_subcats(
                 break
             last_continue = result["continue"]
 
-        return pages, sub_categories
+        return {
+            "id": category_id,
+            "title": category_name,
+            "pages": pages,
+            "sub_categories": sub_categories,
+        }
 
     async def task(
         depth: int,
         category_id: int,
+        category_name: str,
         session: aiohttp.ClientSession,
         task_group: asyncio.TaskGroup,
     ):
-        pages, sub_categories = await get_category_members(category_id, session)
+        category_item = await get_category_members(category_id, category_name, session)
 
-        if category_id not in prev_results:
-            with open(out_file, "a") as f:
-                item = {
-                    "id": category_id,
-                    "pages": pages,
-                    "sub_categories": sub_categories,
-                }
-                f.write(json.dumps(item) + "\n")
+        if category_id not in prev_categories:
+            with open(out_categories_file, "a") as f:
+                f.write(json.dumps(category_item) + "\n")
 
-        for item in sub_categories:
+        for item in category_item["sub_categories"]:
             subcategory_id = item["id"]
             if subcategory_id not in seen and depth + 1 <= max_depth:
                 seen.add(subcategory_id)
                 task_group.create_task(
-                    task(depth + 1, subcategory_id, session, task_group)
+                    task(depth + 1, subcategory_id, item["title"], session, task_group)
                 )
+
+    seen.add(ROOT_CATEGORY_ID)
 
     async with aiohttp.ClientSession(
         timeout=aiohttp.ClientTimeout(total=10)
     ) as session, asyncio.TaskGroup() as task_group:
-        await task(0, root_category_id, session, task_group)
+        await task(0, ROOT_CATEGORY_ID, ROOT_CATEGORY_NAME, session, task_group)
 
 
 async def async_main(_):
-    # Set up
     out_dir = Path(FLAGS.output_dir)
     out_dir.mkdir(parents=True, exist_ok=True)
+    setup_loggging(out_dir)
 
-    logging.set_verbosity(logging.INFO)
-    logging.get_absl_handler().use_absl_log_file(log_dir=out_dir)
+    asyncio.create_task(wikipedia.api_limit.replenish())
 
-    asyncio.create_task(wikipedia_api_limit.replenish())
+    raw_categories_file = out_dir / "raw_categories.jsonl"
+    await get_pages_and_subcats(raw_categories_file, max_depth=FLAGS.max_depth)
 
-    raw_file = out_dir / "raw_results.jsonl"
-
-    await get_pages_and_subcats(ROOT_CATEGORY_ID, raw_file, max_depth=FLAGS.max_depth)
-
-    # Parse raw results
-    with open(raw_file, "r") as f:
-        results = [json.loads(line) for line in f]
-
-    id_to_title = {ROOT_CATEGORY_ID: ROOT_CATEGORY_NAME}
-    for result in results:
-        for page in result["pages"]:
-            id_to_title[page["id"]] = page["title"]
-        for page in result["sub_categories"]:
-            id_to_title[page["id"]] = page["title"]
-
-    categories = []
-    for result in results:
-        category_id = result["id"]
-        categories.append(
-            Category(
-                id_=category_id,
-                title=id_to_title[category_id],
-                subcategories=[page["id"] for page in result["sub_categories"]],
-                pages=[page["id"] for page in result["pages"]],
-            )
-        )
-
-    categories = post_process(categories, ROOT_CATEGORY_ID, lambda x: id_to_title[x])
-
-    save_categories(categories, out_dir, format="jsonl")
-    save_categories(categories, out_dir, format="owl")
+    logging.info("Collected raw categories")
 
 
 def main(_):

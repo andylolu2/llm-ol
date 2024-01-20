@@ -24,3 +24,4 @@ def setup_loggging(dir: Path, log_file_name: str = "logging"):
     logging.get_absl_handler().use_absl_log_file(log_file_name, log_dir)
     logging.set_stderrthreshold("info")
     logging.set_verbosity("debug")
+    print(f"Logging to {log_dir}")

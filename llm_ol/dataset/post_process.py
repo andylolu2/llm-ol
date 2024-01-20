@@ -127,6 +127,7 @@ def post_process(
     root_category_id,
     id_to_title: Callable[[Any], str] = lambda x: str(x),
 ):
+    raise ValueError("DEPRECATED")
     categories = add_missing_leaves(categories, id_to_title)
     categories = remove_cycles(categories, id_to_title)
     categories = remove_unreachable(categories, root_category_id, id_to_title)
