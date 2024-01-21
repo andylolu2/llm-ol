@@ -3,10 +3,9 @@ import json
 from pathlib import Path
 
 import aiohttp
-import networkx as nx
 from absl import app, flags, logging
 
-from llm_ol.dataset import data_model, wikipedia
+from llm_ol.dataset import wikipedia
 from llm_ol.dataset.utils.miscellaneous import setup_loggging
 
 ROOT_CATEGORY_ID = 7345184
