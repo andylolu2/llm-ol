@@ -3,8 +3,7 @@ from pathlib import Path
 
 from absl import app, flags, logging
 
-from llm_ol.dataset import data_model
-from llm_ol.dataset.arxiv.definitions import normalise
+from llm_ol.dataset import arxiv, data_model
 from llm_ol.dataset.utils.miscellaneous import setup_loggging
 
 FLAGS = flags.FLAGS
@@ -38,7 +37,7 @@ def main(_):
         if paper["citation_count"] < FLAGS.min_citations:
             continue
         for category in paper["categories"]:
-            category = normalise(category)
+            category = arxiv.normalise(category)
             if category not in G:
                 logging.warning("Unknown leaf category: %s", category)
                 continue

@@ -8,9 +8,6 @@ from absl import app, flags, logging
 from llm_ol.dataset import wikipedia
 from llm_ol.dataset.utils.miscellaneous import setup_loggging
 
-ROOT_CATEGORY_ID = 7345184
-ROOT_CATEGORY_NAME = "Main topic classifications"
-
 FLAGS = flags.FLAGS
 flags.DEFINE_integer("max_depth", 2, "Max depth to traverse", short_name="d")
 flags.DEFINE_string(
@@ -112,12 +109,18 @@ async def get_pages_and_subcats(out_categories_file: Path, max_depth: int = 0):
                     task(depth + 1, subcategory_id, item["title"], session, task_group)
                 )
 
-    seen.add(ROOT_CATEGORY_ID)
+    seen.add(wikipedia.ROOT_CATEGORY_ID)
 
     async with aiohttp.ClientSession(
         timeout=aiohttp.ClientTimeout(total=10)
     ) as session, asyncio.TaskGroup() as task_group:
-        await task(0, ROOT_CATEGORY_ID, ROOT_CATEGORY_NAME, session, task_group)
+        await task(
+            0,
+            wikipedia.ROOT_CATEGORY_ID,
+            wikipedia.ROOT_CATEGORY_NAME,
+            session,
+            task_group,
+        )
 
 
 async def async_main(_):

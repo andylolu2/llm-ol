@@ -7,6 +7,9 @@ from absl import logging
 from llm_ol.dataset.utils.rate_limit import Resource
 
 WIKIPEDIA_API_URL = "https://en.wikipedia.org/w/api.php"
+ROOT_CATEGORY_ID = 7345184
+ROOT_CATEGORY_NAME = "Main topic classifications"
+
 
 api_limit = Resource(period=timedelta(seconds=1), limit=50)
 

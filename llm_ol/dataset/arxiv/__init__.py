@@ -1,3 +1,6 @@
+ROOT_CATEGORY_ID = "root"
+ROOT_CATEGORY_NAME = "Root"
+
 ALIASES = [
     ["math.MP", "math-ph"],
     ["stat.TH", "math.ST"],
@@ -5,14 +8,14 @@ ALIASES = [
     ["econ.GN", "q-fin.EC"],
     ["cs.SY", "eess.SY"],
     ["cs.NA", "math.NA"],
-    ["grp_physics", "physics"],
-    ["grp_econ", "econ"],
-    ["grp_math", "math"],
-    ["grp_q-bio", "q-bio"],
-    ["grp_q-fin", "q-fin"],
-    ["grp_cs", "cs"],
-    ["grp_stat", "stat"],
-    ["grp_eess", "eess"],
+    ["physics", "grp_physics"],
+    ["econ", "grp_econ"],
+    ["math", "grp_math"],
+    ["q-bio", "grp_q-bio"],
+    ["q-fin", "grp_q-fin"],
+    ["cs", "grp_cs"],
+    ["stat", "grp_stat"],
+    ["eess", "grp_eess"],
 ]
 
 
