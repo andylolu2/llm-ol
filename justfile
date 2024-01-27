@@ -3,3 +3,6 @@ poetry-export-pip:
 
 srun *ARGS:
     sbatch runs/launch.sh {{ARGS}}
+
+clear-nb:
+    find . -name "*.ipynb" -exec jupyter nbconvert --clear-output --inplace {} \;
