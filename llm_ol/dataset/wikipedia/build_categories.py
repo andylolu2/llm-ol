@@ -6,7 +6,7 @@ import aiohttp
 from absl import app, flags, logging
 
 from llm_ol.dataset import wikipedia
-from llm_ol.dataset.utils.miscellaneous import setup_loggging
+from llm_ol.utils.logging import setup_logging
 
 FLAGS = flags.FLAGS
 flags.DEFINE_integer("max_depth", 2, "Max depth to traverse", short_name="d")
@@ -126,7 +126,7 @@ async def get_pages_and_subcats(out_categories_file: Path, max_depth: int = 0):
 async def async_main(_):
     out_dir = Path(FLAGS.output_dir)
     out_dir.mkdir(parents=True, exist_ok=True)
-    setup_loggging(out_dir)
+    setup_logging(out_dir)
 
     asyncio.create_task(wikipedia.api_limit.replenish())
 

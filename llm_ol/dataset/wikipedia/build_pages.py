@@ -7,7 +7,8 @@ import aiohttp
 from absl import app, flags, logging
 
 from llm_ol.dataset import wikipedia
-from llm_ol.dataset.utils.miscellaneous import batch, setup_loggging
+from llm_ol.utils.data import batch
+from llm_ol.utils.logging import setup_logging
 
 FLAGS = flags.FLAGS
 flags.DEFINE_string(
@@ -86,7 +87,7 @@ async def get_pages_abstract(page_ids: set[int], out_file: Path):
 async def async_main(_):
     out_dir = Path(FLAGS.output_dir)
     out_dir.mkdir(parents=True, exist_ok=True)
-    setup_loggging(out_dir)
+    setup_logging(out_dir)
 
     asyncio.create_task(wikipedia.api_limit.replenish())
 

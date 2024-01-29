@@ -5,7 +5,7 @@ import networkx as nx
 from absl import app, flags, logging
 
 from llm_ol.dataset import data_model
-from llm_ol.dataset.utils.miscellaneous import setup_loggging
+from llm_ol.utils.logging import setup_logging
 
 FLAGS = flags.FLAGS
 flags.DEFINE_string(
@@ -22,7 +22,7 @@ flags.DEFINE_string(
 def main(_):
     out_dir = Path(FLAGS.output_dir)
     out_dir.mkdir(parents=True, exist_ok=True)
-    setup_loggging(out_dir)
+    setup_logging(out_dir)
 
     with open(FLAGS.categories_file, "r") as f:
         categories = [json.loads(line) for line in f]

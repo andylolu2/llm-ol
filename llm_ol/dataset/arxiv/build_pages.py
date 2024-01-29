@@ -8,8 +8,9 @@ import aiohttp
 import dotenv
 from absl import app, flags, logging
 
-from llm_ol.dataset.utils.miscellaneous import batch, setup_loggging
-from llm_ol.dataset.utils.rate_limit import Resource
+from llm_ol.utils.data import batch
+from llm_ol.utils.logging import setup_logging
+from llm_ol.utils.rate_limit import Resource
 
 dotenv.load_dotenv()
 
@@ -151,7 +152,7 @@ async def main(_):
     # Set up
     out_dir = Path(FLAGS.output_dir)
     out_dir.mkdir(parents=True, exist_ok=True)
-    setup_loggging(out_dir)
+    setup_logging(out_dir)
     asyncio.create_task(semantic_scholar_limit.replenish())
 
     # Get arXiv data
