@@ -32,7 +32,11 @@ def main(_):
     with open(FLAGS.pages_file, "r") as f:
         for line in f:
             page = json.loads(line)
-            pages[page["id"]] = page
+            pages[page["id"]] = {
+                "id": page["id"],
+                "title": page["title"].strip(),
+                "abstract": page["abstract"].strip(),
+            }
     logging.info("Total of %s pages", len(pages))
 
     missing_pages = 0
