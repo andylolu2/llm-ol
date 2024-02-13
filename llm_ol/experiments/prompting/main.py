@@ -7,8 +7,9 @@ from pathlib import Path
 from absl import app, flags, logging
 
 from llm_ol.dataset import wikipedia
+from llm_ol.experiments.prompting.categorise_article import categorise_article
+from llm_ol.experiments.prompting.create_hierarchy import create_hierarchy
 from llm_ol.llm.cpu import load_mistral_instruct
-from llm_ol.llm.templates import categorise_article
 from llm_ol.utils.logging import setup_logging
 
 FLAGS = flags.FLAGS
@@ -45,19 +46,23 @@ def main(_):
         if id in computed:
             continue
 
-        out = model + categorise_article(title, abstract, categories=[])
-        with open(out_dir / "categoried_pages.jsonl", "a") as f:
-            f.write(
-                json.dumps(
-                    {
-                        "id": id,
-                        "title": title,
-                        "abstract": abstract,
-                        "categories": out["cats"],
-                    }
+        try:
+            # out = model + categorise_article(title, abstract, categories=[])
+            out = model + create_hierarchy(title, abstract)  # type: ignore
+            with open(out_dir / "categoried_pages.jsonl", "a") as f:
+                f.write(
+                    json.dumps(
+                        {
+                            "id": id,
+                            "title": title,
+                            "abstract": abstract,
+                            "hierarchy": out["hierarchy"],
+                        }
+                    )
+                    + "\n"
                 )
-                + "\n"
-            )
+        except Exception as e:
+            logging.error("Error processing page %s: %s", id, repr(e) + str(e))
 
 
 if __name__ == "__main__":

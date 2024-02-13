@@ -1,5 +1,5 @@
 import guidance
-from guidance import gen
+from guidance import gen, instruction
 
 from llm_ol.utils import load_template
 
@@ -28,7 +28,7 @@ def categorise_article(
     categories: list[str],
     t: float = 0,
 ) -> guidance.models.Model:
-    with guidance.instruction():
+    with instruction():
         lm += load_template(s).render(
             title=title, abstract=abstract, categories=categories
         )
