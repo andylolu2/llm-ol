@@ -5,6 +5,7 @@ import networkx as nx
 from absl import app, flags, logging
 
 from llm_ol.dataset import data_model
+from llm_ol.dataset.wikipedia import ROOT_CATEGORY_ID
 from llm_ol.utils.logging import setup_logging
 
 FLAGS = flags.FLAGS
@@ -56,6 +57,10 @@ def main(_):
             if category["id"] in G and subcategory["id"] in G:
                 G.add_edge(category["id"], subcategory["id"])
     data_model.save_graph(G, out_dir / "full_graph.json")
+
+    for depth in range(1, 4):
+        G_sub = nx.ego_graph(G, ROOT_CATEGORY_ID, radius=depth)
+        data_model.save_graph(G_sub, out_dir / f"graph_depth_{depth}.json")
 
 
 if __name__ == "__main__":

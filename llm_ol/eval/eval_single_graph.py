@@ -2,7 +2,6 @@ import json
 from pathlib import Path
 
 import networkx as nx
-import pygraphviz
 from absl import app, flags, logging
 
 from llm_ol.dataset import data_model
@@ -18,8 +17,9 @@ flags.DEFINE_string(
 
 def main(_):
     out_dir = Path(FLAGS.output_dir)
-    setup_logging(out_dir)
+    setup_logging(out_dir, "eval_single_graph")
 
+    logging.info("Loading graph from %s", FLAGS.graph_file)
     G = data_model.load_graph(FLAGS.graph_file)
     metrics, fig, G_subs = compute_graph_metrics(G)
 
@@ -33,9 +33,10 @@ def main(_):
     fig.savefig(out_dir / "metrics.pdf", dpi=300)
 
     for i, G_sub in enumerate(G_subs):
-        G_sub = nx.relabel_nodes(
-            G_sub, {n: G_sub.nodes[n]["title"] for n in G_sub.nodes}
-        )
+        relabel_map = {}
+        for n, data in G_sub.nodes(data=True):
+            relabel_map[n] = data["title"] if "title" in data else n
+        G_sub = nx.relabel_nodes(G_sub, relabel_map)
         A = nx.nx_agraph.to_agraph(G_sub)
         A.layout("fdp")
         A.draw(out_dir / f"random_subgraph_{i}.pdf")

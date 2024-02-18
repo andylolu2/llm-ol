@@ -1,4 +1,4 @@
-arxiv_dir=~/rds/hpc-work/llm-ol/out/data/arxiv/v1
+arxiv_dir=out/data/arxiv/v1
 
 python llm_ol/dataset/arxiv/build_pages.py \
     --output_dir $arxiv_dir/pages \

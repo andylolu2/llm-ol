@@ -4,7 +4,6 @@ import matplotlib.pyplot as plt
 import networkx as nx
 import seaborn as sns
 from absl import logging
-from pygraphviz import AGraph
 
 from llm_ol.utils import sized_subplots
 
@@ -21,12 +20,14 @@ def compute_graph_metrics(
     random_subgraph_max_size: int = 30,
     random_subgraph_undirected: bool = True,
 ):
-    metrics = {
-        "num_nodes": nx.number_of_nodes(G),
-        "num_edges": nx.number_of_edges(G),
-        "diameter": directed_diameter(G),
-        "central_nodes": central_nodes(G),
-    }
+    metrics = {}
+    logging.info("Computing number of nodes and edges")
+    metrics["num_nodes"] = nx.number_of_nodes(G)
+    metrics["num_edges"] = nx.number_of_edges(G)
+    logging.info("Computing diameter")
+    metrics["diameter"] = directed_diameter(G)
+    logging.info("Computing central nodes")
+    metrics["central_nodes"] = central_nodes(G)
 
     all_plots = []
     if weakly_connected:
@@ -58,13 +59,24 @@ def compute_graph_metrics(
 
 
 def directed_diameter(G: nx.DiGraph):
-    return nx.diameter(G.to_undirected())
+    """Diameter of the largest weakly connected component of a directed graph."""
+    comp = nx.weakly_connected_components(G)
+    largest_comp = max(comp, key=len)
+    return nx.algorithms.approximation.diameter(
+        G.subgraph(largest_comp).to_undirected()
+    )
 
 
-def central_nodes(G: nx.DiGraph, k: int = 5) -> list[str]:
-    centrality = nx.betweenness_centrality(G.to_undirected())
-    top_k = sorted(centrality.keys(), key=lambda n: centrality[n], reverse=True)[:k]
-    return top_k
+def central_nodes(G: nx.DiGraph):
+    centrality = nx.betweenness_centrality(G.to_undirected(), k=min(1_000, len(G)))
+    items = list(centrality.items())
+    items = sorted(items, key=lambda x: x[1], reverse=True)
+    result = []
+    for n, v in items:
+        if "title" in G.nodes[n]:
+            n = G.nodes[n]["title"]
+        result.append((n, v))
+    return result
 
 
 def weakly_connected_component_distribution(G: nx.DiGraph, ax: plt.Axes):
@@ -74,7 +86,6 @@ def weakly_connected_component_distribution(G: nx.DiGraph, ax: plt.Axes):
         title="Weakly Connected Component Distribution",
         xlabel="Component Size",
         ylabel="Count",
-        xscale="log",
         yscale="log",
     )
 
@@ -86,7 +97,6 @@ def strongly_connected_component_distribution(G: nx.DiGraph, ax: plt.Axes):
         title="Strongly Connected Component Distribution",
         xlabel="Component Size",
         ylabel="Count",
-        xscale="log",
         yscale="log",
     )
 
@@ -98,7 +108,6 @@ def in_degree_distribution(G: nx.DiGraph, ax: plt.Axes):
         title="In-Degree Distribution",
         xlabel="Degree",
         ylabel="Count",
-        xscale="log",
         yscale="log",
     )
 
@@ -110,7 +119,6 @@ def out_degree_distribution(G: nx.DiGraph, ax: plt.Axes):
         title="Out-Degree Distribution",
         xlabel="Degree",
         ylabel="Count",
-        xscale="log",
         yscale="log",
     )
 

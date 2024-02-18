@@ -49,7 +49,7 @@ def main(_):
         try:
             # out = model + categorise_article(title, abstract, categories=[])
             out = model + create_hierarchy(title, abstract)  # type: ignore
-            with open(out_dir / "categoried_pages.jsonl", "a") as f:
+            with open(out_dir / "categorised_pages.jsonl", "a") as f:
                 f.write(
                     json.dumps(
                         {

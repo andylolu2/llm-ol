@@ -1,4 +1,4 @@
-wiki_dir=~/rds/hpc-work/llm-ol/out/data/wikipedia/v1
+wiki_dir=out/data/wikipedia/v1
 
 python llm_ol/dataset/wikipedia/export_graph.py \
     --categories_file $wiki_dir/categories/raw_categories.jsonl \

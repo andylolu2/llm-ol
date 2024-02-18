@@ -10,7 +10,7 @@
 #SBATCH --time=10:00:00
 #SBATCH --mail-type=NONE
 #SBATCH --no-requeue
-#SBATCH --output=/home/cyal4/rds/hpc-work/llm-ol/out/logs/slurm-%j.out
+#SBATCH --output=out/logs/slurm-%j.out
 
 #! ############################################################
 #! Modify the settings below to specify the application's environment, location 
