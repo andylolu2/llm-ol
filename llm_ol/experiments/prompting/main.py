@@ -9,6 +9,7 @@ from absl import app, flags, logging
 from llm_ol.dataset import wikipedia
 from llm_ol.experiments.prompting.categorise_article import categorise_article
 from llm_ol.experiments.prompting.create_hierarchy import create_hierarchy
+from llm_ol.experiments.prompting.create_hierarchy_v2 import create_hierarchy_v2
 from llm_ol.llm.cpu import load_mistral_instruct
 from llm_ol.utils.logging import setup_logging
 
@@ -16,7 +17,7 @@ FLAGS = flags.FLAGS
 flags.DEFINE_string("graph_file", None, "Path to the graph file", required=True)
 flags.DEFINE_string("model_file", None, "Path to the model", required=True)
 flags.DEFINE_string("output_dir", None, "Path to the output directory", required=True)
-flags.DEFINE_integer("max_depth", 1, "Maximum depth of the graph")
+flags.DEFINE_integer("max_depth", None, "Maximum depth of the graph")
 flags.DEFINE_integer("num_workers", os.cpu_count(), "Number of workers")
 
 
@@ -47,8 +48,8 @@ def main(_):
             continue
 
         try:
-            # out = model + categorise_article(title, abstract, categories=[])
-            out = model + create_hierarchy(title, abstract)  # type: ignore
+            # out = model + create_hierarchy(title, abstract)  # type: ignore
+            out = model + create_hierarchy_v2(title, abstract)  # type: ignore
             with open(out_dir / "categorised_pages.jsonl", "a") as f:
                 f.write(
                     json.dumps(
