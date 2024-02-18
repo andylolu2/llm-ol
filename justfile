@@ -6,3 +6,6 @@ srun *ARGS:
 
 clear-nb:
     find . -name "*.ipynb" -exec jupyter nbconvert --clear-output --inplace {} \;
+
+code-count:
+    cloc --vcs git
