@@ -52,7 +52,11 @@ def main(_):
         except Exception as e:
             logging.error("Error parsing hierarchy %s: %s", item["title"], e)
 
-    G = nx.DiGraph(relations)
+    G = nx.DiGraph()
+    for parent, child in relations:
+        G.add_node(parent, title=parent)
+        G.add_node(child, title=child)
+        G.add_edge(parent, child)
     data_model.save_graph(G, out_dir / "graph.json")
 
 

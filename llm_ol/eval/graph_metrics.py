@@ -3,17 +3,19 @@ import random
 import matplotlib.pyplot as plt
 import networkx as nx
 import seaborn as sns
+import torch
 from absl import logging
+from torch_geometric.data import Batch, Data
+from torch_geometric.nn import GCNConv
+from torch_geometric.utils import from_networkx
 
 from llm_ol.utils import sized_subplots
 
 
 def compute_graph_metrics(
     G: nx.DiGraph,
-    weakly_connected: bool = True,
-    strongly_connected: bool = True,
-    in_degree: bool = True,
-    out_degree: bool = True,
+    diameter: bool = True,
+    centrality: bool = True,
     n_random_subgraphs: int = 5,
     random_subgraph_radius: int = 1,
     random_subgraph_min_size: int = 5,
@@ -24,20 +26,19 @@ def compute_graph_metrics(
     logging.info("Computing number of nodes and edges")
     metrics["num_nodes"] = nx.number_of_nodes(G)
     metrics["num_edges"] = nx.number_of_edges(G)
-    logging.info("Computing diameter")
-    metrics["diameter"] = directed_diameter(G)
-    logging.info("Computing central nodes")
-    metrics["central_nodes"] = central_nodes(G)
+    metrics["density"] = nx.density(G)
+    if diameter:
+        logging.info("Computing diameter")
+        metrics["diameter"] = directed_diameter(G)
+    if centrality:
+        logging.info("Computing central nodes")
+        metrics["central_nodes"] = central_nodes(G)
 
     all_plots = []
-    if weakly_connected:
-        all_plots.append(weakly_connected_component_distribution)
-    if strongly_connected:
-        all_plots.append(strongly_connected_component_distribution)
-    if in_degree:
-        all_plots.append(in_degree_distribution)
-    if out_degree:
-        all_plots.append(out_degree_distribution)
+    all_plots.append(weakly_connected_component_distribution)
+    all_plots.append(strongly_connected_component_distribution)
+    all_plots.append(in_degree_distribution)
+    all_plots.append(out_degree_distribution)
 
     fig, axs = sized_subplots(len(all_plots), n_cols=2)
     for plot_fn, ax in zip(all_plots, axs.flat):
@@ -145,3 +146,48 @@ def random_subgraph(
         max_tries,
     )
     return None
+
+
+@torch.no_grad()
+def graph_similarity(G1: nx.DiGraph, G2: nx.DiGraph, n_iters: int = 5) -> float:
+    def nx_to_vec(G: nx.Graph, n_iters) -> torch.Tensor:
+        """Compute a graph embedding of shape (n_nodes embed_dim).
+
+        Uses a GCN with identity weights to compute the embedding.
+        """
+
+        # Delete all node and edge attributes except for the embedding
+        # Otherwise PyG might complain "Not all nodes/edges contain the same attributes"
+        G = G.copy()
+        for _, _, d in G.edges(data=True):
+            d.clear()
+        for _, d in G.nodes(data=True):
+            for k in list(d.keys()):
+                if k != "embed":
+                    del d[k]
+        pyg_G = from_networkx(G, group_node_attrs=["embed"])
+
+        embed_dim = pyg_G.x.shape[1]
+        conv = GCNConv(embed_dim, embed_dim, bias=False)
+        conv.lin.weight.data = torch.eye(embed_dim)
+
+        pyg_batch = Batch.from_data_list([pyg_G])
+        x, edge_index = pyg_batch.x, pyg_batch.edge_index  # type: ignore
+
+        for _ in range(n_iters):
+            x = conv(x, edge_index)
+
+        return x
+
+    # Compute embeddings
+    x1 = nx_to_vec(G1, n_iters)
+    x2 = nx_to_vec(G2, n_iters)
+
+    # Cosine similarity matrix
+    x1 = x1 / x1.norm(dim=-1, keepdim=True)
+    x2 = x2 / x2.norm(dim=-1, keepdim=True)
+    sim = x1 @ x2.T
+
+    # Aggregate similarity
+    sim = (sim.max(0).values.mean() + sim.max(1).values.mean()) / 2
+    return sim.item()
