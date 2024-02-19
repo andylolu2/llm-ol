@@ -149,7 +149,7 @@ def random_subgraph(
 
 
 @torch.no_grad()
-def graph_similarity(G1: nx.DiGraph, G2: nx.DiGraph, n_iters: int = 5) -> float:
+def graph_similarity(G1: nx.Graph, G2: nx.Graph, n_iters: int = 5) -> float:
     def nx_to_vec(G: nx.Graph, n_iters) -> torch.Tensor:
         """Compute a graph embedding of shape (n_nodes embed_dim).
 

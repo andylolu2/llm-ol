@@ -24,7 +24,7 @@ flags.DEFINE_integer("num_workers", os.cpu_count(), "Number of workers")
 def main(_):
     out_dir = Path(FLAGS.output_dir)
     setup_logging(out_dir)
-    out_file = out_dir / "categoried_pages.jsonl"
+    out_file = out_dir / "categorised_pages.jsonl"
 
     G = wikipedia.load_dataset(Path(FLAGS.graph_file), FLAGS.max_depth)
     pages = {}
@@ -41,7 +41,7 @@ def main(_):
     if out_file.exists():
         with open(out_file, "r") as f:
             computed.update({json.loads(line)["id"] for line in f})
-        logging.info("Loaded %s computed pages", len(computed))
+        logging.info("Loaded %d computed pages", len(computed))
 
     for id, (title, abstract) in pages.items():
         if id in computed:
@@ -50,7 +50,7 @@ def main(_):
         try:
             # out = model + create_hierarchy(title, abstract)  # type: ignore
             out = model + create_hierarchy_v2(title, abstract)  # type: ignore
-            with open(out_dir / "categorised_pages.jsonl", "a") as f:
+            with open(out_file, "a") as f:
                 f.write(
                     json.dumps(
                         {
