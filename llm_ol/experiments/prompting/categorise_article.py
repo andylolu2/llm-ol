@@ -20,7 +20,7 @@ Alternatively, you can also create new category(ies) if you think it is necessar
 """
 
 
-@guidance
+@guidance  # type: ignore
 def categorise_article(
     lm: guidance.models.Model,
     title: str,
@@ -34,13 +34,13 @@ def categorise_article(
         )
     lm += (
         "Here are "
-        + gen(name="n", regex=r"\d+", temperature=t)
+        + gen(name="n", regex=r"\d+", temperature=t)  # type: ignore
         + " category(ies) that are suitable for this article:\n"
     )
-    for i in range(int(lm["n"])):
+    for i in range(int(lm["n"])):  # type: ignore
         lm += (
             f"{i+1}. "
-            + gen(name="cats", list_append=True, stop=["\n", ".", ":"], temperature=t)
+            + gen(name="cats", list_append=True, stop=["\n", ".", ":"], temperature=t)  # type: ignore
             + "\n"
         )
     return lm

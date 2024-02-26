@@ -6,7 +6,7 @@ from pathlib import Path
 
 from absl import app, flags, logging
 
-from llm_ol.dataset import wikipedia
+from llm_ol.dataset import data_model
 from llm_ol.experiments.prompting.categorise_article import categorise_article
 from llm_ol.experiments.prompting.create_hierarchy import create_hierarchy
 from llm_ol.experiments.prompting.create_hierarchy_v2 import create_hierarchy_v2
@@ -26,7 +26,7 @@ def main(_):
     setup_logging(out_dir)
     out_file = out_dir / "categorised_pages.jsonl"
 
-    G = wikipedia.load_dataset(Path(FLAGS.graph_file), FLAGS.max_depth)
+    G = data_model.load_graph(FLAGS.graph_file, FLAGS.max_depth)
     pages = {}
     for _, data in G.nodes(data=True):
         for page in data["pages"]:

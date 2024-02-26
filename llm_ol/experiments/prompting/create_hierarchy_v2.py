@@ -36,7 +36,7 @@ Provide a category hierarchy for the above article. Use the same format as the e
 """
 
 
-@guidance
+@guidance  # type: ignore
 def create_hierarchy_v2(
     lm: guidance.models.Model,
     title: str,
@@ -45,5 +45,5 @@ def create_hierarchy_v2(
 ) -> guidance.models.Model:
     with instruction():
         lm += load_template(s).render(title=title, abstract=abstract)
-    lm += "```txt\n" + gen(name="hierarchy", max_tokens=1000, stop="```", temperature=t)
+    lm += "```txt\n" + gen(name="hierarchy", max_tokens=1000, stop="```", temperature=t)  # type: ignore
     return lm

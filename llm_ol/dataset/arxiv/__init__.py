@@ -30,10 +30,3 @@ def normalise(category_id):
         if category_id in aliases:
             return aliases[0]
     return category_id
-
-
-def load_dataset(file_path: Path, max_depth: int | None = None):
-    G = data_model.load_graph(file_path)
-    if max_depth is not None:
-        G = nx.ego_graph(G, ROOT_CATEGORY_ID, radius=max_depth)
-    return G

@@ -32,7 +32,7 @@ Title: {{ title }}
 """
 
 
-@guidance
+@guidance  # type: ignore
 def create_hierarchy(
     lm: guidance.models.Model,
     title: str,
@@ -43,5 +43,5 @@ def create_hierarchy(
         lm += load_template(s).render(title=title, abstract=abstract)
     lm += "```json\n" + gen(
         name="hierarchy", max_tokens=1000, stop="```", temperature=t
-    )
+    )  # type: ignore
     return lm

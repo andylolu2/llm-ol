@@ -28,7 +28,7 @@ def main(_):
     with open(FLAGS.pages_file, "r") as f:
         papers = [json.loads(line) for line in f]
 
-    G = data_model.load_graph(Path(FLAGS.categories_file))
+    G = data_model.load_graph(FLAGS.categories_file)
 
     for node in G.nodes:
         G.nodes[node]["pages"] = []

@@ -36,10 +36,3 @@ async def api_request(session: aiohttp.ClientSession, params: dict, retries: int
                 )
                 await asyncio.sleep(2**i)
     assert False  # Unreachable
-
-
-def load_dataset(file_path: Path | str, max_depth: int | None = None):
-    G = data_model.load_graph(file_path)
-    if max_depth is not None:
-        G = nx.ego_graph(G, ROOT_CATEGORY_ID, radius=max_depth)
-    return G

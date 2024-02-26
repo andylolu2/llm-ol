@@ -19,37 +19,8 @@ flags.DEFINE_string(
     "output_dir", None, "Directory to save output files", required=True, short_name="o"
 )
 flags.DEFINE_multi_integer(
-    "depths", [-1, 1, 2, 3], "Depths of the graph to export", short_name="d"
+    "depths", [1, 2, 3], "Depths of the graph to export", short_name="d"
 )
-
-
-def export_graph(pages: dict, categories: list, out_dir: Path, depth: int):
-    G = nx.DiGraph()
-    for category in categories:
-        pages_in_category = []
-        for page_id in category["pages"]:
-            if page_id in pages:
-                pages_in_category.append(pages[page_id])
-        G.add_node(category["id"], title=category["title"], pages=pages_in_category)
-
-    if depth >= 0:
-        G = nx.ego_graph(G, ROOT_CATEGORY_ID, radius=depth)
-
-    pages_in_G = {}
-    for node, data in G.nodes(data=True):
-        for page in data["pages"]:
-            if page["id"] not in pages_in_G:
-                pages_in_G[page["id"]] = {
-                    **page,
-                    "categories": [node],
-                }
-            else:
-                pages_in_G[page["id"]]["categories"].append(node)
-
-    data_model.save_graph(G, out_dir / f"graph_depth_{depth}.json")
-    with open(out_dir / f"pages_depth_{depth}.jsonl", "w") as f:
-        for page in pages_in_G.values():
-            f.write(json.dumps(page) + "\n")
 
 
 def main(_):
@@ -77,7 +48,7 @@ def main(_):
         missing_pages += sum(page_id not in pages for page_id in category["pages"])
     logging.info("Missing %s pages", missing_pages)
 
-    G = nx.DiGraph()
+    G = nx.DiGraph(root=ROOT_CATEGORY_ID)
     for category in categories:
         pages_in_category = []
         for page_id in category["pages"]:
@@ -91,11 +62,10 @@ def main(_):
         for subcategory in category["sub_categories"]:
             if category["id"] in G and subcategory["id"] in G:
                 G.add_edge(category["id"], subcategory["id"])
-    data_model.save_graph(G, out_dir / "full_graph.json")
 
+    data_model.save_graph(G, out_dir / "full_graph.json")
     for depth in FLAGS.depths:
-        G_sub = nx.ego_graph(G, ROOT_CATEGORY_ID, radius=depth)
-        data_model.save_graph(G_sub, out_dir / f"graph_depth_{depth}.json")
+        data_model.save_graph(G, out_dir / f"graph_depth_{depth}.json", depth)
 
 
 if __name__ == "__main__":

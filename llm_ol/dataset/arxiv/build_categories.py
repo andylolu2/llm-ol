@@ -29,7 +29,7 @@ def main(_):
     setup_logging(out_dir)
 
     # Build the graph
-    G = nx.DiGraph()
+    G = nx.DiGraph(root=arxiv.ROOT_CATEGORY_ID)
     id_to_name = {arxiv.ROOT_CATEGORY_ID: arxiv.ROOT_CATEGORY_NAME}
     G.add_node(arxiv.ROOT_CATEGORY_ID)
 

@@ -8,7 +8,7 @@ import spacy
 from absl import app, flags
 from tqdm import tqdm
 
-from llm_ol.dataset import wikipedia
+from llm_ol.dataset import data_model
 from llm_ol.experiments.hearst.patterns import find_hyponyms
 from llm_ol.utils.logging import setup_logging
 
@@ -65,7 +65,7 @@ def main(_):
     setup_logging(out_dir)
 
     # Load abstracts
-    G = wikipedia.load_dataset(Path(FLAGS.graph_file), FLAGS.max_depth)
+    G = data_model.load_graph(FLAGS.graph_file, FLAGS.max_depth)
     abstracts = set()
     for _, data in G.nodes(data=True):
         for page in data["pages"]:
