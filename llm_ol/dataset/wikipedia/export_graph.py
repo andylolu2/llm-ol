@@ -54,8 +54,6 @@ def main(_):
         for page_id in category["pages"]:
             if page_id in pages:
                 pages_in_category.append(pages[page_id])
-            pages[page_id]
-
         G.add_node(category["id"], title=category["title"], pages=pages_in_category)
 
     for category in categories:
