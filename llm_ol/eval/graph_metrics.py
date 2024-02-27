@@ -1,62 +1,11 @@
 import random
 
-import matplotlib.pyplot as plt
 import networkx as nx
-import seaborn as sns
 import torch
 from absl import logging
-from torch_geometric.data import Batch, Data
+from torch_geometric.data import Batch
 from torch_geometric.nn import GCNConv
 from torch_geometric.utils import from_networkx
-
-from llm_ol.utils import sized_subplots
-
-
-def compute_graph_metrics(
-    G: nx.DiGraph,
-    diameter: bool = True,
-    centrality: bool = True,
-    n_random_subgraphs: int = 5,
-    random_subgraph_radius: int = 1,
-    random_subgraph_min_size: int = 5,
-    random_subgraph_max_size: int = 30,
-    random_subgraph_undirected: bool = True,
-):
-    metrics = {}
-    logging.info("Computing number of nodes and edges")
-    metrics["num_nodes"] = nx.number_of_nodes(G)
-    metrics["num_edges"] = nx.number_of_edges(G)
-    metrics["density"] = nx.density(G)
-    if diameter:
-        logging.info("Computing diameter")
-        metrics["diameter"] = directed_diameter(G)
-    if centrality:
-        logging.info("Computing central nodes")
-        metrics["central_nodes"] = central_nodes(G)
-
-    all_plots = []
-    all_plots.append(weakly_connected_component_distribution)
-    all_plots.append(strongly_connected_component_distribution)
-    all_plots.append(in_degree_distribution)
-    all_plots.append(out_degree_distribution)
-
-    fig, axs = sized_subplots(len(all_plots), n_cols=2)
-    for plot_fn, ax in zip(all_plots, axs.flat):
-        plot_fn(G, ax)
-
-    G_subs: list[nx.DiGraph] = []
-    for _ in range(n_random_subgraphs):
-        G_sub = random_subgraph(
-            G,
-            random_subgraph_radius,
-            random_subgraph_min_size,
-            random_subgraph_max_size,
-            random_subgraph_undirected,
-        )
-        if G_sub is not None:
-            G_subs.append(G_sub)
-
-    return metrics, fig, G_subs
 
 
 def directed_diameter(G: nx.DiGraph):
@@ -80,52 +29,24 @@ def central_nodes(G: nx.DiGraph):
     return result
 
 
-def weakly_connected_component_distribution(G: nx.DiGraph, ax: plt.Axes):
-    data = [len(c) for c in nx.weakly_connected_components(G)]
-    sns.histplot(data, ax=ax)
-    ax.set(
-        title="Weakly Connected Component Distribution",
-        xlabel="Component Size",
-        ylabel="Count",
-        yscale="log",
-    )
+def weakly_connected_component_distribution(G: nx.DiGraph):
+    return [len(c) for c in nx.weakly_connected_components(G)]
 
 
-def strongly_connected_component_distribution(G: nx.DiGraph, ax: plt.Axes):
-    data = [len(c) for c in nx.strongly_connected_components(G)]
-    sns.histplot(data, ax=ax)
-    ax.set(
-        title="Strongly Connected Component Distribution",
-        xlabel="Component Size",
-        ylabel="Count",
-        yscale="log",
-    )
+def strongly_connected_component_distribution(G: nx.DiGraph):
+    return [len(c) for c in nx.strongly_connected_components(G)]
 
 
-def in_degree_distribution(G: nx.DiGraph, ax: plt.Axes):
-    data = [d for n, d in G.in_degree()]
-    sns.histplot(data, ax=ax)
-    ax.set(
-        title="In-Degree Distribution",
-        xlabel="Degree",
-        ylabel="Count",
-        yscale="log",
-    )
+def in_degree_distribution(G: nx.DiGraph):
+    return [d for n, d in G.in_degree()]
 
 
-def out_degree_distribution(G: nx.DiGraph, ax: plt.Axes):
-    data = [d for n, d in G.out_degree()]
-    sns.histplot(data, ax=ax)
-    ax.set(
-        title="Out-Degree Distribution",
-        xlabel="Degree",
-        ylabel="Count",
-        yscale="log",
-    )
+def out_degree_distribution(G: nx.DiGraph):
+    return [d for n, d in G.out_degree()]
 
 
 def random_subgraph(
-    G: nx.DiGraph,
+    G: nx.Graph,
     radius: int = 1,
     min_size: int = 5,
     max_size: int = 30,
@@ -145,7 +66,11 @@ def random_subgraph(
         max_size,
         max_tries,
     )
-    return None
+
+
+def eigenspectrum(G: nx.Graph):
+    lambda_ = nx.linalg.normalized_laplacian_spectrum(G.to_undirected())
+    return lambda_.tolist()
 
 
 @torch.no_grad()

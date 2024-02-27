@@ -26,5 +26,6 @@ module load rhel8/default-icl              # REQUIRED - loads the basic environm
 #! Insert additional module load commands after this line if needed:
 module load miniconda/3
 module load graphviz/2.40.1
+module load texlive/2015
 
 sleep infinity
