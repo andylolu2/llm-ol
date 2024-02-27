@@ -1,12 +1,11 @@
 #!/bin/bash
 #!
 
-#SBATCH --job-name cpujob
-#SBATCH --account COMPUTERLAB-SL3-CPU
+#SBATCH --job-name llm-ol-cpujob
+#SBATCH --account COMPUTERLAB-SL2-CPU
 #SBATCH --partition icelake
 #SBATCH --nodes=1
 #SBATCH --ntasks=1
-#SBATCH --mem=16G
 #SBATCH --time=10:00:00
 #SBATCH --mail-type=NONE
 #SBATCH --no-requeue
