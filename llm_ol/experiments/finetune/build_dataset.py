@@ -53,7 +53,7 @@ def split_graph(
     )
 
     G_1 = G.edge_subgraph(reachable_edges | G_shared.edges).copy()
-    G_2 = G.edge_subgraph((G.edges - reachable_edges) | G_shared.edges).copy()
+    G_2 = G.edge_subgraph(G.edges - reachable_edges).copy()
     logging.info(
         "Spliting graph of %d nodes into %d (%.2f%%) and %d (%.2f%%) nodes. %d shared nodes.",
         G.number_of_nodes(),
