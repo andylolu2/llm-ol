@@ -101,9 +101,11 @@ def paths_from_root(G: nx.Graph, page: dict, n: int):
 
 
 def make_training_samples(G: nx.Graph):
+    G = G.copy()
+
     pages = {}
     for node, data in G.nodes(data=True):
-        for page in data["pages"]:
+        for page in data.pop("pages"):
             id_ = page["id"]
             if id_ not in pages:
                 pages[id_] = {**page, "categories": [node]}
@@ -111,7 +113,6 @@ def make_training_samples(G: nx.Graph):
                 pages[id_]["categories"].append(node)
 
     path_lengths = []
-
     with Pool(FLAGS.num_workers) as p, tqdm(total=len(pages)) as pbar:
         for page, paths in zip(
             pages.values(),
