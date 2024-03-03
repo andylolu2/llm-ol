@@ -6,9 +6,6 @@
 #SBATCH --partition icelake
 #SBATCH --nodes=1
 #SBATCH --ntasks=1
-#SBATCH --cpus-per-task=16
-#SBATCH --mem=64G
-#SBATCH --time=24:00:00
 #SBATCH --mail-type=NONE
 #SBATCH --no-requeue
 #SBATCH --output=/home/cyal4/tmp/slurm/interactive-%j.out
