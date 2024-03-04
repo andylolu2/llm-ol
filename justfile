@@ -12,10 +12,10 @@ cpu-run cmd cpus='8' mem='32G' time='6:00:00' *ARGS='':
     sbatch --cpus-per-task={{cpus}} --mem={{mem}} --time={{time}} {{ARGS}} runs/launch.sh {{cmd}}
 
 intr-cpu cpus='4' mem='10G' time='12:00:00':
-    sbatch --cpus-per-task={{cpus}} --mem={{mem}} --time={{time}} runs/slurm/interactive_cpu.sh
+    just cpu-run 'sleep infinity' {{cpus}} {{mem}} {{time}}
 
 clear-nb:
-    find . -name "*.ipynb" -exec jupyter nbconvert --clear-output --inplace {} \;
+    find . -name "*.ipynb" -print0 | xargs -0 -P 8 -I {} jupyter nbconvert --clear-output --inplace {}
 
 code-count:
     cloc --vcs git
