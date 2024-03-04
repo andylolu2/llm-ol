@@ -3,10 +3,10 @@ from pathlib import Path
 
 import networkx as nx
 from absl import app, flags
-from tqdm import tqdm
 
 from llm_ol.dataset import data_model
 from llm_ol.eval.graph_metrics import central_nodes
+from llm_ol.utils import textqdm
 
 FLAGS = flags.FLAGS
 flags.DEFINE_string("hyponyms_file", None, "Path to the input file", required=True)
@@ -18,7 +18,7 @@ def main(_):
         hyponyms = json.load(f)
 
     G = nx.DiGraph()
-    for src, tgts in tqdm(hyponyms.items()):
+    for src, tgts in textqdm(hyponyms.items()):
         for tgt, count in tgts.items():
             if count > 1:
                 G.add_node(src, title=src)

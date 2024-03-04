@@ -6,7 +6,7 @@ import aiohttp
 from absl import app, flags, logging
 
 from llm_ol.dataset import wikipedia
-from llm_ol.utils.logging import setup_logging
+from llm_ol.utils import setup_logging
 
 FLAGS = flags.FLAGS
 flags.DEFINE_integer("max_depth", 2, "Max depth to traverse", short_name="d")

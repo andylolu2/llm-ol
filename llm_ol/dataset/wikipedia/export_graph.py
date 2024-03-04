@@ -6,7 +6,7 @@ from absl import app, flags, logging
 
 from llm_ol.dataset import data_model
 from llm_ol.dataset.wikipedia import ROOT_CATEGORY_ID
-from llm_ol.utils.logging import setup_logging
+from llm_ol.utils import setup_logging
 
 FLAGS = flags.FLAGS
 flags.DEFINE_string(

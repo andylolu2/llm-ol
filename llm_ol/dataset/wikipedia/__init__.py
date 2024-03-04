@@ -1,13 +1,10 @@
 import asyncio
 from datetime import timedelta
-from pathlib import Path
 
 import aiohttp
-import networkx as nx
 from absl import logging
 
-from llm_ol.dataset import data_model
-from llm_ol.utils.rate_limit import Resource
+from llm_ol.utils import Resource
 
 WIKIPEDIA_API_URL = "https://en.wikipedia.org/w/api.php"
 ROOT_CATEGORY_ID = 7345184

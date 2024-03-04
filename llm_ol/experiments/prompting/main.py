@@ -11,7 +11,7 @@ from llm_ol.experiments.prompting.categorise_article import categorise_article
 from llm_ol.experiments.prompting.create_hierarchy import create_hierarchy
 from llm_ol.experiments.prompting.create_hierarchy_v2 import create_hierarchy_v2
 from llm_ol.llm.cpu import load_mistral_instruct
-from llm_ol.utils.logging import setup_logging
+from llm_ol.utils import setup_logging, textqdm
 
 FLAGS = flags.FLAGS
 flags.DEFINE_string("graph_file", None, "Path to the graph file", required=True)
@@ -43,7 +43,7 @@ def main(_):
             computed.update({json.loads(line)["id"] for line in f})
         logging.info("Loaded %d computed pages", len(computed))
 
-    for id, (title, abstract) in pages.items():
+    for id, (title, abstract) in textqdm(pages.items()):
         if id in computed:
             continue
 

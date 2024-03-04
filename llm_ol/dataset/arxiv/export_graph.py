@@ -4,7 +4,7 @@ from pathlib import Path
 from absl import app, flags, logging
 
 from llm_ol.dataset import arxiv, data_model
-from llm_ol.utils.logging import setup_logging
+from llm_ol.utils import setup_logging
 
 FLAGS = flags.FLAGS
 flags.DEFINE_string(

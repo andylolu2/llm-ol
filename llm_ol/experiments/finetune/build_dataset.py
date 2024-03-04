@@ -7,11 +7,10 @@ from pathlib import Path
 
 import networkx as nx
 from absl import app, flags, logging
-from tqdm import tqdm
 
 from llm_ol.dataset import data_model
 from llm_ol.experiments.finetune.templates import PROMPT_TEMPLATE, RESPONSE_TEMPLATE
-from llm_ol.utils import setup_logging
+from llm_ol.utils import setup_logging, textqdm
 
 FLAGS = flags.FLAGS
 flags.DEFINE_string("graph_file", None, "Path to the graph file", required=True)
@@ -113,12 +112,16 @@ def make_training_samples(G: nx.Graph):
                 pages[id_]["categories"].append(node)
 
     path_lengths = []
-    with Pool(FLAGS.num_workers) as p, tqdm(total=len(pages)) as pbar:
+    with Pool(FLAGS.num_workers) as p:
         for page, paths in zip(
             pages.values(),
-            p.imap(partial(paths_from_root, G, n=5), pages.values(), chunksize=5000),
+            textqdm(
+                p.imap(
+                    partial(paths_from_root, G, n=5), pages.values(), chunksize=5000
+                ),
+                total=len(pages),
+            ),
         ):
-            pbar.update()
             if len(paths) == 0:
                 continue
             yield {

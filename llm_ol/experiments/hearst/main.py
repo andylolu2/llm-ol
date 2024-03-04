@@ -6,11 +6,10 @@ from typing import Collection
 
 import spacy
 from absl import app, flags
-from tqdm import tqdm
 
 from llm_ol.dataset import data_model
 from llm_ol.experiments.hearst.patterns import find_hyponyms
-from llm_ol.utils.logging import setup_logging
+from llm_ol.utils import setup_logging, textqdm
 
 FLAGS = flags.FLAGS
 flags.DEFINE_string("graph_file", None, "Path to the graph file", required=True)
@@ -22,7 +21,7 @@ flags.DEFINE_integer("num_workers", os.cpu_count(), "Number of workers")
 def normalize(nlp: spacy.language.Language, np_tags: Collection[str]):
     result = {}
     texts = (np_tag.replace("_", " ").replace("NP ", "") for np_tag in np_tags)
-    for np_tag, doc in tqdm(
+    for np_tag, doc in textqdm(
         zip(np_tags, nlp.pipe(texts, n_process=FLAGS.num_workers, batch_size=100)),
         total=len(np_tags),
     ):
@@ -43,7 +42,7 @@ def normalize(nlp: spacy.language.Language, np_tags: Collection[str]):
 
 def extract_hyponyms(nlp: spacy.language.Language, texts: Collection[str]):
     nlp.add_pipe("merge_noun_chunks")
-    for doc in tqdm(
+    for doc in textqdm(
         nlp.pipe(texts, n_process=FLAGS.num_workers, batch_size=100), total=len(texts)
     ):
         new_text = []

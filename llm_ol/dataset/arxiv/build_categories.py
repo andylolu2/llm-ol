@@ -7,7 +7,7 @@ from arxiv.taxonomy.definitions import CATEGORIES_ACTIVE as CATEGORIES
 from arxiv.taxonomy.definitions import GROUPS
 
 from llm_ol.dataset import arxiv, data_model
-from llm_ol.utils.logging import setup_logging
+from llm_ol.utils import setup_logging
 
 FLAGS = flags.FLAGS
 flags.DEFINE_string(

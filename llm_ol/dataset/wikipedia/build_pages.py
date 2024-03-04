@@ -7,8 +7,7 @@ import aiohttp
 from absl import app, flags, logging
 
 from llm_ol.dataset import wikipedia
-from llm_ol.utils.data import batch
-from llm_ol.utils.logging import setup_logging
+from llm_ol.utils import batch, setup_logging
 
 FLAGS = flags.FLAGS
 flags.DEFINE_string(
