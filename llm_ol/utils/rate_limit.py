@@ -4,7 +4,7 @@ from datetime import datetime, timedelta
 
 
 class Resource:
-    def __init__(self, period: timedelta, limit: float):
+    def __init__(self, period: timedelta = timedelta(seconds=1), limit: float = 1):
         """Represent a resource that re-plenishes over time.
 
         Args:
@@ -18,6 +18,13 @@ class Resource:
 
         self.resources = limit
         self.waiters: deque[tuple[float, asyncio.Future]] = deque()
+
+    async def __aenter__(self):
+        await self.acquire()
+        return self
+
+    async def __aexit__(self, exc_type, exc, tb):
+        await self.release()
 
     async def replenish(self):
         """Periodically replinish the resource."""
@@ -37,7 +44,7 @@ class Resource:
                 break
             else:
                 self.waiters.popleft()
-                self.resources -= resource_requested
+                # self.resources -= resource_requested
                 waiter.set_result(None)
                 await asyncio.sleep(self.min_wait.total_seconds())
 
@@ -56,6 +63,15 @@ class Resource:
             await waiter
 
         self.resources -= resource_requested
+
+    async def release(self, resource_released: int = 1):
+        """Release the resource.
+
+        Args:
+            resource_released (int, optional): Amount of resource released. Defaults to 1.
+        """
+        self.resources += resource_released
+        await self.wake_waiters()
 
 
 if __name__ == "__main__":

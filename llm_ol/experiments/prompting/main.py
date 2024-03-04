@@ -2,7 +2,6 @@
 
 import asyncio
 import json
-import os
 from pathlib import Path
 
 from absl import app, flags, logging
@@ -36,32 +35,34 @@ async def main(_):
     logging.info("Loaded %d computed pages", len(computed))
 
     pbar = textpbar(len(pages) - len(computed))
+    sem = asyncio.Semaphore(1000)  # Limit the number of concurrent requests
 
     async def task(id_, title, abstract):
-        try:
-            out = await create_hierarchy_v2(title, abstract)
-            with open(out_file, "a") as f:
-                f.write(
-                    json.dumps(
-                        {
-                            "id": id_,
-                            "title": title,
-                            "abstract": abstract,
-                            "hierarchy": out,
-                        }
+        async with sem:
+            try:
+                out = await create_hierarchy_v2(title, abstract)
+                with open(out_file, "a") as f:
+                    f.write(
+                        json.dumps(
+                            {
+                                "id": id_,
+                                "title": title,
+                                "abstract": abstract,
+                                "hierarchy": out,
+                            }
+                        )
+                        + "\n"
                     )
-                    + "\n"
-                )
-        except Exception as e:
-            logging.error("Error processing page %s: %s", id_, repr(e) + str(e))
-        finally:
-            pbar.update()
+            except Exception as e:
+                logging.error("Error processing page %s: %s", id_, repr(e) + str(e))
+            finally:
+                pbar.update()
 
     tasks = []
     for id_, (title, abstract) in pages.items():
         if id_ not in computed:
             tasks.append(task(id_, title, abstract))
-    await asyncio.gather(*tasks)  # This just works ¯\_(ツ)_/¯
+    await asyncio.gather(*tasks)
 
 
 if __name__ == "__main__":

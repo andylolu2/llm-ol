@@ -33,6 +33,7 @@ Title: {{ title }}
 
 Provide a category hierarchy for the above article. Use the same format as the examples above.
 """
+template = load_template(s)
 
 client = AsyncOpenAI(
     base_url="http://localhost:8080/v1",
@@ -46,7 +47,7 @@ async def create_hierarchy_v2(title: str, abstract: str, t: float = 0) -> str:
         messages=[
             {
                 "role": "user",
-                "content": load_template(s).render(title=title, abstract=abstract),
+                "content": template.render(title=title, abstract=abstract),
             },
         ],
         temperature=t,

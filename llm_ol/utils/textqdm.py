@@ -15,6 +15,7 @@ class textpbar:
         self.period = period
         self.last_time = time() - period
         self.i = 0
+        self.update(0)
 
     def update(self, n: int = 1):
         self.i += n
