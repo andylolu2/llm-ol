@@ -1,3 +1,5 @@
+#!/bin/bash
+
 arxiv_dir=out/data/arxiv/v1
 
 python llm_ol/dataset/arxiv/export_graph.py \

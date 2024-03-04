@@ -1,3 +1,5 @@
+#!/bin/bash
+
 wiki_dir=out/data/wikipedia/v1
 
 python llm_ol/dataset/wikipedia/export_graph.py \
