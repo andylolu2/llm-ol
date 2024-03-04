@@ -52,6 +52,7 @@ def main(_):
             logging.error("Error parsing hierarchy %s: %s", item["title"], e)
 
     G = nx.DiGraph()
+    G.graph["root"] = "Main topic classifications"
     for parent, child in relations:
         G.add_node(parent, title=parent)
         G.add_node(child, title=child)

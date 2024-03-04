@@ -3,8 +3,10 @@ from pathlib import Path
 
 import networkx as nx
 from absl import app, flags
+from tqdm import tqdm
 
 from llm_ol.dataset import data_model
+from llm_ol.eval.graph_metrics import central_nodes
 
 FLAGS = flags.FLAGS
 flags.DEFINE_string("hyponyms_file", None, "Path to the input file", required=True)
@@ -16,7 +18,7 @@ def main(_):
         hyponyms = json.load(f)
 
     G = nx.DiGraph()
-    for src, tgts in hyponyms.items():
+    for src, tgts in tqdm(hyponyms.items()):
         for tgt, count in tgts.items():
             if count > 1:
                 G.add_node(src, title=src)
@@ -27,6 +29,9 @@ def main(_):
     G.remove_nodes_from(["part"])
     largest_connected = max(nx.weakly_connected_components(G), key=len)
     G = nx.subgraph(G, largest_connected)
+
+    centrality = central_nodes(G)
+    G.graph["root"] = centrality[0][0]
 
     data_model.save_graph(G, Path(FLAGS.output_dir) / "graph.json")
 
