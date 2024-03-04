@@ -42,8 +42,7 @@ client = AsyncOpenAI(
 
 async def create_hierarchy_v2(title: str, abstract: str, t: float = 0) -> str:
     completion = await client.chat.completions.create(
-        # model="gpt-3.5-turbo",
-        model="TheBloke/Mistral-7B-Instruct-v0.2-AWQ",
+        model="gpt-3.5-turbo",
         messages=[
             {
                 "role": "user",
