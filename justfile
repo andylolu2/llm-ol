@@ -16,7 +16,7 @@ gpu-run cmd time='6:00:00' *ARGS='':
     tmp_dir=$HOME/tmp/llm-ol-$(date +%s)
     mkdir -p $tmp_dir
     echo "Copying files to $tmp_dir"
-    git ls-files --cached --others --exclude-standard | xargs -I {} cp --parents {} $tmp_dir
+    git ls-files --cached --others --exclude-standard | xargs -I {} cp -r --parents {} $tmp_dir
     ln -s /rds/user/cyal4/hpc-work/llm-ol/out $tmp_dir/out
     cd $tmp_dir
     sbatch --time={{time}} {{ARGS}} runs/launch_gpu.sh {{cmd}}

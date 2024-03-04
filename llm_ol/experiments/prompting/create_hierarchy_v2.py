@@ -1,5 +1,4 @@
-import guidance
-from guidance import gen, instruction
+from openai import AsyncOpenAI
 
 from llm_ol.utils import load_template
 
@@ -35,15 +34,23 @@ Title: {{ title }}
 Provide a category hierarchy for the above article. Use the same format as the examples above.
 """
 
+client = AsyncOpenAI(
+    base_url="http://localhost:8080/v1",
+    api_key="sk-no-key-required",
+)
 
-@guidance  # type: ignore
-def create_hierarchy_v2(
-    lm: guidance.models.Model,
-    title: str,
-    abstract: str,
-    t: float = 0,
-) -> guidance.models.Model:
-    with instruction():
-        lm += load_template(s).render(title=title, abstract=abstract)
-    lm += "```txt\n" + gen(name="hierarchy", max_tokens=1000, stop="```", temperature=t)  # type: ignore
-    return lm
+
+async def create_hierarchy_v2(title: str, abstract: str, t: float = 0) -> str:
+    completion = await client.chat.completions.create(
+        # model="gpt-3.5-turbo",
+        model="TheBloke/Mistral-7B-Instruct-v0.2-AWQ",
+        messages=[
+            {
+                "role": "user",
+                "content": load_template(s).render(title=title, abstract=abstract),
+            },
+        ],
+        temperature=t,
+        max_tokens=1024,
+    )
+    return completion.choices[0].message.content

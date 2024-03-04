@@ -1,3 +1,5 @@
+"""DEPRECATED"""
+
 import guidance
 from guidance import gen, instruction
 
