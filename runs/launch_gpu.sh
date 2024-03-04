@@ -1,7 +1,7 @@
 #!/bin/bash
 #!
 
-#SBATCH --job-name gpujob
+#SBATCH --job-name llm-ol-gpujob
 #SBATCH --account COMPUTERLAB-SL2-GPU
 #SBATCH --partition ampere
 #SBATCH --nodes=1
@@ -27,4 +27,25 @@ module load miniconda/3
 module load graphviz/2.40.1
 module load texlive/2015
 
-sleep infinity
+#! Work directory (i.e. where the job will run):
+workdir="$SLURM_SUBMIT_DIR"
+
+###############################################################
+### You should not have to change anything below this line ####
+###############################################################
+
+cd $workdir
+echo -e "Changed directory to `pwd`.\n"
+
+source $(conda info --base)/etc/profile.d/conda.sh
+
+JOBID=$SLURM_JOB_ID
+
+echo -e "JobID: $JOBID\n======"
+echo "Time: `date`"
+echo "Running on master node: `hostname`"
+echo "Current directory: `pwd`"
+
+echo -e "\nExecuting command: $@\n==================\n\n"
+
+conda run -n llm-ol $@

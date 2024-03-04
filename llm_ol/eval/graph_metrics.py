@@ -8,7 +8,7 @@ from torch_geometric.data import Batch
 from torch_geometric.nn import GCNConv
 from torch_geometric.utils import from_networkx
 
-from llm_ol.utils import nx_to_gt
+from llm_ol.utils.nx_to_gt import nx_to_gt
 
 
 def directed_diameter(G: nx.DiGraph):
