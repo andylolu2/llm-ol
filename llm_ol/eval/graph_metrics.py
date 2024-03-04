@@ -1,11 +1,14 @@
 import random
 
+import graph_tool.all as gt
 import networkx as nx
 import torch
 from absl import logging
 from torch_geometric.data import Batch
 from torch_geometric.nn import GCNConv
 from torch_geometric.utils import from_networkx
+
+from llm_ol.utils import nx_to_gt
 
 
 def directed_diameter(G: nx.DiGraph):
@@ -18,8 +21,12 @@ def directed_diameter(G: nx.DiGraph):
 
 
 def central_nodes(G: nx.DiGraph):
-    centrality = nx.betweenness_centrality(G.to_undirected(), k=min(1_000, len(G)))
-    items = list(centrality.items())
+    G_gt = nx_to_gt(G.to_undirected())
+    vertex_betweeness, edge_betweeness = gt.betweenness(G_gt)
+    items = []
+    for v in G_gt.vertices():
+        items.append((G_gt.vp["id"][v], vertex_betweeness[v]))
+
     items = sorted(items, key=lambda x: x[1], reverse=True)
     result = []
     for n, v in items:
@@ -43,6 +50,10 @@ def in_degree_distribution(G: nx.DiGraph):
 
 def out_degree_distribution(G: nx.DiGraph):
     return [d for n, d in G.out_degree()]
+
+
+def distance_distribution(G: nx.Graph):
+    return list(nx.single_source_shortest_path_length(G, G.graph["root"]).values())
 
 
 def random_subgraph(

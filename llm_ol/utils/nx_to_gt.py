@@ -42,7 +42,7 @@ def nx_to_gt(G_nx: nx.Graph) -> gt.Graph:
 
     # Nodes and node properties (including the node id)
     vertices = {}  # mapping nx nodes -> gt vertices for later
-    G_gt.vp["id"] = G_gt.new_vp("string")
+    G_gt.vp["id"] = G_gt.new_vp(get_gt_type(next(iter(G_nx.nodes))))
     for node, data in G_nx.nodes(data=True):
         v = G_gt.add_vertex()
         vertices[node] = v

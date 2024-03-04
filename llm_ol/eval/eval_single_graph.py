@@ -10,6 +10,7 @@ from llm_ol.dataset import data_model
 from llm_ol.eval.graph_metrics import (
     central_nodes,
     directed_diameter,
+    distance_distribution,
     eigenspectrum,
     in_degree_distribution,
     out_degree_distribution,
@@ -44,6 +45,7 @@ def main(_):
         "in_degree": in_degree_distribution,
         "out_degree": out_degree_distribution,
         "eigenspectrum": eigenspectrum,
+        "distance": distance_distribution,
     }
     metrics = {}
     for k, fn in fns.items():
