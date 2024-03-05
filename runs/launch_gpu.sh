@@ -37,7 +37,9 @@ workdir="$SLURM_SUBMIT_DIR"
 cd $workdir
 echo -e "Changed directory to `pwd`.\n"
 
-source $(conda info --base)/etc/profile.d/conda.sh
+eval "$(conda shell.bash hook)"
+conda deactivate
+conda activate llm-ol
 
 JOBID=$SLURM_JOB_ID
 
@@ -45,7 +47,9 @@ echo -e "JobID: $JOBID\n======"
 echo "Time: `date`"
 echo "Running on master node: `hostname`"
 echo "Current directory: `pwd`"
+echo "Environment: `conda info`"
+echo "Python version: `python --version`"
+echo "Python dependencies: `pip freeze`"
 
 echo -e "\nExecuting command: $@\n==================\n\n"
-
-conda run -n llm-ol $@
+$@
