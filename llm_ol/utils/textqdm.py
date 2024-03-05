@@ -13,6 +13,7 @@ class textpbar:
     def __init__(self, total: int | None = None, period: float = 10.0):
         self.total = total
         self.period = period
+        self.start_time = time()
         self.last_time = time() - period
         self.i = 0
         self.update(0)
@@ -21,10 +22,16 @@ class textpbar:
         self.i += n
         if time() - self.last_time > self.period:
             self.last_time = time()
+            avg_rate = self.i / (time() - self.start_time)
             if self.total is not None:
-                logging.info("Progress: %d / %d", self.i, self.total)
+                logging.info(
+                    "Progress: %d / %d (Avg. rate: %.2f it/s)",
+                    self.i,
+                    self.total,
+                    avg_rate,
+                )
             else:
-                logging.info("Progress: %d", self.i)
+                logging.info("Progress: %d (Avg. rate: %.2f it/s)", self.i, avg_rate)
 
 
 def textqdm(
