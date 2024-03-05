@@ -27,8 +27,7 @@ def main(_):
 
     # TODO: Temporary fix for the outlier "part"
     G.remove_nodes_from(["part"])
-    largest_connected = max(nx.weakly_connected_components(G), key=len)
-    G = nx.subgraph(G, largest_connected)
+    G = G.subgraph(max(nx.weakly_connected_components(G), key=len)).copy()
 
     centrality = central_nodes(G)
     G.graph["root"] = centrality[0][0]
