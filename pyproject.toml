@@ -37,6 +37,9 @@ trl = "^0.7.11"
 scienceplots = "^2.1.1"
 openai = "^1.13.3"
 vllm = "^0.3.3"
+ml-collections = "^0.1.1"
+wandb = "^0.16.4"
+tensorboardx = "^2.6.2.2"
 
 
 [build-system]
@@ -45,3 +48,4 @@ build-backend = "poetry.core.masonry.api"
 
 [tool.isort]
 profile = "black"
+known_third_party = ["wandb"]

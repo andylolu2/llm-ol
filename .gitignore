@@ -18,3 +18,5 @@ out
 # Core latex build outputs
 report/build
 
+# wandb
+wandb/

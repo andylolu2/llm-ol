@@ -10,7 +10,7 @@ from absl import app, flags, logging
 
 from llm_ol.dataset import data_model
 from llm_ol.experiments.finetune.templates import PROMPT_TEMPLATE, RESPONSE_TEMPLATE
-from llm_ol.utils import setup_logging, textqdm
+from llm_ol.utils import setup_logging, textpbar
 
 FLAGS = flags.FLAGS
 flags.DEFINE_string("graph_file", None, "Path to the graph file", required=True)
@@ -112,24 +112,29 @@ def make_training_samples(G: nx.Graph):
                 pages[id_]["categories"].append(node)
 
     path_lengths = []
+    pbar = textpbar(len(pages))
     with Pool(FLAGS.num_workers) as p:
         for page, paths in zip(
             pages.values(),
-            textqdm(
-                p.imap(
-                    partial(paths_from_root, G, n=5), pages.values(), chunksize=5000
-                ),
-                total=len(pages),
-            ),
+            p.imap(partial(paths_from_root, G, n=5), pages.values(), chunksize=5000),
         ):
             if len(paths) == 0:
                 continue
             yield {
-                "prompt": PROMPT_TEMPLATE.render(
-                    title=page["title"], abstract=page["abstract"]
-                ),
-                "response": RESPONSE_TEMPLATE.render(paths=paths),
+                "messages": [
+                    {
+                        "role": "user",
+                        "content": PROMPT_TEMPLATE.render(
+                            title=page["title"], abstract=page["abstract"]
+                        ),
+                    },
+                    {
+                        "role": "assistant",
+                        "content": RESPONSE_TEMPLATE.render(paths=paths),
+                    },
+                ]
             }
+            pbar.update()
             path_lengths.append(len(paths))
 
     logging.info("Number of samples: %d", len(path_lengths))

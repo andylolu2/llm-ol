@@ -6,7 +6,7 @@ Title: {{ title }}
 
 _RESPONSE_TEMPLATE = """
 {% for path in paths %}
-{{ path | join(" > ") }}
+{{ path | join(" -> ") }}
 {% endfor %}"""
 
 PROMPT_TEMPLATE = load_template(_PROMPT_TEMPLATE)

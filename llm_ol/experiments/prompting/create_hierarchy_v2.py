@@ -2,8 +2,10 @@ from openai import AsyncOpenAI
 
 from llm_ol.utils import load_template
 
+#   "chat_template": "{{ bos_token }}{% for message in messages %}{% if (message['role'] == 'user') != (loop.index0 % 2 == 0) %}{{ raise_exception('Conversation roles must alternate user/assistant/user/assistant/...') }}{% endif %}{% if message['role'] == 'user' %}{{ '[INST] ' + message['content'] + ' [/INST]' }}{% elif message['role'] == 'assistant' %}{{ message['content'] + eos_token}}{% else %}{{ raise_exception('Only user and assistant roles are supported!') }}{% endif %}{% endfor %}"
+
 s = """
-The following is an article's title and abstract. Your task is to assign this article to suitable category hierarchy. \
+<s>[INST] The following is an article's title and abstract. Your task is to assign this article to suitable category hierarchy. \
 A category is typically represented by a word or a short phrase, representing broader topics/concepts that the article is about. \
 A category hierarchy is a directed acyclic graph that starts with a detailed categorisation and becomes more and more \
 general higher up the hierarchy, until it reaches the special base category "ROOT".
@@ -31,7 +33,8 @@ Title: {{ title }}
 {{ abstract }}
 ### END ARTICLE ###
 
-Provide a category hierarchy for the above article. Use the same format as the examples above.
+Provide a category hierarchy for the above article. Use the same format as the examples above. [/INST]\
+```txt
 """
 template = load_template(s)
 
@@ -42,15 +45,11 @@ client = AsyncOpenAI(
 
 
 async def create_hierarchy_v2(title: str, abstract: str, t: float = 0) -> str:
-    completion = await client.chat.completions.create(
+    completion = await client.completions.create(
         model="gpt-3.5-turbo",
-        messages=[
-            {
-                "role": "user",
-                "content": template.render(title=title, abstract=abstract),
-            },
-        ],
+        prompt=template.render(title=title, abstract=abstract),
         temperature=t,
-        max_tokens=1024,
+        stop=["```"],
+        max_tokens=2048,
     )
-    return completion.choices[0].message.content
+    return completion.choices[0].text
