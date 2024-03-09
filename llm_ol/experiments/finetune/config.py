@@ -33,6 +33,7 @@ def get_config():
     config.eval = dict(
         eval_steps=100,
         batch_size=1,
+        num_generate_samples=5,
     )
 
     return config

@@ -11,6 +11,7 @@ from ml_collections import config_flags
 from transformers import (
     AutoModelForCausalLM,
     AutoTokenizer,
+    MistralForCausalLM,
     TrainerCallback,
     TrainingArguments,
 )
@@ -24,6 +25,11 @@ config_flags.DEFINE_config_file("config")
 
 
 class GenerateSamplesCallback(TrainerCallback):
+    def __init__(self, num_samples: int, response_template: list[int]):
+        super().__init__()
+        self.num_samples = num_samples
+        self.response_template = torch.tensor(response_template, device="cpu")
+
     def on_evaluate(
         self,
         args: TrainingArguments,
@@ -33,23 +39,61 @@ class GenerateSamplesCallback(TrainerCallback):
     ):
         model = kwargs["model"]
         eval_loader = kwargs["eval_dataloader"]
+        tokenizer = kwargs["tokenizer"]
 
-        # TODO: Generate real samples
-        samples = [
-            {
-                "prompt": "PROMPT",
-                "response": "RESPONSE",
-            }
-        ]
+        prompts = []
+        for batch in eval_loader:
+            if len(prompts) >= self.num_samples:
+                break
+
+            device = batch["input_ids"].device
+            for input_ids, attention_mask in zip(
+                batch["input_ids"].cpu(), batch["attention_mask"].cpu()
+            ):
+                if len(prompts) >= self.num_samples:
+                    break
+
+                # search for the response template
+                for start in range(len(input_ids) - len(self.response_template)):
+                    end = start + len(self.response_template)
+                    if (input_ids[start:end] == self.response_template).all():
+                        prompts.append(
+                            {
+                                "input_ids": input_ids[:end].to(device),
+                                "attention_mask": attention_mask[:end].to(device),
+                                "target_ids": input_ids[end:].to(device),
+                            }
+                        )
+                        break
+
+        samples = []
+        for prompt in prompts:
+            [sample] = model.generate(
+                inputs=prompt["input_ids"].unsqueeze(0),
+                attention_mask=prompt["attention_mask"].unsqueeze(0),
+                max_new_tokens=512,
+                pad_token_id=tokenizer.pad_token_id,
+            )
+            samples.append(
+                {
+                    "prompt": tokenizer.decode(prompt["input_ids"]),
+                    "completion": tokenizer.decode(sample[len(prompt["input_ids"]) :]),
+                    "target": tokenizer.decode(
+                        prompt["target_ids"],
+                        skip_special_tokens=True,  # Remove pad tokens
+                    ),
+                }
+            )
 
         for i, sample in enumerate(samples):
             logging.info("Sample %d: %s", i, sample)
 
         if len(samples) > 0:
-            table = wandb.Table(columns=samples[0].keys())
-            for sample in samples:
-                table.add_data([sample[k] for k in sample])
-            wandb.log({"eval/samples": table})
+            table = wandb.Table(
+                columns=list(samples[0].keys()),
+                data=[list(s.values()) for s in samples],
+            )
+            wandb.log({"eval/samples": table}, step=state.global_step + 1)
 
 
 def datasets_from_file(
@@ -90,7 +134,7 @@ def main(_):
     # Temp fixes for Mistral
     tokenizer.padding_side = "right"
     if getattr(tokenizer, "pad_token", None) is None:
-        tokenizer.pad_token = tokenizer.eos_token
+        tokenizer.pad_token = tokenizer.unk_token
 
     collator = DataCollatorForCompletionOnlyLM(
         response_template=config.model.response_template,
@@ -119,7 +163,11 @@ def main(_):
         train_dataset=train_dataset,
         eval_dataset=eval_dataset,
         max_seq_length=config.train.max_seq_length,
-        callbacks=[GenerateSamplesCallback()],
+        callbacks=[
+            GenerateSamplesCallback(
+                config.eval.num_generate_samples, config.model.response_template
+            )
+        ],
         args=TrainingArguments(
             output_dir=config.output_dir,
             report_to=["wandb", "tensorboard"],
@@ -128,18 +176,20 @@ def main(_):
             gradient_checkpointing=True,
             gradient_accumulation_steps=config.train.grad_acc_steps,
             group_by_length=True,
-            seed=config.seed,
             bf16=torch.cuda.is_available() and torch.cuda.is_bf16_supported(),
             evaluation_strategy="steps",
             eval_steps=config.eval.eval_steps,
             save_steps=config.eval.eval_steps,
             per_device_train_batch_size=config.train.batch_size,
             per_device_eval_batch_size=config.eval.batch_size,
+            seed=config.seed,
+            data_seed=config.seed,
         ),
         dataset_kwargs={
             "add_special_tokens": False,
         },
     )
+    trainer.evaluate()
     trainer.train()
 
 

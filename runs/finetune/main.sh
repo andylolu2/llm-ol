@@ -1,10 +1,13 @@
 #!/bin/bash
 
+export OMP_NUM_THREADS=16
+
 python llm_ol/experiments/finetune/main.py \
     --config llm_ol/experiments/finetune/config.py \
     --config.model.name out/models/mistral-tiny \
     --config.data.file out/experiments/finetune/v1/train_samples.jsonl \
     --config.output_dir out/experiments/finetune/dev/out \
+    --config.train.learning_rate 1e-3 \
     --config.train.grad_acc_steps 1 \
     --config.train.batch_size 16 \
     --config.eval.batch_size 16
