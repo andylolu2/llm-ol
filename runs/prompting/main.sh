@@ -14,8 +14,8 @@ sleep 20
 
 # Run the main script
 python llm_ol/experiments/prompting/main.py \
-    --graph_file out/data/wikipedia/v1/full/graph_depth_1.json \
-    --output_dir out/experiments/prompting/dev-h-v2
+    --graph_file out/data/wikipedia/v1/full/graph_depth_2.json \
+    --output_dir out/experiments/prompting/v3
 
 # Kill the OpenAI API server
 kill $API_SERVER_PID

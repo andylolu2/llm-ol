@@ -49,7 +49,7 @@ async def create_hierarchy_v2(title: str, abstract: str, t: float = 0) -> str:
         model="gpt-3.5-turbo",
         prompt=template.render(title=title, abstract=abstract),
         temperature=t,
-        stop=["```"],
+        stop=["```", "\n\n"],
         max_tokens=2048,
     )
     return completion.choices[0].text
