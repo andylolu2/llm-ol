@@ -6,8 +6,10 @@ def get_config():
 
     config.seed = 0
     config.output_dir = config_dict.placeholder(str)
-    config.cache_dir = "out/models"
-    config.wandb_project = "llm-ol"
+    config.wandb = dict(
+        project="llm-ol",
+        notes="",
+    )
 
     config.model = dict(
         name="mistralai/Mistral-7B-Instruct-v0.2",
@@ -21,18 +23,21 @@ def get_config():
     )
 
     config.train = dict(
-        steps=1000,
+        steps=10_000,
         warmup_steps=100,
         learning_rate=1e-5,
-        logging_steps=10,
-        grad_acc_steps=8,
-        batch_size=1,
-        max_seq_length=4096,
+        logging_steps=50,
+        grad_acc_steps=1,
+        batch_size=16,
+        max_seq_length=2048,
+        lora=dict(
+            rank=32,
+        ),
     )
 
     config.eval = dict(
-        eval_steps=100,
-        batch_size=1,
+        eval_steps=500,
+        batch_size=32,
         num_generate_samples=5,
     )
 

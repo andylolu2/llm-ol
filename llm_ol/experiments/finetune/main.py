@@ -1,17 +1,16 @@
-import math
 import os
-from functools import partial
 from pathlib import Path
 
 import torch
 import wandb
 from absl import app, flags, logging
+from accelerate import PartialState
 from datasets import Dataset, load_dataset
 from ml_collections import config_flags
+from peft import LoraConfig, get_peft_model
 from transformers import (
     AutoModelForCausalLM,
     AutoTokenizer,
-    MistralForCausalLM,
     TrainerCallback,
     TrainingArguments,
 )
@@ -37,9 +36,13 @@ class GenerateSamplesCallback(TrainerCallback):
         control: TrainerControl,
         **kwargs
     ):
+        if not state.is_world_process_zero:
+            return
+
         model = kwargs["model"]
         eval_loader = kwargs["eval_dataloader"]
         tokenizer = kwargs["tokenizer"]
+        model.config.use_cache = True
 
         prompts = []
         for batch in eval_loader:
@@ -95,6 +98,8 @@ class GenerateSamplesCallback(TrainerCallback):
             )
             wandb.log({"eval/samples": table}, step=state.global_step + 1)
 
+        model.config.use_cache = False
+
 
 def datasets_from_file(
     data_file: str | Path, eval_size: int, seed: int = 0
@@ -108,28 +113,34 @@ def datasets_from_file(
     return splits["train"], splits["test"]
 
 
-def cosine_decay_with_warmup(step: int, total_steps: int, warmup_steps: int):
-    """Cosine decay with warmup.
-
-    Step:
-        - 0 -> `warmup_steps`: Linearly increase learning rate from 0 to 1
-        - `warmup_steps` -> `total_steps`: Cosine decay learning rate from 1 to 0
-    """
-    if step < warmup_steps:
-        return step / warmup_steps
-    progress = (step - warmup_steps) / (total_steps - warmup_steps)
-    return 0.5 * (1.0 + math.cos(math.pi * progress))
-
-
 def main(_):
     config = FLAGS.config
     logging.info("Config:\n%s", config)
-
-    os.environ["WANDB_PROJECT"] = config.wandb_project
-    os.environ["HF_HUB_CACHE"] = config.cache_dir
     setup_logging(config.output_dir, "main")
 
-    model = AutoModelForCausalLM.from_pretrained(config.model.name, use_cache=False)
+    device_string = PartialState().process_index
+    model = AutoModelForCausalLM.from_pretrained(
+        config.model.name, use_cache=False, device_map={"": device_string}
+    )
+    model = get_peft_model(
+        model,
+        LoraConfig(
+            r=config.train.lora.rank,
+            lora_alpha=16,
+            target_modules=[
+                "q_proj",
+                "k_proj",
+                "v_proj",
+                "o_proj",
+                "gate_proj",
+                "up_proj",
+                "down_proj",
+            ],
+            task_type="CAUSAL_LM",
+        ),
+    )
+    model.print_trainable_parameters()
+
     tokenizer = AutoTokenizer.from_pretrained(config.model.name)
     # Temp fixes for Mistral
     tokenizer.padding_side = "right"
@@ -144,25 +155,17 @@ def main(_):
     train_dataset, eval_dataset = datasets_from_file(
         config.data.file, config.data.eval_size, config.seed
     )
-    optimizer = torch.optim.Adam(model.parameters(), lr=config.train.learning_rate)
-    lr_scheduler = torch.optim.lr_scheduler.LambdaLR(
-        optimizer,
-        partial(
-            cosine_decay_with_warmup,
-            total_steps=config.train.steps,
-            warmup_steps=config.train.warmup_steps,
-        ),
-    )
 
-    # TODO: Use flash attention 2
     trainer = SFTTrainer(
         model=model,
         tokenizer=tokenizer,
-        optimizers=(optimizer, lr_scheduler),
         data_collator=collator,
+        max_seq_length=config.train.max_seq_length,
         train_dataset=train_dataset,
         eval_dataset=eval_dataset,
-        max_seq_length=config.train.max_seq_length,
+        dataset_kwargs={
+            "add_special_tokens": False,
+        },
         callbacks=[
             GenerateSamplesCallback(
                 config.eval.num_generate_samples, config.model.response_template
@@ -170,12 +173,20 @@ def main(_):
         ],
         args=TrainingArguments(
             output_dir=config.output_dir,
+            overwrite_output_dir=True,
+            optim="adamw_torch_fused",
+            learning_rate=config.train.learning_rate,
+            lr_scheduler_type="cosine",
+            warmup_steps=config.train.warmup_steps,
             report_to=["wandb", "tensorboard"],
             max_steps=config.train.steps,
             logging_steps=config.train.logging_steps,
             gradient_checkpointing=True,
+            gradient_checkpointing_kwargs={"use_reentrant": False},
             gradient_accumulation_steps=config.train.grad_acc_steps,
+            ddp_find_unused_parameters=False,
             group_by_length=True,
+            fp16=torch.cuda.is_available() and not torch.cuda.is_bf16_supported(),
             bf16=torch.cuda.is_available() and torch.cuda.is_bf16_supported(),
             evaluation_strategy="steps",
             eval_steps=config.eval.eval_steps,
@@ -185,10 +196,14 @@ def main(_):
             seed=config.seed,
             data_seed=config.seed,
         ),
-        dataset_kwargs={
-            "add_special_tokens": False,
-        },
     )
+    wandb.init(
+        project=config.wandb.project,
+        notes=config.wandb.notes,
+        config=config.to_dict(),
+        save_code=True,
+    )
+
     trainer.evaluate()
     trainer.train()
 
