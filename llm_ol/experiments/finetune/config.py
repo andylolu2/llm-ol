@@ -12,7 +12,7 @@ def get_config():
     )
 
     config.model = dict(
-        name="mistralai/Mistral-7B-Instruct-v0.2",
+        name="mistralai/Mistral-7B-v0.1",
         response_template=[733, 28748, 16289, 28793],  # _[/INST]
         instruction_template=[733, 16289, 28793],  # _[INST]
     )
@@ -23,7 +23,7 @@ def get_config():
     )
 
     config.train = dict(
-        steps=10_000,
+        epochs=1,
         warmup_steps=100,
         learning_rate=1e-5,
         logging_steps=50,

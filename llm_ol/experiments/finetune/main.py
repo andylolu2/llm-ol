@@ -17,6 +17,7 @@ from transformers import (
 from transformers.trainer_callback import TrainerControl, TrainerState
 from trl import DataCollatorForCompletionOnlyLM, SFTTrainer
 
+from llm_ol.experiments.finetune.templates import MISTRAL_TEMPLATE
 from llm_ol.utils import setup_logging
 
 FLAGS = flags.FLAGS
@@ -142,7 +143,7 @@ def main(_):
     model.print_trainable_parameters()
 
     tokenizer = AutoTokenizer.from_pretrained(config.model.name)
-    # Temp fixes for Mistral
+    tokenizer.chat_template = MISTRAL_TEMPLATE
     tokenizer.padding_side = "right"
     if getattr(tokenizer, "pad_token", None) is None:
         tokenizer.pad_token = tokenizer.unk_token
@@ -151,6 +152,7 @@ def main(_):
         response_template=config.model.response_template,
         instruction_template=config.model.instruction_template,
         tokenizer=tokenizer,
+        pad_to_multiple_of=8,
     )
     train_dataset, eval_dataset = datasets_from_file(
         config.data.file, config.data.eval_size, config.seed
@@ -176,10 +178,10 @@ def main(_):
             overwrite_output_dir=True,
             optim="adamw_torch_fused",
             learning_rate=config.train.learning_rate,
-            lr_scheduler_type="cosine",
+            lr_scheduler_type="constant_with_warmup",
             warmup_steps=config.train.warmup_steps,
             report_to=["wandb", "tensorboard"],
-            max_steps=config.train.steps,
+            num_train_epochs=config.train.epochs,
             logging_steps=config.train.logging_steps,
             gradient_checkpointing=True,
             gradient_checkpointing_kwargs={"use_reentrant": False},
@@ -197,15 +199,15 @@ def main(_):
             data_seed=config.seed,
         ),
     )
+
     wandb.init(
         project=config.wandb.project,
         notes=config.wandb.notes,
         config=config.to_dict(),
         save_code=True,
     )
-
     trainer.evaluate()
-    trainer.train()
+    trainer.train()  # type: ignore
 
 
 if __name__ == "__main__":
