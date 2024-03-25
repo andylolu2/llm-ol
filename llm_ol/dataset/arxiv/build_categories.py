@@ -26,7 +26,7 @@ def main(_):
     # Set up
     out_dir = Path(FLAGS.output_dir)
     out_dir.mkdir(parents=True, exist_ok=True)
-    setup_logging(out_dir)
+    setup_logging(out_dir, "build_categories", flags=FLAGS)
 
     # Build the graph
     G = nx.DiGraph(root=arxiv.ROOT_CATEGORY_ID)

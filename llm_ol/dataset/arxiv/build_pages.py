@@ -150,7 +150,7 @@ async def main(_):
     # Set up
     out_dir = Path(FLAGS.output_dir)
     out_dir.mkdir(parents=True, exist_ok=True)
-    setup_logging(out_dir)
+    setup_logging(out_dir, "build_pages", flags=FLAGS)
     asyncio.create_task(semantic_scholar_limit.replenish())
 
     # Get arXiv data

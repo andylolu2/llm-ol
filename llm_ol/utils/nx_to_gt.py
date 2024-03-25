@@ -1,3 +1,5 @@
+from typing import Hashable
+
 import graph_tool as gt
 import networkx as nx
 
@@ -29,7 +31,9 @@ def get_gt_type(value):
             raise ValueError(f"Unsupported type: {type(value)}")
 
 
-def nx_to_gt(G_nx: nx.Graph) -> gt.Graph:
+def nx_to_gt(
+    G_nx: nx.Graph,
+) -> tuple[gt.Graph, dict[Hashable, int], dict[int, Hashable]]:
     """
     Converts a networkx graph to a graph-tool graph.
     """
@@ -41,11 +45,11 @@ def nx_to_gt(G_nx: nx.Graph) -> gt.Graph:
         G_gt.gp[key] = value
 
     # Nodes and node properties (including the node id)
-    vertices = {}  # mapping nx nodes -> gt vertices for later
+    nx_to_gt_map = {}  # mapping nx nodes -> gt vertices for later
     G_gt.vp["id"] = G_gt.new_vp(get_gt_type(next(iter(G_nx.nodes))))
     for node, data in G_nx.nodes(data=True):
         v = G_gt.add_vertex()
-        vertices[node] = v
+        nx_to_gt_map[node] = G_gt.vertex_index[v]
         G_gt.vp["id"][v] = str(node)
 
         for key, val in data.items():
@@ -55,10 +59,12 @@ def nx_to_gt(G_nx: nx.Graph) -> gt.Graph:
 
     # Edges and edge properties
     for src, dst, data in G_nx.edges(data=True):
-        e = G_gt.add_edge(vertices[src], vertices[dst])
+        e = G_gt.add_edge(nx_to_gt_map[src], nx_to_gt_map[dst])
         for key, val in data.items():
             if key not in G_gt.ep:
                 G_gt.ep[key] = G_gt.new_ep(get_gt_type(val))
             G_gt.ep[key][e] = val
 
-    return G_gt
+    gt_to_nx_map = {v: k for k, v in nx_to_gt_map.items()}
+
+    return G_gt, nx_to_gt_map, gt_to_nx_map

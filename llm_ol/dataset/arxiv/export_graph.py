@@ -23,7 +23,7 @@ def main(_):
     # Set up
     out_dir = Path(FLAGS.output_dir)
     out_dir.mkdir(parents=True, exist_ok=True)
-    setup_logging(out_dir)
+    setup_logging(out_dir, "export_graph", flags=FLAGS)
 
     with open(FLAGS.pages_file, "r") as f:
         papers = [json.loads(line) for line in f]

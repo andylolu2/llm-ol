@@ -126,7 +126,7 @@ async def get_pages_and_subcats(out_categories_file: Path, max_depth: int = 0):
 async def async_main(_):
     out_dir = Path(FLAGS.output_dir)
     out_dir.mkdir(parents=True, exist_ok=True)
-    setup_logging(out_dir)
+    setup_logging(out_dir, "build_categories", flags=FLAGS)
 
     asyncio.create_task(wikipedia.api_limit.replenish())
 

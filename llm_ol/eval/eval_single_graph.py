@@ -32,7 +32,7 @@ flags.mark_flags_as_required(["graph_file", "output_dir"])
 
 def main(_):
     out_dir = Path(FLAGS.output_dir)
-    setup_logging(out_dir, "eval_single_graph")
+    setup_logging(out_dir, "eval_single_graph", flags=FLAGS)
 
     G = data_model.load_graph(FLAGS.graph_file)
     assert isinstance(G, nx.DiGraph)

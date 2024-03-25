@@ -1,4 +1,3 @@
-import os
 from pathlib import Path
 
 import torch
@@ -117,11 +116,14 @@ def datasets_from_file(
 def main(_):
     config = FLAGS.config
     logging.info("Config:\n%s", config)
-    setup_logging(config.output_dir, "main")
+    setup_logging(config.output_dir, "main", flags=FLAGS)
 
     device_string = PartialState().process_index
     model = AutoModelForCausalLM.from_pretrained(
-        config.model.name, use_cache=False, device_map={"": device_string}
+        config.model.name,
+        use_cache=False,
+        device_map={"": device_string},
+        torch_dtype="auto",
     )
     model = get_peft_model(
         model,
@@ -208,6 +210,9 @@ def main(_):
     )
     trainer.evaluate()
     trainer.train()  # type: ignore
+
+    # Save the final model
+    trainer.save_model()
 
 
 if __name__ == "__main__":

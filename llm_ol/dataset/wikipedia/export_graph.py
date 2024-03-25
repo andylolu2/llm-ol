@@ -26,7 +26,7 @@ flags.DEFINE_multi_integer(
 def main(_):
     out_dir = Path(FLAGS.output_dir)
     out_dir.mkdir(parents=True, exist_ok=True)
-    setup_logging(out_dir)
+    setup_logging(out_dir, "export_graph", flags=FLAGS)
 
     with open(FLAGS.categories_file, "r") as f:
         categories = [json.loads(line) for line in f]
@@ -61,9 +61,11 @@ def main(_):
             if category["id"] in G and subcategory["id"] in G:
                 G.add_edge(category["id"], subcategory["id"])
 
-    data_model.save_graph(G, out_dir / "full_graph.json")
+    data_model.save_graph(G, out_dir / "full_graph.json", clean_up=True)
     for depth in FLAGS.depths:
-        data_model.save_graph(G, out_dir / f"graph_depth_{depth}.json", depth)
+        data_model.save_graph(
+            G, out_dir / f"graph_depth_{depth}.json", depth, clean_up=True
+        )
 
 
 if __name__ == "__main__":

@@ -39,7 +39,7 @@ def parse_hierarchy(hierarchy_str: str):
 
 def main(_):
     out_dir = Path(FLAGS.output_dir)
-    setup_logging(out_dir, "export_graph")
+    setup_logging(out_dir, "export_graph", flags=FLAGS)
 
     results = []
     with open(FLAGS.hierarchy_file, "r") as f:

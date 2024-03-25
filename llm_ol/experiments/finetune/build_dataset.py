@@ -1,106 +1,53 @@
 import json
 import random
 from functools import partial
-from itertools import islice
 from multiprocessing import Pool
 from pathlib import Path
 
+import graph_tool.all as gt
 import networkx as nx
+import numpy as np
 from absl import app, flags, logging
 
 from llm_ol.dataset import data_model
 from llm_ol.experiments.finetune.templates import PROMPT_TEMPLATE, RESPONSE_TEMPLATE
 from llm_ol.utils import setup_logging, textpbar
+from llm_ol.utils.nx_to_gt import nx_to_gt
 
 FLAGS = flags.FLAGS
-flags.DEFINE_string("graph_file", None, "Path to the graph file", required=True)
+flags.DEFINE_string(
+    "train_graph_file", None, "Path to the train split of the graph file", required=True
+)
+flags.DEFINE_integer("cutoff", 5, "Maximum path length from the root to the page")
 flags.DEFINE_string("output_dir", None, "Path to the output directory", required=True)
-flags.DEFINE_integer("split_depth", 1, "Depth at which to split the graph")
-flags.DEFINE_float("split_prop", 0.1, "Proportion of nodes to split")
 flags.DEFINE_integer("num_workers", 8, "Number of workers to use")
 
 
-def split_graph(
-    G: nx.Graph, split_depth: int, prop: float
-) -> tuple[nx.Graph, nx.Graph]:
-    dist_to_root = nx.single_source_shortest_path_length(G, G.graph["root"])
-    shared_nodes = {n for n, d in dist_to_root.items() if d <= split_depth}
-    G_shared = G.subgraph(shared_nodes).copy()
-
-    longest_dist = max(dist_to_root.values())
-    nodes_to_split = [n for n, d in dist_to_root.items() if d == split_depth]
-    nodes_1 = set(random.sample(nodes_to_split, int(prop * len(nodes_to_split))))
-    logging.info(
-        "Splitting graph at depth %d, selecting %d/%d nodes",
-        split_depth,
-        len(nodes_1),
-        len(nodes_to_split),
-    )
-
-    # compute edges reachable from nodes_1
-    reachable_edges = set()
-    for n in nodes_1:
-        decentants = nx.ego_graph(G, n, radius=longest_dist - split_depth).edges
-        reachable_edges.update(decentants)
-    logging.info(
-        "Found %d/%d (%.2f%%) reachable edges in %d/%d hops",
-        len(reachable_edges),
-        G.number_of_edges(),
-        100 * len(reachable_edges) / G.number_of_edges(),
-        longest_dist - split_depth,
-        longest_dist,
-    )
-
-    G_1 = G.edge_subgraph(reachable_edges | G_shared.edges).copy()
-    G_2 = G.edge_subgraph(G.edges - reachable_edges).copy()
-    logging.info(
-        "Spliting graph of %d nodes into %d (%.2f%%) and %d (%.2f%%) nodes. %d shared nodes.",
-        G.number_of_nodes(),
-        G_1.number_of_nodes(),
-        100 * G_1.number_of_nodes() / G.number_of_nodes(),
-        G_2.number_of_nodes(),
-        100 * G_2.number_of_nodes() / G.number_of_nodes(),
-        len(G_1.nodes & G_2.nodes),
-    )
-    logging.info(
-        "Spliting graph of %d edges into %d (%.2f%%) and %d (%.2f%%) edges. %d shared edges.",
-        G.number_of_edges(),
-        G_1.number_of_edges(),
-        100 * G_1.number_of_edges() / G.number_of_edges(),
-        G_2.number_of_edges(),
-        100 * G_2.number_of_edges() / G.number_of_edges(),
-        len(G_1.edges & G_2.edges),
-    )
-
-    return G_1, G_2
-
-
-def paths_from_root(G: nx.Graph, page: dict, n: int):
-    """Find the n shortest simple paths from the root to the page.
-
-    May return less than n paths.
-    """
+def paths_from_root(
+    G_gt: gt.Graph,
+    root_idx: int,
+    page_categories_idxs: list[int],
+    cutoff: None | int = None,
+):
+    """Find the simple paths with len <= cutoff from the root to the page."""
 
     # Temporarily add the page to the graph
-    G.add_node(page["id"], title=page["title"])
-    for category in page["categories"]:
-        if category in G:
-            G.add_edge(category, page["id"])
+    page_node = G_gt.add_vertex()
+    for idx in page_categories_idxs:
+        G_gt.add_edge(idx, page_node)
 
     try:
-        paths = islice(nx.shortest_simple_paths(G, G.graph["root"], page["id"]), n)
-        paths = [[G.nodes[n]["title"] for n in path] for path in paths]
-    except nx.NetworkXNoPath:
-        paths = []
+        paths = gt.all_paths(G_gt, source=root_idx, target=page_node, cutoff=cutoff)
+        paths = [path[:-1] for path in paths]
+        random.shuffle(paths)
+        return paths
     finally:
-        G.remove_node(page["id"])
-
-    random.shuffle(paths)  # shuffling to avoid bias
-    return paths
+        G_gt.remove_vertex(page_node)
 
 
 def make_training_samples(G: nx.Graph):
     G = G.copy()
+    G_gt, nx_to_gt_map, gt_to_nx_map = nx_to_gt(G)
 
     pages = {}
     for node, data in G.nodes(data=True):
@@ -110,16 +57,30 @@ def make_training_samples(G: nx.Graph):
                 pages[id_] = {**page, "categories": [node]}
             else:
                 pages[id_]["categories"].append(node)
+    pages = list(pages.values())
+    category_idxs = [
+        [nx_to_gt_map[category] for category in page["categories"]] for page in pages
+    ]
 
+    not_covered_edges = set(G.edges())
+    num_paths = []
     path_lengths = []
     pbar = textpbar(len(pages))
+    map_fn = partial(
+        paths_from_root,
+        G_gt,
+        nx_to_gt_map[G.graph["root"]],
+        cutoff=FLAGS.cutoff,
+    )
     with Pool(FLAGS.num_workers) as p:
-        for page, paths in zip(
-            pages.values(),
-            p.imap(partial(paths_from_root, G, n=5), pages.values(), chunksize=5000),
-        ):
+        for page, paths in zip(pages, p.imap(map_fn, category_idxs, chunksize=5000)):
             if len(paths) == 0:
+                logging.warning("No paths found for page %s", page["title"])
                 continue
+
+            path_titles = [
+                [G.nodes[gt_to_nx_map[v]]["title"] for v in path] for path in paths
+            ]
             yield {
                 "messages": [
                     {
@@ -130,32 +91,45 @@ def make_training_samples(G: nx.Graph):
                     },
                     {
                         "role": "assistant",
-                        "content": RESPONSE_TEMPLATE.render(paths=paths),
+                        "content": RESPONSE_TEMPLATE.render(paths=path_titles),
                     },
                 ]
             }
             pbar.update()
-            path_lengths.append(len(paths))
+            num_paths.append(len(paths))
+            path_lengths += [len(path) for path in paths]
+            for path in paths:
+                for u, v in zip(path[:-1], path[1:]):
+                    not_covered_edges.discard((gt_to_nx_map[u], gt_to_nx_map[v]))
 
-    logging.info("Number of samples: %d", len(path_lengths))
-    logging.info("Average path length: %.2f", sum(path_lengths) / len(path_lengths))
+    logging.info("Number of samples: %d/%d", len(num_paths), len(pages))
+    logging.info(
+        "Number of paths quantiles: %s (5 | 25 | 50 | 75 | 95). Mean: %.3f",
+        np.percentile(num_paths, [5, 25, 50, 75, 95]),
+        np.mean(num_paths),
+    )
+    logging.info(
+        "Path length quantiles: %s (5 | 25 | 50 | 75 | 95). Mean: %.3f",
+        np.percentile(path_lengths, [5, 25, 50, 75, 95]),
+        np.mean(path_lengths),
+    )
+    logging.info(
+        "Edges not covered by any path: %d/%d (%.2f%%)",
+        len(not_covered_edges),
+        G.number_of_edges(),
+        len(not_covered_edges) / G.number_of_edges() * 100,
+    )
 
 
 def main(_):
     out_dir = Path(FLAGS.output_dir)
-    setup_logging(out_dir, "build_finetune")
+    setup_logging(out_dir, "build_chat_messages", flags=FLAGS)
 
-    G = data_model.load_graph(FLAGS.graph_file)
-    G_test, G_train = split_graph(G, FLAGS.split_depth, FLAGS.split_prop)
+    G = data_model.load_graph(FLAGS.train_graph_file)
 
-    logging.info("Saving train samples to %s", out_dir / "train_samples.jsonl")
-    with open(out_dir / "train_samples.jsonl", "w") as f:
-        for chat in make_training_samples(G_train):
-            f.write(json.dumps(chat) + "\n")
-
-    logging.info("Saving test samples to %s", out_dir / "test_samples.jsonl")
-    with open(out_dir / "test_samples.jsonl", "w") as f:
-        for chat in make_training_samples(G_test):
+    logging.info("Saving chat samples to %s", out_dir / "chat_messages.jsonl")
+    with open(out_dir / "chat_messages.jsonl", "w") as f:
+        for chat in make_training_samples(G):
             f.write(json.dumps(chat) + "\n")
 
 

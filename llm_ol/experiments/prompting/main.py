@@ -18,7 +18,7 @@ flags.DEFINE_integer("max_depth", None, "Maximum depth of the graph")
 
 async def main(_):
     out_dir = Path(FLAGS.output_dir)
-    setup_logging(out_dir)
+    setup_logging(out_dir, "main", flags=FLAGS)
     out_file = out_dir / "categorised_pages.jsonl"
 
     G = data_model.load_graph(FLAGS.graph_file, FLAGS.max_depth)

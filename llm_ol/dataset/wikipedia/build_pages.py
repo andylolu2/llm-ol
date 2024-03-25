@@ -86,7 +86,7 @@ async def get_pages_abstract(page_ids: set[int], out_file: Path):
 async def async_main(_):
     out_dir = Path(FLAGS.output_dir)
     out_dir.mkdir(parents=True, exist_ok=True)
-    setup_logging(out_dir)
+    setup_logging(out_dir, "build_pages", flags=FLAGS)
 
     asyncio.create_task(wikipedia.api_limit.replenish())
 
