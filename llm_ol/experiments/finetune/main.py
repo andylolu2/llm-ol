@@ -116,7 +116,7 @@ def datasets_from_file(
 def main(_):
     config = FLAGS.config
     logging.info("Config:\n%s", config)
-    setup_logging(config.output_dir, "main", flags=FLAGS)
+    setup_logging(config.output_dir, "main")
 
     device_string = PartialState().process_index
     model = AutoModelForCausalLM.from_pretrained(

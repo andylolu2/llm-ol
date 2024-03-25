@@ -26,4 +26,4 @@ def setup_logging(
 def log_flags(file_name: Path | str, flags: flags.FlagValues):
     dict_ = flags.flag_values_dict()
     with open(file_name, "w") as f:
-        json.dump(dict_, f, indent=2)
+        json.dump(dict_, f, indent=2, default=str)
