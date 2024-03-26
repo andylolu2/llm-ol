@@ -1,14 +1,21 @@
 import asyncio
+import json
+from pathlib import Path
 
+import aiohttp
+import openai
 from absl import app, flags, logging
+from httpx import Limits, Timeout
 from openai import AsyncOpenAI
 
+from llm_ol.dataset import data_model
 from llm_ol.experiments.finetune.templates import PROMPT_TEMPLATE
+from llm_ol.utils import setup_logging, textpbar
 
 FLAGS = flags.FLAGS
-# flags.DEFINE_string("graph_file", None, "Path to the graph file", required=True)
-# flags.DEFINE_string("output_dir", None, "Path to the output directory", required=True)
-# flags.DEFINE_integer("max_depth", None, "Maximum depth of the graph")
+flags.DEFINE_string("graph_file", None, "Path to the graph file", required=True)
+flags.DEFINE_string("output_dir", None, "Path to the output directory", required=True)
+flags.DEFINE_integer("max_depth", None, "Maximum depth of the graph")
 
 
 async def query(client: AsyncOpenAI, title: str, abstract: str, t: float = 0) -> str:
@@ -28,22 +35,72 @@ async def query(client: AsyncOpenAI, title: str, abstract: str, t: float = 0) ->
 
 
 async def main(_):
+    out_dir = Path(FLAGS.output_dir)
+    setup_logging(out_dir, "inference", flags=FLAGS)
+    out_file = out_dir / "categorised_pages.jsonl"
+
+    # wait for the server to start
+    async with aiohttp.ClientSession() as session:
+        while True:
+            logging.info("Waiting for server to start")
+            try:
+                async with session.get("http://localhost:8080/health") as resp:
+                    if resp.status == 200:
+                        break
+            except aiohttp.ClientConnectorError:
+                await asyncio.sleep(5)
+    logging.info("Server started")
+
     client = AsyncOpenAI(
-        base_url="http://localhost:8080/v1",
         api_key="no-key-required",
+        base_url="http://localhost:8080/v1",
+        http_client=openai._base_client.AsyncHttpxClientWrapper(
+            base_url="http://localhost:8080/v1",
+            timeout=Timeout(None),
+            limits=Limits(max_keepalive_connections=1000, max_connections=1000),
+        ),
     )
 
-    result = await query(
-        client,
-        "Life on Mars",
-        """The possibility of life on Mars is a subject of interest in astrobiology due to the planet's proximity and similarities to Earth. To date, no proof of past or present life has been found on Mars. Cumulative evidence suggests that during the ancient Noachian time period, the surface environment of Mars had liquid water and may have been habitable for microorganisms, but habitable conditions do not necessarily indicate life.[1][2]
-Scientific searches for evidence of life began in the 19th century and continue today via telescopic investigations and deployed probes, searching for water, chemical biosignatures in the soil and rocks at the planet's surface, and biomarker gases in the atmosphere.[3]
-Mars is of particular interest for the study of the origins of life because of its similarity to the early Earth. This is especially true since Mars has a cold climate and lacks plate tectonics or continental drift, so it has remained almost unchanged since the end of the Hesperian period. At least two-thirds of Mars's surface is more than 3.5 billion years old, and it could have been habitable 4.48 billion years ago, 500 million years before the earliest known Earth lifeforms;[4] Mars may thus hold the best record of the prebiotic conditions leading to life, even if life does not or has never existed there.[5][6]
-Following the confirmation of the past existence of surface liquid water, the Curiosity, Perseverance and Opportunity rovers started searching for evidence of past life, including a past biosphere based on autotrophic, chemotrophic, or chemolithoautotrophic microorganisms, as well as ancient water, including fluvio-lacustrine environments (plains related to ancient rivers or lakes) that may have been habitable.[7][8][9][10] The search for evidence of habitability, taphonomy (related to fossils), and organic compounds on Mars is now a primary objective for space agencies. """,
-        t=0.5,
-    )
+    G = data_model.load_graph(FLAGS.graph_file, FLAGS.max_depth)
+    computed = set()
+    if out_file.exists():
+        with open(out_file, "r") as f:
+            computed.update({json.loads(line)["id"] for line in f})
+    logging.info("Loaded %d computed pages", len(computed))
 
-    logging.info(result)
+    pages = []
+    for _, data in G.nodes(data=True):
+        for page in data["pages"]:
+            if page["id"] not in computed:
+                pages.append(page)
+
+    pbar = textpbar(len(pages))
+    sem = asyncio.Semaphore(1000)  # Limit the number of concurrent requests
+
+    async def task(page):
+        async with sem:
+            try:
+                out = await query(client, page["title"], page["abstract"])
+                with open(out_file, "a") as f:
+                    f.write(
+                        json.dumps(
+                            {
+                                "id": page["id"],
+                                "title": page["title"],
+                                "abstract": page["abstract"],
+                                "hierarchy": out,
+                            }
+                        )
+                        + "\n"
+                    )
+            except Exception as e:
+                logging.error(
+                    "Error processing page %s: %s", page["id"], repr(e) + str(e)
+                )
+            finally:
+                pbar.update()
+
+    await asyncio.gather(*[task(page) for page in pages])
 
 
 if __name__ == "__main__":

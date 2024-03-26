@@ -76,6 +76,7 @@ class GenerateSamplesCallback(TrainerCallback):
                 attention_mask=prompt["attention_mask"].unsqueeze(0),
                 max_new_tokens=512,
                 pad_token_id=tokenizer.pad_token_id,
+                do_sample=False,
             )
             samples.append(
                 {
@@ -202,17 +203,18 @@ def main(_):
         ),
     )
 
-    wandb.init(
-        project=config.wandb.project,
-        notes=config.wandb.notes,
-        config=config.to_dict(),
-        save_code=True,
-    )
+    if trainer.state.is_world_process_zero:
+        wandb.init(
+            project=config.wandb.project,
+            notes=config.wandb.notes,
+            config=config.to_dict(),
+            save_code=True,
+        )
     trainer.evaluate()
     trainer.train()  # type: ignore
 
     # Save the final model
-    trainer.save_model()
+    trainer.save_model(str(Path(config.output_dir) / "final"))
 
 
 if __name__ == "__main__":

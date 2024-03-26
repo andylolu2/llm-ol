@@ -14,7 +14,7 @@ from llm_ol.utils import setup_logging, textqdm
 FLAGS = flags.FLAGS
 flags.DEFINE_string("graph_file", None, "Path to the graph file", required=True)
 flags.DEFINE_string("output_dir", None, "Path to the output directory", required=True)
-flags.DEFINE_integer("max_depth", 1, "Maximum depth of the graph")
+flags.DEFINE_integer("max_depth", None, "Maximum depth of the graph")
 flags.DEFINE_integer("num_workers", os.cpu_count(), "Number of workers")
 
 
