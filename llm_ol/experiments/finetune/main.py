@@ -76,7 +76,8 @@ class GenerateSamplesCallback(TrainerCallback):
                 attention_mask=prompt["attention_mask"].unsqueeze(0),
                 max_new_tokens=512,
                 pad_token_id=tokenizer.pad_token_id,
-                do_sample=False,
+                do_sample=True,
+                temperature=0.1,
             )
             samples.append(
                 {

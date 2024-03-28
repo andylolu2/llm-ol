@@ -9,9 +9,6 @@ python -m vllm.entrypoints.openai.api_server \
     --disable-log-requests &
 API_SERVER_PID=$!
 
-# Wait for the API server to start
-sleep 20
-
 # Run the main script
 python llm_ol/experiments/prompting/main.py \
     --graph_file out/data/wikipedia/v1/full/graph_depth_2.json \

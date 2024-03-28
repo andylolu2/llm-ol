@@ -1,6 +1,4 @@
-from openai import AsyncOpenAI
-
-from llm_ol.utils import load_template
+from llm_ol.utils import ParallelAsyncOpenAI, load_template
 
 #   "chat_template": "{{ bos_token }}{% for message in messages %}{% if (message['role'] == 'user') != (loop.index0 % 2 == 0) %}{{ raise_exception('Conversation roles must alternate user/assistant/user/assistant/...') }}{% endif %}{% if message['role'] == 'user' %}{{ '[INST] ' + message['content'] + ' [/INST]' }}{% elif message['role'] == 'assistant' %}{{ message['content'] + eos_token}}{% else %}{{ raise_exception('Only user and assistant roles are supported!') }}{% endif %}{% endfor %}"
 
@@ -38,14 +36,11 @@ Provide a category hierarchy for the above article. Use the same format as the e
 """
 template = load_template(s)
 
-client = AsyncOpenAI(
-    base_url="http://localhost:8080/v1",
-    api_key="sk-no-key-required",
-)
 
-
-async def create_hierarchy_v2(title: str, abstract: str, t: float = 0) -> str:
-    completion = await client.completions.create(
+async def create_hierarchy_v2(
+    client: ParallelAsyncOpenAI, title: str, abstract: str, t: float = 0
+) -> str:
+    completion = await client.completions(
         model="gpt-3.5-turbo",
         prompt=template.render(title=title, abstract=abstract),
         temperature=t,

@@ -21,18 +21,18 @@ def directed_diameter(G: nx.DiGraph):
 
 
 def central_nodes(G: nx.DiGraph):
-    G_gt = nx_to_gt(G.to_undirected())
+    G_gt, nx_to_gt_map, gt_to_nx_map = nx_to_gt(G.to_undirected())
     vertex_betweeness, edge_betweeness = gt.betweenness(G_gt)
     items = []
     for v in G_gt.vertices():
-        items.append((G_gt.vp["id"][v], vertex_betweeness[v]))
+        items.append((v, vertex_betweeness[v]))
 
     items = sorted(items, key=lambda x: x[1], reverse=True)
     result = []
-    for n, v in items:
-        if "title" in G.nodes[n]:
-            n = G.nodes[n]["title"]
-        result.append((n, v))
+    for v, centrality in items:
+        n = gt_to_nx_map[v]
+        title = G.nodes[n].get("title", n)
+        result.append((title, centrality))
     return result
 
 
