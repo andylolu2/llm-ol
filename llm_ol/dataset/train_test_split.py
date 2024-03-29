@@ -57,8 +57,6 @@ def main(_):
     G = data_model.load_graph(FLAGS.graph_file)
     assert isinstance(G, nx.DiGraph)
     G_test, G_train = split_graph(G, FLAGS.split_depth, FLAGS.split_prop)
-    G_train = data_model.clean_up_graph(G_train)
-    G_test = data_model.clean_up_graph(G_test)
 
     dist_to_root = nx.single_source_shortest_path_length(G, G.graph["root"])
     for i in range(max(dist_to_root.values()) + 1):

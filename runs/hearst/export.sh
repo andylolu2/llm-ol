@@ -3,5 +3,5 @@
 dir=out/experiments/hearst/v2
 
 python llm_ol/experiments/hearst/export_graph.py \
-    --hyponyms_file $dir/hyponyms.json \
+    --extraction_dir $dir/extractions \
     --output_dir $dir

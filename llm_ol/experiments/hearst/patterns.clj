@@ -1,4 +1,5 @@
 ; Taken from https://gist.github.com/stephenroller/85b41a88c611a260530e4053f6ef84b9
+; Run this code in a Clojure REPL (https://www.mycompiler.io/new/clojure) to generate the hearst.rules file
 ; Copyright Facebook 2018-2020
 ; Licensed under MIT.
 
@@ -53,7 +54,7 @@
 
 (defn print-patterns [patterns]
   (doseq [pattern patterns]
-    (println "{ ruleType: \"tokens\", pattern: " (pattern :regex) ", action: Annotate($head, ner, Concat($$pretail.text, \" \", $$tail.text, \"|||\", $$prehead.text, \" \", $$head.text)) }"
+    (println "{ ruleType: \"tokens\", pattern:" (pattern :regex) ", action: Annotate($head, ner, Concat($$pretail.text, \" \", $$tail.text, \"|||\", $$prehead.text, \" \", $$head.text, \"|||\", \"" (pattern :id) "\")) }"
     )))
 
 (print-patterns token-patterns)
