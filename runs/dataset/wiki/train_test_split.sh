@@ -1,4 +1,5 @@
 #!/bin/bash
+set -e
 
 wiki_dir=out/data/wikipedia/v2
 

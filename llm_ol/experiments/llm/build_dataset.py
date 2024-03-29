@@ -10,16 +10,15 @@ import numpy as np
 from absl import app, flags, logging
 
 from llm_ol.dataset import data_model
-from llm_ol.experiments.finetune.templates import PROMPT_TEMPLATE, RESPONSE_TEMPLATE
 from llm_ol.utils import setup_logging, textpbar
 from llm_ol.utils.nx_to_gt import nx_to_gt
 
 FLAGS = flags.FLAGS
 flags.DEFINE_string(
-    "train_graph_file", None, "Path to the train split of the graph file", required=True
+    "graph_file", None, "Path to the train split of the graph file", required=True
 )
+flags.DEFINE_string("output_file", None, "Output file", required=True)
 flags.DEFINE_integer("cutoff", 5, "Maximum path length from the root to the page")
-flags.DEFINE_string("output_dir", None, "Path to the output directory", required=True)
 flags.DEFINE_integer("num_workers", 8, "Number of workers to use")
 
 
@@ -82,18 +81,10 @@ def make_training_samples(G: nx.Graph):
                 [G.nodes[gt_to_nx_map[v]]["title"] for v in path] for path in paths
             ]
             yield {
-                "messages": [
-                    {
-                        "role": "user",
-                        "content": PROMPT_TEMPLATE.render(
-                            title=page["title"], abstract=page["abstract"]
-                        ),
-                    },
-                    {
-                        "role": "assistant",
-                        "content": RESPONSE_TEMPLATE.render(paths=path_titles),
-                    },
-                ]
+                "id": page["id"],
+                "title": page["title"],
+                "abstract": page["abstract"],
+                "paths": path_titles,
             }
             pbar.update()
             num_paths.append(len(paths))
@@ -122,13 +113,14 @@ def make_training_samples(G: nx.Graph):
 
 
 def main(_):
-    out_dir = Path(FLAGS.output_dir)
-    setup_logging(out_dir, "build_chat_messages", flags=FLAGS)
+    out_file = Path(FLAGS.output_file)
+    assert out_file.suffix == ".jsonl"
+    setup_logging(out_file.parent, "build_dataset", flags=FLAGS)
 
-    G = data_model.load_graph(FLAGS.train_graph_file)
+    G = data_model.load_graph(FLAGS.graph_file)
 
-    logging.info("Saving chat samples to %s", out_dir / "chat_messages.jsonl")
-    with open(out_dir / "chat_messages.jsonl", "w") as f:
+    logging.info("Saving dataset samples to %s", out_file)
+    with open(out_file, "w") as f:
         for chat in make_training_samples(G):
             f.write(json.dumps(chat) + "\n")
 

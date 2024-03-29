@@ -1,4 +1,5 @@
 #!/bin/bash
+set -e
 
 export HF_HUB_CACHE=out/models
 

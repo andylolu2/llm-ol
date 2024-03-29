@@ -1,4 +1,5 @@
 #!/bin/bash
+set -e
 
 python llm_ol/dataset/wikipedia/build_categories.py \
     --max_depth 4 \

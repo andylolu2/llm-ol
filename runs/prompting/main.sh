@@ -1,4 +1,5 @@
 #!/bin/bash
+set -e
 
 # Start the OpenAI API server in the background
 python -m vllm.entrypoints.openai.api_server \
@@ -11,8 +12,10 @@ API_SERVER_PID=$!
 
 # Run the main script
 python llm_ol/experiments/prompting/main.py \
-    --graph_file out/data/wikipedia/v1/full/graph_depth_2.json \
-    --output_dir out/experiments/prompting/v3
+    --train_dataset out/experiments/llm/v1/train_dataset.jsonl \
+    --test_dataset out/experiments/llm/v1/test_dataset.jsonl \
+    --ports 8080 \
+    --output_dir out/experiments/prompting/dev
 
 # Kill the OpenAI API server
 kill $API_SERVER_PID

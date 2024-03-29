@@ -1,4 +1,5 @@
 #!/bin/bash
+set -e
 
 # Get current open file limit
 OPEN_FILE_LIMIT=$(ulimit -n)

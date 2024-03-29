@@ -1,5 +1,3 @@
-"""This script is idempotent."""
-
 import asyncio
 import json
 from pathlib import Path
@@ -7,22 +5,42 @@ from pathlib import Path
 from absl import app, flags, logging
 
 from llm_ol.dataset import data_model
-from llm_ol.experiments.prompting.create_hierarchy_v2 import create_hierarchy_v2
+from llm_ol.experiments.llm.templates import PROMPT_TEMPLATE, RESPONSE_REGEX
 from llm_ol.utils import ParallelAsyncOpenAI, setup_logging, textpbar, wait_for_endpoint
 
 FLAGS = flags.FLAGS
 flags.DEFINE_string("graph_file", None, "Path to the graph file", required=True)
 flags.DEFINE_string("output_dir", None, "Path to the output directory", required=True)
-flags.DEFINE_integer("max_depth", None, "Maximum depth of the graph")
 flags.DEFINE_integer(
     "max_concurrent_requests", 512, "Maximum number of concurrent requests per endpoint"
 )
 flags.DEFINE_multi_integer("ports", [], "Ports to use for the API")
+flags.DEFINE_integer("max_depth", None, "Maximum depth of the graph")
+
+
+async def query(
+    client: ParallelAsyncOpenAI, title: str, abstract: str, t: float = 0
+) -> str:
+    completion = await client.chat(
+        messages=[
+            {
+                "role": "user",
+                "content": PROMPT_TEMPLATE.render(title=title, abstract=abstract),
+            }
+        ],
+        model="gpt-3.5-turbo",
+        temperature=t,
+        max_tokens=2048,
+        # extra_body={"guided_regex": RESPONSE_REGEX},
+    )
+    out = completion.choices[0].message.content
+    assert isinstance(out, str)
+    return out
 
 
 async def main(_):
     out_dir = Path(FLAGS.output_dir)
-    setup_logging(out_dir, "main", flags=FLAGS)
+    setup_logging(out_dir, "inference", flags=FLAGS)
     out_file = out_dir / "categorised_pages.jsonl"
 
     client = ParallelAsyncOpenAI(
@@ -47,7 +65,7 @@ async def main(_):
 
     async def task(page):
         try:
-            out = await create_hierarchy_v2(client, page["title"], page["abstract"])
+            out = await query(client, page["title"], page["abstract"], t=0.1)
             with open(out_file, "a") as f:
                 f.write(
                     json.dumps(

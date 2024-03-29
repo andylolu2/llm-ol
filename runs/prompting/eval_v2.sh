@@ -1,4 +1,5 @@
 #!/bin/bash
+set -e
 
 python llm_ol/eval/eval_single_graph.py \
     --graph_file out/experiments/prompting/v2/graph.json \

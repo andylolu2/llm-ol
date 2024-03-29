@@ -1,4 +1,5 @@
 #!/bin/bash
+set -e
 
 dir=out/experiments/hearst/v2
 

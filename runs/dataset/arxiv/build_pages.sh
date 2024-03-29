@@ -1,4 +1,5 @@
 #!/bin/bash
+set -e
 
 arxiv_dir=out/data/arxiv/v1
 

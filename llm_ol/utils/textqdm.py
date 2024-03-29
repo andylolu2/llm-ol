@@ -25,9 +25,10 @@ class textpbar:
             avg_rate = self.i / (time() - self.start_time)
             if self.total is not None:
                 logging.info(
-                    "Progress: %d / %d (Avg. rate: %.2f it/s)",
+                    "Progress: %d / %d %.2f%% (Avg. rate: %.2f it/s)",
                     self.i,
                     self.total,
+                    self.i / self.total * 100,
                     avg_rate,
                 )
             else:
