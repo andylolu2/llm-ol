@@ -20,7 +20,7 @@ for device_id in $GPUS; do
 done
 
 # Run the main script
-python llm_ol/experiments/finetune/inference.py \
+python llm_ol/experiments/llm/finetune/inference.py \
     --graph_file out/data/wikipedia/v1/full/graph_depth_3.json \
     $(for i in $GPUS; do echo "--ports $((8080 + $i))"; done) \
     --output_dir out/experiments/finetune/v2

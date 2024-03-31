@@ -16,7 +16,7 @@ from transformers import (
 from transformers.trainer_callback import TrainerControl, TrainerState
 from trl import DataCollatorForCompletionOnlyLM, SFTTrainer
 
-from llm_ol.experiments.finetune.templates import MISTRAL_TEMPLATE
+from llm_ol.experiments.llm.templates import _MISTRAL_TEMPLATE
 from llm_ol.utils import setup_logging
 
 FLAGS = flags.FLAGS
@@ -147,7 +147,7 @@ def main(_):
     model.print_trainable_parameters()
 
     tokenizer = AutoTokenizer.from_pretrained(config.model.name)
-    tokenizer.chat_template = MISTRAL_TEMPLATE
+    tokenizer.chat_template = _MISTRAL_TEMPLATE
     tokenizer.padding_side = "right"
     if getattr(tokenizer, "pad_token", None) is None:
         tokenizer.pad_token = tokenizer.unk_token

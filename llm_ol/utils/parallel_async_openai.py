@@ -22,10 +22,9 @@ class ParallelAsyncOpenAI:
                 base_url=base_url,
                 http_client=openai._base_client.AsyncHttpxClientWrapper(
                     base_url=base_url,
-                    timeout=Timeout(None),
                     limits=Limits(
                         max_connections=max_concurrent_per_client,
-                        max_keepalive_connections=max_concurrent_per_client,
+                        max_keepalive_connections=max_concurrent_per_client // 5,
                     ),
                 ),
             )
