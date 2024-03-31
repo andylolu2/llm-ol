@@ -18,12 +18,13 @@ def get_config():
     )
 
     config.data = dict(
-        file=config_dict.placeholder(str),
+        train_file=config_dict.placeholder(str),
+        eval_file=config_dict.placeholder(str),
         eval_size=1024,
     )
 
     config.train = dict(
-        epochs=1,
+        epochs=2,
         warmup_steps=100,
         learning_rate=1e-5,
         logging_steps=50,

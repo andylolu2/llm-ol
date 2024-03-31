@@ -16,7 +16,11 @@ from transformers import (
 from transformers.trainer_callback import TrainerControl, TrainerState
 from trl import DataCollatorForCompletionOnlyLM, SFTTrainer
 
-from llm_ol.experiments.llm.templates import _MISTRAL_TEMPLATE
+from llm_ol.experiments.llm.templates import (
+    _MISTRAL_TEMPLATE,
+    PROMPT_TEMPLATE,
+    RESPONSE_TEMPLATE,
+)
 from llm_ol.utils import setup_logging
 
 FLAGS = flags.FLAGS
@@ -42,7 +46,6 @@ class GenerateSamplesCallback(TrainerCallback):
         model = kwargs["model"]
         eval_loader = kwargs["eval_dataloader"]
         tokenizer = kwargs["tokenizer"]
-        model.config.use_cache = True
 
         prompts = []
         for batch in eval_loader:
@@ -70,28 +73,27 @@ class GenerateSamplesCallback(TrainerCallback):
                         break
 
         samples = []
-        for prompt in prompts:
+        for i, prompt in enumerate(prompts):
             [sample] = model.generate(
                 inputs=prompt["input_ids"].unsqueeze(0),
                 attention_mask=prompt["attention_mask"].unsqueeze(0),
-                max_new_tokens=512,
                 pad_token_id=tokenizer.pad_token_id,
                 do_sample=True,
                 temperature=0.1,
+                top_p=0.9,
+                max_new_tokens=1024,
+                use_cache=True,
             )
-            samples.append(
-                {
-                    "prompt": tokenizer.decode(prompt["input_ids"]),
-                    "completion": tokenizer.decode(sample[len(prompt["input_ids"]) :]),
-                    "target": tokenizer.decode(
-                        prompt["target_ids"],
-                        skip_special_tokens=True,  # Remove pad tokens
-                    ),
-                }
-            )
-
-        for i, sample in enumerate(samples):
+            sample = {
+                "prompt": tokenizer.decode(prompt["input_ids"]),
+                "completion": tokenizer.decode(sample[len(prompt["input_ids"]) :]),
+                "target": tokenizer.decode(
+                    prompt["target_ids"],
+                    skip_special_tokens=True,  # Remove pad tokens
+                ),
+            }
             logging.info("Sample %d: %s", i, sample)
+            samples.append(sample)
 
         if len(samples) > 0:
             table = wandb.Table(
@@ -100,19 +102,31 @@ class GenerateSamplesCallback(TrainerCallback):
             )
             wandb.log({"eval/samples": table}, step=state.global_step + 1)
 
-        model.config.use_cache = False
 
-
-def datasets_from_file(
-    data_file: str | Path, eval_size: int, seed: int = 0
-) -> tuple[Dataset, Dataset]:
+def dataset_from_file(
+    data_file: str | Path, size: int | None = None, seed: int = 0
+) -> Dataset:
     dataset = load_dataset("json", data_files=str(data_file), split="train")
     assert isinstance(dataset, Dataset)
-    splits = dataset.train_test_split(test_size=eval_size, seed=seed)
-    logging.info(
-        "Train size: %d, Test size: %d", len(splits["train"]), len(splits["test"])
-    )
-    return splits["train"], splits["test"]
+    if size is not None:
+        dataset = dataset.shuffle(seed=seed).select(range(size))
+
+    def make_messages(examples: dict[str, list]) -> dict[str, list]:
+        outputs = []
+        for title, abstract, paths in zip(
+            examples["title"], examples["abstract"], examples["paths"]
+        ):
+            prompt = PROMPT_TEMPLATE.render(title=title, abstract=abstract)
+            response = RESPONSE_TEMPLATE.render(paths=paths)
+            messages = [
+                {"role": "user", "content": prompt},
+                {"role": "assistant", "content": response},
+            ]
+            outputs.append(messages)
+        return {"messages": outputs}
+
+    dataset = dataset.map(make_messages, batched=True, num_proc=16)
+    return dataset
 
 
 def main(_):
@@ -158,17 +172,15 @@ def main(_):
         tokenizer=tokenizer,
         pad_to_multiple_of=8,
     )
-    train_dataset, eval_dataset = datasets_from_file(
-        config.data.file, config.data.eval_size, config.seed
-    )
 
     trainer = SFTTrainer(
         model=model,
         tokenizer=tokenizer,
         data_collator=collator,
         max_seq_length=config.train.max_seq_length,
-        train_dataset=train_dataset,
-        eval_dataset=eval_dataset,
+        dataset_num_proc=16,
+        train_dataset=dataset_from_file(config.data.train_file),
+        eval_dataset=dataset_from_file(config.data.eval_file, config.data.eval_size),
         dataset_kwargs={
             "add_special_tokens": False,
         },

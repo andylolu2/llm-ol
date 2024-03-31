@@ -2,7 +2,7 @@ from asyncio import Semaphore
 from typing import Any, Callable, TypeVar
 
 import openai
-from httpx import Limits, Timeout
+from httpx import Limits
 from openai import AsyncOpenAI
 from openai.resources.chat.completions import AsyncCompletions as ChatCompletions
 from openai.resources.completions import AsyncCompletions as Completions

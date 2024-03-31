@@ -89,7 +89,7 @@ def main(_):
     )
     tokenizer = llm.get_tokenizer()
 
-    for pages in batch(test_pages, 1000):
+    for pages in batch(test_pages, 5000):
         prompts = []
         few_shot_examples = [random.sample(examples, FLAGS.k_shot) for _ in pages]
         for page, few_shot in zip(pages, few_shot_examples):
@@ -113,7 +113,6 @@ def main(_):
                 temperature=0.1,
                 top_p=0.9,
                 max_tokens=1024,
-                repetition_penalty=1.15,
                 stop=["\n\n"],
             ),
         )

@@ -18,21 +18,21 @@ class textpbar:
     ):
         self.total = total
         self.period = period
-        self.running_avg_rate = running_avg_rate
-        self.last_time = time() - period
+        self.alpha = running_avg_rate
+        self.last_time = time()
         self.last_i = 0
-        self.avg_rate = 0
+        self.avg_rate = None
         self.i = 0
         self.update(0)
 
     def update(self, n: int = 1):
         self.i += n
         if time() - self.last_time > self.period:
-            di = self.i - self.last_i
-            dt = time() - self.last_time
+            rate = (self.i - self.last_i) / (time() - self.last_time)
             self.avg_rate = (
-                self.running_avg_rate * self.avg_rate
-                + (1 - self.running_avg_rate) * di / dt
+                (self.alpha * self.avg_rate + (1 - self.alpha) * rate)
+                if self.avg_rate is not None
+                else rate
             )
 
             self.last_time = time()
