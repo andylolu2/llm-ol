@@ -24,20 +24,22 @@ def get_config():
     )
 
     config.train = dict(
-        epochs=2,
+        epochs=1,
         warmup_steps=100,
-        learning_rate=1e-5,
+        learning_rate=3e-6,
         logging_steps=50,
         grad_acc_steps=1,
         batch_size=16,
         max_seq_length=2048,
         lora=dict(
-            rank=32,
+            rank=16,
+            alpha=16,
+            dropout=0.5,
         ),
     )
 
     config.eval = dict(
-        eval_steps=500,
+        eval_steps=200,
         batch_size=32,
         num_generate_samples=5,
     )

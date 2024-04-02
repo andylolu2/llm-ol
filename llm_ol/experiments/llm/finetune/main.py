@@ -145,7 +145,8 @@ def main(_):
         model,
         LoraConfig(
             r=config.train.lora.rank,
-            lora_alpha=16,
+            lora_alpha=config.train.lora.alpha,
+            lora_dropout=config.train.lora.dropout,
             target_modules=[
                 "q_proj",
                 "k_proj",

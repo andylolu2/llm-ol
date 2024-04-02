@@ -26,7 +26,7 @@ flags.DEFINE_string(
 )
 flags.DEFINE_integer(
     "n_iters",
-    5,
+    3,
     "Number of iterations for the similarity computation",
 )
 flags.DEFINE_integer(
@@ -49,6 +49,8 @@ def main(_):
     embedder, tokenizer = load_embedding_model(FLAGS.embedding_model)
     G1 = data_model.load_graph(FLAGS.graph_file_1)
     G2 = data_model.load_graph(FLAGS.graph_file_2)
+    assert isinstance(G1, nx.DiGraph)
+    assert isinstance(G2, nx.DiGraph)
 
     logging.info("Computing embeddings")
     G1 = embed_graph(G1, embedder, tokenizer)

@@ -7,7 +7,7 @@ from pathlib import Path
 from absl import app, flags, logging
 from vllm import LLM, SamplingParams
 
-from llm_ol.utils import batch, load_template, setup_logging
+from llm_ol.utils import batch, load_template, setup_logging, textpbar
 
 FLAGS = flags.FLAGS
 flags.DEFINE_string(
@@ -86,8 +86,10 @@ def main(_):
         download_dir="out/models",
         max_num_seqs=512,
         max_paddings=512,
+        max_model_len=4096,
     )
     tokenizer = llm.get_tokenizer()
+    pbar = textpbar(len(test_pages))
 
     for pages in batch(test_pages, 5000):
         prompts = []
@@ -125,6 +127,7 @@ def main(_):
                     "few_shot_ids": [ex["id"] for ex in few_shot],
                 }
                 f.write(json.dumps(item) + "\n")
+            pbar.update()
 
 
 if __name__ == "__main__":

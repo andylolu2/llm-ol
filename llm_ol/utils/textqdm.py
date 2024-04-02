@@ -14,11 +14,12 @@ class textpbar:
         self,
         total: int | None = None,
         period: float = 10.0,
-        running_avg_rate: float = 0.9,
+        running_avg_rate: float = 0.99,
     ):
         self.total = total
         self.period = period
         self.alpha = running_avg_rate
+        self.last_log = time()
         self.last_time = time()
         self.last_i = 0
         self.avg_rate = None
@@ -27,17 +28,17 @@ class textpbar:
 
     def update(self, n: int = 1):
         self.i += n
-        if time() - self.last_time > self.period:
-            rate = (self.i - self.last_i) / (time() - self.last_time)
-            self.avg_rate = (
-                (self.alpha * self.avg_rate + (1 - self.alpha) * rate)
-                if self.avg_rate is not None
-                else rate
-            )
+        rate = (self.i - self.last_i) / (time() - self.last_time)
+        self.avg_rate = (
+            (self.alpha * self.avg_rate + (1 - self.alpha) * rate)
+            if self.avg_rate is not None
+            else rate
+        )
+        self.last_time = time()
+        self.last_i = self.i
 
-            self.last_time = time()
-            self.last_i = self.i
-
+        if time() - self.last_log > self.period:
+            self.last_log = time()
             if self.total is not None:
                 logging.info(
                     "Progress: %d / %d %.2f%% (Avg. rate: %.2f it/s)",

@@ -1,93 +1,84 @@
-import asyncio
+"""This script is idempotent."""
+
 import json
 from pathlib import Path
 
 from absl import app, flags, logging
+from vllm import LLM, SamplingParams
 
-from llm_ol.dataset import data_model
-from llm_ol.experiments.llm.templates import PROMPT_TEMPLATE, RESPONSE_REGEX
-from llm_ol.utils import ParallelAsyncOpenAI, setup_logging, textpbar, wait_for_endpoint
+from llm_ol.experiments.llm.templates import PROMPT_TEMPLATE
+from llm_ol.utils import batch, setup_logging, textpbar
 
 FLAGS = flags.FLAGS
-flags.DEFINE_string("graph_file", None, "Path to the graph file", required=True)
+flags.DEFINE_string("test_dataset", None, "Path to the test dataset", required=True)
 flags.DEFINE_string("output_dir", None, "Path to the output directory", required=True)
-flags.DEFINE_integer(
-    "max_concurrent_requests", 512, "Maximum number of concurrent requests per endpoint"
-)
-flags.DEFINE_multi_integer("ports", [], "Ports to use for the API")
-flags.DEFINE_integer("max_depth", None, "Maximum depth of the graph")
+flags.DEFINE_string("model", None, "Model to use for inference.", required=True)
 
 
-async def query(
-    client: ParallelAsyncOpenAI, title: str, abstract: str, t: float = 0
-) -> str:
-    completion = await client.chat(
-        messages=[
-            {
-                "role": "user",
-                "content": PROMPT_TEMPLATE.render(title=title, abstract=abstract),
-            }
-        ],
-        model="gpt-3.5-turbo",
-        temperature=t,
-        max_tokens=2048,
-        # extra_body={"guided_regex": RESPONSE_REGEX},
-    )
-    out = completion.choices[0].message.content
-    assert isinstance(out, str)
-    return out
-
-
-async def main(_):
+def main(_):
     out_dir = Path(FLAGS.output_dir)
-    setup_logging(out_dir, "inference", flags=FLAGS)
+    setup_logging(out_dir, "main", flags=FLAGS)
     out_file = out_dir / "categorised_pages.jsonl"
 
-    client = ParallelAsyncOpenAI(
-        base_urls=[f"http://localhost:{port}/v1" for port in FLAGS.ports],
-        max_concurrent_per_client=FLAGS.max_concurrent_requests,
+    logging.info(
+        "Example prompt:\n%s",
+        PROMPT_TEMPLATE.render(title="TITLE", abstract="ABSTRACT"),
     )
 
-    G = data_model.load_graph(FLAGS.graph_file, FLAGS.max_depth)
     computed = set()
     if out_file.exists():
         with open(out_file, "r") as f:
             computed.update({json.loads(line)["id"] for line in f})
     logging.info("Loaded %d computed pages", len(computed))
 
-    pages = []
-    for _, data in G.nodes(data=True):
-        for page in data["pages"]:
-            if page["id"] not in computed:
-                pages.append(page)
+    with open(FLAGS.test_dataset, "r") as f:
+        test_pages = [json.loads(line) for line in f.readlines()]
+        test_pages = [
+            {
+                "id": sample["id"],
+                "title": sample["title"],
+                "abstract": sample["abstract"],
+            }
+            for sample in test_pages
+            if sample["id"] not in computed
+        ]
+    logging.info("Computing responses for %d pages", len(test_pages))
 
-    pbar = textpbar(len(pages))
+    llm = LLM(model=FLAGS.model, max_num_seqs=512, max_paddings=512)
+    tokenizer = llm.get_tokenizer()
+    pbar = textpbar(len(test_pages))
 
-    async def task(page):
-        try:
-            out = await query(client, page["title"], page["abstract"], t=0.1)
+    for pages in batch(test_pages, 5000):
+        prompts = []
+        for page in pages:
+            messages = [
+                {
+                    "role": "user",
+                    "content": PROMPT_TEMPLATE.render(
+                        title=page["title"], abstract=page["abstract"]
+                    ),
+                }
+            ]
+            prompt = tokenizer.apply_chat_template(
+                messages, tokenize=False, add_generation_prompt=True
+            )
+            prompts.append(prompt)
+        outputs = llm.generate(
+            prompts,
+            sampling_params=SamplingParams(
+                temperature=0.1,
+                top_p=0.9,
+                max_tokens=1024,
+                stop=["\n\n"],
+            ),
+        )
+        for page, out in zip(pages, outputs):
             with open(out_file, "a") as f:
-                f.write(
-                    json.dumps(
-                        {
-                            "id": page["id"],
-                            "title": page["title"],
-                            "abstract": page["abstract"],
-                            "hierarchy": out,
-                        }
-                    )
-                    + "\n"
-                )
-        except Exception as e:
-            logging.error("Error processing page %s: %s", page["id"], repr(e) + str(e))
-        finally:
+                response = out.outputs[0].text
+                item = {**page, "hierarchy": response}
+                f.write(json.dumps(item) + "\n")
             pbar.update()
-
-    await asyncio.gather(
-        *[wait_for_endpoint(f"http://localhost:{port}/health") for port in FLAGS.ports]
-    )
-    await asyncio.gather(*[task(page) for page in pages])
 
 
 if __name__ == "__main__":
-    app.run(lambda _: asyncio.run(main(_)))
+    app.run(main)
