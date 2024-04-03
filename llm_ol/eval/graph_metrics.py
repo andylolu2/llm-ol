@@ -8,6 +8,8 @@ from torch_geometric.data import Batch
 from torch_geometric.nn import GCNConv
 from torch_geometric.utils import from_networkx
 
+from llm_ol.llm.embed import embed, load_embedding_model
+from llm_ol.utils import batch, device, textqdm
 from llm_ol.utils.nx_to_gt import nx_to_gt
 
 
@@ -64,9 +66,11 @@ def random_subgraph(
     undirected: bool = True,
     max_tries: int = 1000,
 ):
+    if undirected:
+        G = G.to_undirected()
     for _ in range(max_tries):
         root = random.choice(list(G.nodes))
-        G_sub = nx.ego_graph(G, root, radius=radius, undirected=undirected)
+        G_sub = nx.ego_graph(G, root, radius=radius)
 
         if min_size <= len(G_sub) <= max_size:
             return G_sub
@@ -85,7 +89,22 @@ def eigenspectrum(G: nx.Graph):
 
 
 @torch.no_grad()
-def graph_similarity(G1: nx.Graph, G2: nx.Graph, n_iters: int = 5) -> float:
+def graph_similarity(
+    G1: nx.Graph,
+    G2: nx.Graph,
+    n_iters: int = 3,
+    embedding_model: str = "sentence-transformers/all-MiniLM-L6-v2",
+) -> dict[str, float]:
+    embedder, tokenizer = load_embedding_model(embedding_model)
+
+    def embed_graph(G: nx.Graph, embedder, tokenizer):
+        for nodes in batch(textqdm(G.nodes), batch_size=128):
+            titles = [G.nodes[n]["title"] for n in nodes]
+            embedding = embed(titles, embedder, tokenizer)
+            for n, e in zip(nodes, embedding):
+                G.nodes[n]["embed"] = e
+        return G
+
     def nx_to_vec(G: nx.Graph, n_iters) -> torch.Tensor:
         """Compute a graph embedding of shape (n_nodes embed_dim).
 
@@ -104,26 +123,71 @@ def graph_similarity(G1: nx.Graph, G2: nx.Graph, n_iters: int = 5) -> float:
         pyg_G = from_networkx(G, group_node_attrs=["embed"])
 
         embed_dim = pyg_G.x.shape[1]
-        conv = GCNConv(embed_dim, embed_dim, bias=False)
-        conv.lin.weight.data = torch.eye(embed_dim)
+        conv = GCNConv(embed_dim, embed_dim, bias=False).to(device)
+        conv.lin.weight.data = torch.eye(embed_dim, device=conv.lin.weight.device)
 
         pyg_batch = Batch.from_data_list([pyg_G])
         x, edge_index = pyg_batch.x, pyg_batch.edge_index  # type: ignore
+        x, edge_index = x.to(device), edge_index.to(device)
 
         for _ in range(n_iters):
             x = conv(x, edge_index)
 
         return x
 
-    # Compute embeddings
-    x1 = nx_to_vec(G1, n_iters)
-    x2 = nx_to_vec(G2, n_iters)
+    if "embed" not in G1.nodes[next(iter(G1.nodes))]:
+        G1 = embed_graph(G1, embedder, tokenizer)
+    if "embed" not in G2.nodes[next(iter(G2.nodes))]:
+        G2 = embed_graph(G2, embedder, tokenizer)
 
-    # Cosine similarity matrix
-    x1 = x1 / x1.norm(dim=-1, keepdim=True)
-    x2 = x2 / x2.norm(dim=-1, keepdim=True)
-    sim = x1 @ x2.T
+    def sim(G1, G2):
+        # Compute embeddings
+        x1 = nx_to_vec(G1, n_iters)
+        x2 = nx_to_vec(G2, n_iters)
 
-    # Aggregate similarity
-    sim = (sim.max(0).values.mean() + sim.max(1).values.mean()) / 2
-    return sim.item()
+        # Cosine similarity matrix
+        x1 = x1 / x1.norm(dim=-1, keepdim=True)
+        x2 = x2 / x2.norm(dim=-1, keepdim=True)
+        sim = x1 @ x2.T
+
+        # Aggregate similarity
+        sim = (sim.max(0).values.mean() + sim.max(1).values.mean()) / 2
+        return sim.item()
+
+    return {
+        "similarity": sim(G1, G2),
+        "similarity_reverse": sim(nx.reverse(G1), nx.reverse(G2)),
+        "similarity_undirected": sim(G1.to_undirected(), G2.to_undirected()),
+    }
+
+
+def node_precision_recall_f1(G_pred: nx.Graph, G_true: nx.Graph):
+    def _title(n):
+        return G_pred.nodes[n].get("title", n).lower()
+
+    nodes_G = {_title(n) for n in G_pred.nodes}
+    nodes_G_true = {_title(n) for n in G_true.nodes}
+    precision = len(nodes_G & nodes_G_true) / len(nodes_G)
+    recall = len(nodes_G & nodes_G_true) / len(nodes_G_true)
+    f1 = 2 * precision * recall / (precision + recall)
+    return {
+        "node_precision": precision,
+        "node_recall": recall,
+        "node_f1": f1,
+    }
+
+
+def edge_precision_recall_f1(G_pred: nx.Graph, G_true: nx.Graph):
+    def _title(n):
+        return G_pred.nodes[n].get("title", n).lower()
+
+    edges_G = {(_title(u), _title(v)) for u, v in G_pred.edges}
+    edges_G_true = {(_title(u), _title(v)) for u, v in G_true.edges}
+    precision = len(edges_G & edges_G_true) / len(edges_G)
+    recall = len(edges_G & edges_G_true) / len(edges_G_true)
+    f1 = 2 * precision * recall / (precision + recall) if precision + recall > 0 else 0
+    return {
+        "edge_precision": precision,
+        "edge_recall": recall,
+        "edge_f1": f1,
+    }

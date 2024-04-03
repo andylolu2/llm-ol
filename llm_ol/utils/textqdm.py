@@ -14,43 +14,36 @@ class textpbar:
         self,
         total: int | None = None,
         period: float = 10.0,
-        running_avg_rate: float = 0.99,
+        window: int = 100,
     ):
+        assert window > 0
         self.total = total
         self.period = period
-        self.alpha = running_avg_rate
-        self.last_log = time()
-        self.last_time = time()
-        self.last_i = 0
-        self.avg_rate = None
+        self.window = window
+        self.history = []
         self.i = 0
-        self.update(0)
+        self.last_log = time()
 
     def update(self, n: int = 1):
         self.i += n
-        rate = (self.i - self.last_i) / (time() - self.last_time)
-        self.avg_rate = (
-            (self.alpha * self.avg_rate + (1 - self.alpha) * rate)
-            if self.avg_rate is not None
-            else rate
-        )
-        self.last_time = time()
-        self.last_i = self.i
+        self.history.append((self.i, time()))
+        self.history = self.history[-self.window :]
 
         if time() - self.last_log > self.period:
             self.last_log = time()
+            rate = (self.history[-1][0] - self.history[0][0]) / (
+                self.history[-1][1] - self.history[0][1]
+            )
             if self.total is not None:
                 logging.info(
                     "Progress: %d / %d %.2f%% (Avg. rate: %.2f it/s)",
                     self.i,
                     self.total,
                     self.i / self.total * 100,
-                    self.avg_rate,
+                    rate,
                 )
             else:
-                logging.info(
-                    "Progress: %d (Avg. rate: %.2f it/s)", self.i, self.avg_rate
-                )
+                logging.info("Progress: %d (Avg. rate: %.2f it/s)", self.i, rate)
 
 
 def textqdm(

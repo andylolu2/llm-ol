@@ -2,11 +2,13 @@ import torch
 from absl import logging
 from transformers import AutoModel, AutoTokenizer
 
+from llm_ol.utils import device
+
 
 def load_embedding_model(name: str = "sentence-transformers/all-MiniLM-L6-v2"):
     logging.info("Loading embedding model %s", name)
     tokenizer = AutoTokenizer.from_pretrained(name)
-    model = AutoModel.from_pretrained(name)
+    model = AutoModel.from_pretrained(name, device_map=device)
     return model, tokenizer
 
 
@@ -16,7 +18,9 @@ def embed(text: str | list[str], model, tokenizer, variant: str = "mean"):
     if is_single:
         text = [text]
 
-    inputs = tokenizer(text, return_tensors="pt", padding=True, truncation=True)
+    inputs = tokenizer(text, return_tensors="pt", padding=True, truncation=True).to(
+        device
+    )
     outputs = model(**inputs)
     if variant == "cls":
         embed = outputs.last_hidden_state[:, 0, :]

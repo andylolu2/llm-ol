@@ -11,8 +11,11 @@ from llm_ol.eval.graph_metrics import (
     central_nodes,
     directed_diameter,
     distance_distribution,
+    edge_precision_recall_f1,
     eigenspectrum,
+    graph_similarity,
     in_degree_distribution,
+    node_precision_recall_f1,
     out_degree_distribution,
     random_subgraph,
     strongly_connected_component_distribution,
@@ -21,13 +24,21 @@ from llm_ol.eval.graph_metrics import (
 from llm_ol.utils import setup_logging
 
 FLAGS = flags.FLAGS
-flags.DEFINE_string("graph_file", None, "Path to the graph files to evaluate")
 flags.DEFINE_string(
-    "output_dir", None, "Path to the output directory to save the evaluation results"
+    "graph_file", None, "Path to the graph files to evaluate", required=True
+)
+flags.DEFINE_string(
+    "ground_truth_graph_file", None, "Path to the ground truth graph", required=True
+)
+flags.DEFINE_string(
+    "output_dir",
+    None,
+    "Path to the output directory to save the evaluation results",
+    required=True,
 )
 flags.DEFINE_bool("skip_central_nodes", False, "Skip computing central nodes")
 flags.DEFINE_bool("skip_eigenspectrum", False, "Skip computing eigenspectrum")
-flags.mark_flags_as_required(["graph_file", "output_dir"])
+flags.DEFINE_bool("skip_similarity", False, "Skip computing similarity")
 
 
 def main(_):
@@ -35,7 +46,9 @@ def main(_):
     setup_logging(out_dir, "eval_single_graph", flags=FLAGS)
 
     G = data_model.load_graph(FLAGS.graph_file)
+    G_true = data_model.load_graph(FLAGS.ground_truth_graph_file)
     assert isinstance(G, nx.DiGraph)
+    assert isinstance(G_true, nx.DiGraph)
 
     fns = {
         "num_nodes": nx.number_of_nodes,
@@ -47,11 +60,15 @@ def main(_):
         "in_degree": in_degree_distribution,
         "out_degree": out_degree_distribution,
         "distance": distance_distribution,
+        "node_precision_recall_f1": lambda G: node_precision_recall_f1(G, G_true),
+        "edge_precision_recall_f1": lambda G: edge_precision_recall_f1(G, G_true),
     }
     if not FLAGS.skip_central_nodes:
         fns["central_nodes"] = central_nodes
     if not FLAGS.skip_eigenspectrum:
         fns["eigenspectrum"] = eigenspectrum
+    if not FLAGS.skip_similarity:
+        fns["similarity"] = lambda G: graph_similarity(G, G_true)
 
     metrics = {}
     for k, fn in fns.items():
@@ -59,7 +76,7 @@ def main(_):
         v = fn(G)
         metrics[k] = v
 
-        if isinstance(v, Iterable):
+        if isinstance(v, Iterable) and not isinstance(v, dict):
             v = list(islice(v, 10))
         logging.info("%s: %s", k, v)
 
@@ -68,7 +85,7 @@ def main(_):
 
     logging.info("Computing random subgraph")
     for i in range(5):
-        G_sub = random_subgraph(G, 2)
+        G_sub = random_subgraph(G, 2, max_size=50)
         if G_sub is None:
             logging.warn("Could not compute random subgraph")
             break

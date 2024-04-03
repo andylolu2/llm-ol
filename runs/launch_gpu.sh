@@ -26,6 +26,7 @@ module load rhel8/default-amp              # REQUIRED - loads the basic environm
 module load miniconda/3
 module load graphviz/2.40.1
 module load texlive/2015
+module load cuda/12.1
 
 #! Work directory (i.e. where the job will run):
 workdir="$SLURM_SUBMIT_DIR"
