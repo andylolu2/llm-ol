@@ -1,3 +1,6 @@
+# There some conflict between graph-tools and torch, need to import gt first
+import graph_tool  # isort: skip
+
 import json
 from itertools import islice
 from pathlib import Path
@@ -11,11 +14,15 @@ from llm_ol.eval.graph_metrics import (
     central_nodes,
     directed_diameter,
     distance_distribution,
-    edge_precision_recall_f1,
+    edge_f1,
+    edge_precision,
+    edge_recall,
     eigenspectrum,
     graph_similarity,
     in_degree_distribution,
-    node_precision_recall_f1,
+    node_f1,
+    node_precision,
+    node_recall,
     out_degree_distribution,
     random_subgraph,
     strongly_connected_component_distribution,
@@ -39,6 +46,7 @@ flags.DEFINE_string(
 flags.DEFINE_bool("skip_central_nodes", False, "Skip computing central nodes")
 flags.DEFINE_bool("skip_eigenspectrum", False, "Skip computing eigenspectrum")
 flags.DEFINE_bool("skip_similarity", False, "Skip computing similarity")
+flags.DEFINE_bool("skip_random_subgraph", False, "Skip computing random subgraph")
 
 
 def main(_):
@@ -60,8 +68,12 @@ def main(_):
         "in_degree": in_degree_distribution,
         "out_degree": out_degree_distribution,
         "distance": distance_distribution,
-        "node_precision_recall_f1": lambda G: node_precision_recall_f1(G, G_true),
-        "edge_precision_recall_f1": lambda G: edge_precision_recall_f1(G, G_true),
+        "node_precision": lambda G: node_precision(G, G_true),
+        "node_recall": lambda G: node_recall(G, G_true),
+        "node_f1": lambda G: node_f1(G, G_true),
+        "edge_precision": lambda G: edge_precision(G, G_true),
+        "edge_recall": lambda G: edge_recall(G, G_true),
+        "edge_f1": lambda G: edge_f1(G, G_true),
     }
     if not FLAGS.skip_central_nodes:
         fns["central_nodes"] = central_nodes
@@ -69,6 +81,12 @@ def main(_):
         fns["eigenspectrum"] = eigenspectrum
     if not FLAGS.skip_similarity:
         fns["similarity"] = lambda G: graph_similarity(G, G_true)
+        fns["similarity_rev"] = lambda G: graph_similarity(
+            G, G_true, direction="reverse"
+        )
+        fns["similarity_sym"] = lambda G: graph_similarity(
+            G, G_true, direction="undirected"
+        )
 
     metrics = {}
     for k, fn in fns.items():
@@ -83,19 +101,20 @@ def main(_):
     with open(out_dir / "metrics.json", "w") as f:
         json.dump(metrics, f, indent=2)
 
-    logging.info("Computing random subgraph")
-    for i in range(5):
-        G_sub = random_subgraph(G, 2, max_size=50)
-        if G_sub is None:
-            logging.warn("Could not compute random subgraph")
-            break
-        relabel_map = {}
-        for n, data in G_sub.nodes(data=True):
-            relabel_map[n] = data["title"] if "title" in data else n
-        G_sub = nx.relabel_nodes(G_sub, relabel_map)
-        A = nx.nx_agraph.to_agraph(G_sub)
-        A.layout("fdp")
-        A.draw(out_dir / f"random_subgraph_{i}.pdf")
+    if not FLAGS.skip_random_subgraph:
+        logging.info("Computing random subgraph")
+        for i in range(5):
+            G_sub = random_subgraph(G, 2, max_size=50)
+            if G_sub is None:
+                logging.warn("Could not compute random subgraph")
+                break
+            relabel_map = {}
+            for n, data in G_sub.nodes(data=True):
+                relabel_map[n] = data["title"] if "title" in data else n
+            G_sub = nx.relabel_nodes(G_sub, relabel_map)
+            A = nx.nx_agraph.to_agraph(G_sub)
+            A.layout("fdp")
+            A.draw(out_dir / f"random_subgraph_{i}.pdf")
 
 
 if __name__ == "__main__":

@@ -34,7 +34,7 @@ def central_nodes(G: nx.DiGraph):
     for v, centrality in items:
         n = gt_to_nx_map[v]
         title = G.nodes[n].get("title", n)
-        result.append((title, centrality))
+        result.append((n, title, centrality))
     return result
 
 
@@ -94,7 +94,8 @@ def graph_similarity(
     G2: nx.Graph,
     n_iters: int = 3,
     embedding_model: str = "sentence-transformers/all-MiniLM-L6-v2",
-) -> dict[str, float]:
+    direction: str = "forward",
+) -> float:
     embedder, tokenizer = load_embedding_model(embedding_model)
 
     def embed_graph(G: nx.Graph, embedder, tokenizer):
@@ -140,7 +141,7 @@ def graph_similarity(
     if "embed" not in G2.nodes[next(iter(G2.nodes))]:
         G2 = embed_graph(G2, embedder, tokenizer)
 
-    def sim(G1, G2):
+    def sim(G1, G2) -> float:
         # Compute embeddings
         x1 = nx_to_vec(G1, n_iters)
         x2 = nx_to_vec(G2, n_iters)
@@ -154,40 +155,67 @@ def graph_similarity(
         sim = (sim.max(0).values.mean() + sim.max(1).values.mean()) / 2
         return sim.item()
 
-    return {
-        "similarity": sim(G1, G2),
-        "similarity_reverse": sim(nx.reverse(G1), nx.reverse(G2)),
-        "similarity_undirected": sim(G1.to_undirected(), G2.to_undirected()),
-    }
+    if direction == "forward":
+        return sim(G1, G2)
+    elif direction == "reverse":
+        return sim(nx.reverse(G1), nx.reverse(G2))
+    elif direction == "undirected":
+        return sim(G1.to_undirected(), G2.to_undirected())
+    else:
+        raise ValueError(f"Invalid direction {direction}")
 
 
-def node_precision_recall_f1(G_pred: nx.Graph, G_true: nx.Graph):
-    def _title(n):
-        return G_pred.nodes[n].get("title", n).lower()
+def node_precision(G_pred: nx.Graph, G_true: nx.Graph):
+    def title(G, n):
+        return G.nodes[n].get("title").lower()
 
-    nodes_G = {_title(n) for n in G_pred.nodes}
-    nodes_G_true = {_title(n) for n in G_true.nodes}
-    precision = len(nodes_G & nodes_G_true) / len(nodes_G)
-    recall = len(nodes_G & nodes_G_true) / len(nodes_G_true)
-    f1 = 2 * precision * recall / (precision + recall)
-    return {
-        "node_precision": precision,
-        "node_recall": recall,
-        "node_f1": f1,
-    }
+    nodes_G = {title(G_pred, n) for n in G_pred.nodes}
+    nodes_G_true = {title(G_true, n) for n in G_true.nodes}
+    return len(nodes_G & nodes_G_true) / len(nodes_G) if len(nodes_G) > 0 else 0
 
 
-def edge_precision_recall_f1(G_pred: nx.Graph, G_true: nx.Graph):
-    def _title(n):
-        return G_pred.nodes[n].get("title", n).lower()
+def node_recall(G_pred: nx.Graph, G_true: nx.Graph):
+    def title(G, n):
+        return G.nodes[n].get("title").lower()
 
-    edges_G = {(_title(u), _title(v)) for u, v in G_pred.edges}
-    edges_G_true = {(_title(u), _title(v)) for u, v in G_true.edges}
-    precision = len(edges_G & edges_G_true) / len(edges_G)
-    recall = len(edges_G & edges_G_true) / len(edges_G_true)
-    f1 = 2 * precision * recall / (precision + recall) if precision + recall > 0 else 0
-    return {
-        "edge_precision": precision,
-        "edge_recall": recall,
-        "edge_f1": f1,
-    }
+    nodes_G = {title(G_pred, n) for n in G_pred.nodes}
+    nodes_G_true = {title(G_true, n) for n in G_true.nodes}
+    return (
+        len(nodes_G & nodes_G_true) / len(nodes_G_true) if len(nodes_G_true) > 0 else 0
+    )
+
+
+def node_f1(G_pred: nx.Graph, G_true: nx.Graph):
+    precision = node_precision(G_pred, G_true)
+    recall = node_recall(G_pred, G_true)
+    return (
+        2 * precision * recall / (precision + recall) if precision + recall > 0 else 0
+    )
+
+
+def edge_precision(G_pred: nx.Graph, G_true: nx.Graph):
+    def title(G, n):
+        return G.nodes[n]["title"].lower()
+
+    edges_G = {(title(G_pred, u), title(G_pred, v)) for u, v in G_pred.edges}
+    edges_G_true = {(title(G_true, u), title(G_true, v)) for u, v in G_true.edges}
+    return len(edges_G & edges_G_true) / len(edges_G) if len(edges_G) > 0 else 0
+
+
+def edge_recall(G_pred: nx.Graph, G_true: nx.Graph):
+    def title(G, n):
+        return G.nodes[n]["title"].lower()
+
+    edges_G = {(title(G_pred, u), title(G_pred, v)) for u, v in G_pred.edges}
+    edges_G_true = {(title(G_true, u), title(G_true, v)) for u, v in G_true.edges}
+    return (
+        len(edges_G & edges_G_true) / len(edges_G_true) if len(edges_G_true) > 0 else 0
+    )
+
+
+def edge_f1(G_pred: nx.Graph, G_true: nx.Graph):
+    precision = edge_precision(G_pred, G_true)
+    recall = edge_recall(G_pred, G_true)
+    return (
+        2 * precision * recall / (precision + recall) if precision + recall > 0 else 0
+    )

@@ -14,6 +14,7 @@ flags.DEFINE_integer("split_depth", 1, "Depth at which to split the graph")
 flags.DEFINE_float(
     "split_prop", 0.1, "Proportion of nodes at the split depth in the test set"
 )
+flags.DEFINE_integer("seed", 0, "Random seed")
 
 
 def split_graph(
@@ -51,6 +52,7 @@ def split_graph(
 
 
 def main(_):
+    random.seed(FLAGS.seed)
     out_dir = Path(FLAGS.output_dir)
     setup_logging(out_dir, "train_test_split", flags=FLAGS)
 

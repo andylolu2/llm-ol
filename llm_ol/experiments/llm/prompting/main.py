@@ -87,6 +87,7 @@ def main(_):
         max_num_seqs=512,
         max_paddings=512,
         max_model_len=4096,
+        seed=FLAGS.seed,
     )
     tokenizer = llm.get_tokenizer()
     pbar = textpbar(len(test_pages))

@@ -20,6 +20,7 @@ flags.DEFINE_string(
 flags.DEFINE_string("output_file", None, "Output file", required=True)
 flags.DEFINE_integer("cutoff", 5, "Maximum path length from the root to the page")
 flags.DEFINE_integer("num_workers", 8, "Number of workers to use")
+flags.DEFINE_integer("seed", 0, "Random seed")
 
 
 def paths_from_root(
@@ -113,6 +114,7 @@ def make_training_samples(G: nx.Graph):
 
 
 def main(_):
+    random.seed(FLAGS.seed)
     out_file = Path(FLAGS.output_file)
     assert out_file.suffix == ".jsonl"
     setup_logging(out_file.parent, "build_dataset", flags=FLAGS)

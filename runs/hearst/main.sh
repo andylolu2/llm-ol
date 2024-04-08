@@ -1,10 +1,11 @@
 #!/bin/bash
 set -e
 
-exp_dir=out/experiments/hearst/v2
+exp_dir=out/experiments/hearst/v2/eval
 
 python llm_ol/experiments/hearst/make_txt.py \
-    --graph_file out/data/wikipedia/v2/full/full_graph.json \
+    --graph_file out/data/wikipedia/v2/train_eval_split/train_graph.json \
+    --graph_file out/data/wikipedia/v2/train_eval_split/test_graph.json \
     --output_dir $exp_dir/abstracts
 
 dir $exp_dir/abstracts/*.txt | sort -V > $exp_dir/abstract-list.txt
