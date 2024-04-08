@@ -1,9 +1,13 @@
 #!/bin/bash
 set -e
 
-export HF_HUB_CACHE=out/models
+if [ -f .env ]; then
+    set -o allexport
+    source .env
+    set +o allexport
+fi
 
-model=out/experiments/finetune/v3/out/final
+model=out/experiments/finetune/v3/out/checkpoint-1000
 
 if [ ! -d "$model/merged" ]; then
     echo "Exporting model to $model/merged"

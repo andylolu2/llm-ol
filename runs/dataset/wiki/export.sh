@@ -1,6 +1,12 @@
 #!/bin/bash
 set -e
 
+if [ -f .env ]; then
+    set -o allexport
+    source .env
+    set +o allexport
+fi
+
 wiki_dir=out/data/wikipedia/v2
 
 python llm_ol/dataset/wikipedia/export_graph.py \

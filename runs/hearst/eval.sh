@@ -1,7 +1,11 @@
 #!/bin/bash
 set -e
 
-export HF_HUB_CACHE=out/models
+if [ -f .env ]; then
+    set -o allexport
+    source .env
+    set +o allexport
+fi
 
 python llm_ol/eval/eval_single_graph.py \
     --graph_file out/experiments/hearst/v2/graph.json \

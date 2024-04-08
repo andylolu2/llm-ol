@@ -1,6 +1,10 @@
 #!/bin/bash
 
-export HF_HUB_CACHE=out/models
+if [ -f .env ]; then
+    set -o allexport
+    source .env
+    set +o allexport
+fi
 
 python llm_ol/experiments/llm/prompting/main.py \
     --train_dataset out/experiments/llm/v2/train_dataset.jsonl \

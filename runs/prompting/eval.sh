@@ -1,7 +1,11 @@
 #!/bin/bash
 set -e
 
-export HF_HUB_CACHE=out/models
+if [ -f .env ]; then
+    set -o allexport
+    source .env
+    set +o allexport
+fi
 
 exp_dir=out/experiments/prompting/v4
 

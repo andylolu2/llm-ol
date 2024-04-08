@@ -1,6 +1,12 @@
 #!/bin/bash
 set -e
 
+if [ -f .env ]; then
+    set -o allexport
+    source .env
+    set +o allexport
+fi
+
 exp_dir=out/experiments/hearst/v2/eval
 
 python llm_ol/experiments/hearst/make_txt.py \
