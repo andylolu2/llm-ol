@@ -88,6 +88,20 @@ def eigenspectrum(G: nx.Graph):
     return lambda_.tolist()
 
 
+def embed_graph(
+    G: nx.Graph,
+    embedding_model: str = "sentence-transformers/all-MiniLM-L6-v2",
+    batch_size: int = 256,
+):
+    embedder, tokenizer = load_embedding_model(embedding_model)
+    for nodes in batch(textqdm(G.nodes), batch_size=batch_size):
+        titles = [G.nodes[n]["title"] for n in nodes]
+        embedding = embed(titles, embedder, tokenizer)
+        for n, e in zip(nodes, embedding):
+            G.nodes[n]["embed"] = e
+    return G
+
+
 @torch.no_grad()
 def graph_similarity(
     G1: nx.Graph,
@@ -96,15 +110,6 @@ def graph_similarity(
     embedding_model: str = "sentence-transformers/all-MiniLM-L6-v2",
     direction: str = "forward",
 ) -> float:
-    embedder, tokenizer = load_embedding_model(embedding_model)
-
-    def embed_graph(G: nx.Graph, embedder, tokenizer):
-        for nodes in batch(textqdm(G.nodes), batch_size=128):
-            titles = [G.nodes[n]["title"] for n in nodes]
-            embedding = embed(titles, embedder, tokenizer)
-            for n, e in zip(nodes, embedding):
-                G.nodes[n]["embed"] = e
-        return G
 
     def nx_to_vec(G: nx.Graph, n_iters) -> torch.Tensor:
         """Compute a graph embedding of shape (n_nodes embed_dim).
@@ -137,9 +142,9 @@ def graph_similarity(
         return x
 
     if "embed" not in G1.nodes[next(iter(G1.nodes))]:
-        G1 = embed_graph(G1, embedder, tokenizer)
+        G1 = embed_graph(G1, embedding_model=embedding_model)
     if "embed" not in G2.nodes[next(iter(G2.nodes))]:
-        G2 = embed_graph(G2, embedder, tokenizer)
+        G2 = embed_graph(G2, embedding_model=embedding_model)
 
     def sim(G1, G2) -> float:
         # Compute embeddings
@@ -152,7 +157,7 @@ def graph_similarity(
         sim = x1 @ x2.T
 
         # Aggregate similarity
-        sim = (sim.max(0).values.mean() + sim.max(1).values.mean()) / 2
+        sim = (sim.amax(0).mean() + sim.amax(1).mean()) / 2
         return sim.item()
 
     if direction == "forward":
@@ -186,8 +191,15 @@ def node_recall(G_pred: nx.Graph, G_true: nx.Graph):
 
 
 def node_f1(G_pred: nx.Graph, G_true: nx.Graph):
-    precision = node_precision(G_pred, G_true)
-    recall = node_recall(G_pred, G_true)
+    def title(G, n):
+        return G.nodes[n].get("title").lower()
+
+    nodes_G = {title(G_pred, n) for n in G_pred.nodes}
+    nodes_G_true = {title(G_true, n) for n in G_true.nodes}
+    precision = len(nodes_G & nodes_G_true) / len(nodes_G) if len(nodes_G) > 0 else 0
+    recall = (
+        len(nodes_G & nodes_G_true) / len(nodes_G_true) if len(nodes_G_true) > 0 else 0
+    )
     return (
         2 * precision * recall / (precision + recall) if precision + recall > 0 else 0
     )
@@ -214,8 +226,15 @@ def edge_recall(G_pred: nx.Graph, G_true: nx.Graph):
 
 
 def edge_f1(G_pred: nx.Graph, G_true: nx.Graph):
-    precision = edge_precision(G_pred, G_true)
-    recall = edge_recall(G_pred, G_true)
+    def title(G, n):
+        return G.nodes[n]["title"].lower()
+
+    edges_G = {(title(G_pred, u), title(G_pred, v)) for u, v in G_pred.edges}
+    edges_G_true = {(title(G_true, u), title(G_true, v)) for u, v in G_true.edges}
+    precision = len(edges_G & edges_G_true) / len(edges_G) if len(edges_G) > 0 else 0
+    recall = (
+        len(edges_G & edges_G_true) / len(edges_G_true) if len(edges_G_true) > 0 else 0
+    )
     return (
         2 * precision * recall / (precision + recall) if precision + recall > 0 else 0
     )

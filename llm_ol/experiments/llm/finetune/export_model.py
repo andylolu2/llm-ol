@@ -26,6 +26,9 @@ def main(_):
 
     tokenizer = AutoTokenizer.from_pretrained(FLAGS.checkpoint_dir)
     tokenizer.save_pretrained(Path(FLAGS.checkpoint_dir) / "merged")
+    logging.info(
+        "Model and tokenizer saved to %s", Path(FLAGS.checkpoint_dir) / "merged"
+    )
 
 
 if __name__ == "__main__":

@@ -7,11 +7,12 @@ if [ -f .env ]; then
     set +o allexport
 fi
 
-accelerate launch --multi_gpu llm_ol/experiments/llm/finetune/training/main.py \
+python llm_ol/experiments/llm/finetune/training/main_weighted.py \
     --config llm_ol/experiments/llm/finetune/training/config.py \
-    --config.model.name alpindale/Mistral-7B-v0.2-hf \
-    --config.train.epochs 2 \
-    --config.train.batch_size 8 \
+    --config.model.name out/models/mistral-tiny \
+    --config.train.batch_size 32 \
+    --config.train.learning_rate 1e-3 \
+    --config.train.epochs 0.1 \
     --config.data.train_file out/experiments/llm/v2/train_dataset.jsonl \
     --config.data.eval_file out/experiments/llm/v2/eval_dataset.jsonl \
-    --config.output_dir out/experiments/finetune/v4/train
+    --config.output_dir out/experiments/finetune/debug

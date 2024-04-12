@@ -17,23 +17,28 @@ flags.DEFINE_string("output_dir", None, "Path to the output directory", required
 flags.DEFINE_integer("prune_threshold", 0, "Prune weight")
 
 pattern = re.compile(r"Main topic classifications( -> ((?!(\n|->)).)+)+")
-empty = re.compile(r"\s*")
+empty_pattern = re.compile(r"\s*")
 
 
 def parse_hierarchy(hierarchy_str: str):
     paths = hierarchy_str.split("\n")
     relations = set()
+    total = 0
+    num_invalid = 0
     for path in paths:
         path = path.strip()
-        if empty.fullmatch(path) is not None:
+        if empty_pattern.fullmatch(path) is not None:
             continue
+
+        total += 1
         if pattern.fullmatch(path) is None:
-            logging.warn("Invalid pattern: %s", path)
+            num_invalid += 1
+            logging.debug("Invalid pattern: %s", path)
             continue
         nodes = path.split(" -> ")
         for parent, child in zip(nodes[:-1], nodes[1:]):
             relations.add((parent, child))
-    return relations
+    return relations, total, num_invalid
 
 
 def main(_):
@@ -45,13 +50,31 @@ def main(_):
         results = [json.loads(line) for line in f.readlines()]
 
     hypernyms = defaultdict(int)
+    num_samples = len(results)
+    num_invalid, num_paths, num_invalid_paths = 0, 0, 0
     for item in results:
+        relations, total, invalid = parse_hierarchy(item["hierarchy"])
+        num_paths += total
+        num_invalid_paths += invalid
+        num_invalid += 1 if invalid > 0 else 0
         try:
-            for parent, child in parse_hierarchy(item["hierarchy"]):
+            for parent, child in relations:
                 hypernyms[(parent, child)] += 1
         except Exception as e:
             logging.error("Error parsing hierarchy %s: %s", item["title"], e)
 
+    logging.info("Total of %s samples", num_samples)
+    logging.info(
+        "Total of %s invalid samples (%.2f%%)",
+        num_invalid,
+        num_invalid / num_samples * 100,
+    )
+    logging.info("Total of %s paths", num_paths)
+    logging.info(
+        "Total of %s invalid paths (%.2f%%)",
+        num_invalid_paths,
+        num_invalid_paths / num_paths * 100,
+    )
     logging.info("Total of %s relations", len(hypernyms))
 
     G = nx.DiGraph()
@@ -62,16 +85,16 @@ def main(_):
         G.add_edge(parent, child, weight=count)
 
     # Prune graph
-    edges_to_remove = set()
-    for u, v, data in G.edges(data=True):
-        if data["weight"] <= FLAGS.prune_threshold:
-            edges_to_remove.add((u, v))
-    G.remove_edges_from(edges_to_remove)
-    logging.info("Removed %s edges", len(edges_to_remove))
+    # edges_to_remove = set()
+    # for u, v, data in G.edges(data=True):
+    #     if data["weight"] <= FLAGS.prune_threshold:
+    #         edges_to_remove.add((u, v))
+    # G.remove_edges_from(edges_to_remove)
+    # logging.info("Removed %s edges", len(edges_to_remove))
 
-    largest_cc = max(nx.weakly_connected_components(G), key=len)
-    logging.info("Removed %s unconnected nodes", len(G) - len(largest_cc))
-    G = G.subgraph(largest_cc).copy()
+    # largest_cc = max(nx.weakly_connected_components(G), key=len)
+    # logging.info("Removed %s unconnected nodes", len(G) - len(largest_cc))
+    # G = G.subgraph(largest_cc).copy()
 
     data_model.save_graph(G, out_dir / "graph.json")
 

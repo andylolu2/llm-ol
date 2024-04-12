@@ -3,7 +3,6 @@ import graph_tool  # isort: skip
 
 from collections import Counter, defaultdict
 from dataclasses import dataclass
-from functools import lru_cache
 from itertools import product
 
 import networkx as nx
@@ -11,12 +10,18 @@ import numpy as np
 import spacy
 from absl import logging
 
-from llm_ol.eval.graph_metrics import central_nodes, edge_f1, graph_similarity, node_f1
+from llm_ol.eval.graph_metrics import (
+    central_nodes,
+    edge_f1,
+    embed_graph,
+    graph_similarity,
+    node_f1,
+)
 
 
 @dataclass
 class PostProcessHP:
-    weight_threshold: int = 0
+    edge_percentile: float = 0
     percentile_threshold: float = 1
     remove_self_loops: bool = True
     remove_inverse_edges: bool = True
@@ -30,7 +35,7 @@ def post_process(G: nx.DiGraph, hp: PostProcessHP) -> nx.DiGraph:
 
     Args:
         G: The input graph.
-        weight_threshold: Edges with weights <= threshold are pruned.
+        edge_percentile: The bottom percentile of edges with the lowest weight are pruned.
         percentile_threshold: Outgoing edges with weight percentile > threshold are pruned.
         remove_self_loops: Remove self loops.
         remove_inverse_edges: Remove any pair (y, x) if p(y, x) < p(x, y).
@@ -90,12 +95,16 @@ def post_process(G: nx.DiGraph, hp: PostProcessHP) -> nx.DiGraph:
 
     edges_to_remove = set()
     for u, v in G.edges:
-        if weight(u, v) <= hp.weight_threshold:
-            edges_to_remove.add((u, v))
         if hp.remove_self_loops and u == v:
             edges_to_remove.add((u, v))
         if hp.remove_inverse_edges and G.has_edge(v, u) and weight(v, u) > weight(u, v):
             edges_to_remove.add((u, v))
+    edges = list(G.edges)
+    weights = np.array([weight(u, v) for u, v in edges])
+    bottom_indices = np.argpartition(weights, int(hp.edge_percentile * len(edges)))[
+        : int(hp.edge_percentile * len(edges))
+    ]
+    edges_to_remove |= {edges[i] for i in bottom_indices}
     for n in G.nodes:
         edges_to_remove |= prune_edges_out_from_node(G, n, hp.percentile_threshold)
     G.remove_edges_from(edges_to_remove)
@@ -150,11 +159,15 @@ def hp_search(G: nx.DiGraph, G_true: nx.DiGraph, metric: str = "edge_f1", **kwar
     elif metric == "node_f1":
         score_fn = node_f1
     elif metric == "graph_similarity":
-        score_fn = graph_similarity
+        G = embed_graph(G)  # type: ignore
+        G_true = embed_graph(G_true)  # type: ignore
+        score_fn = lambda G_pred, G_true: graph_similarity(
+            G_pred, G_true, direction="forward"
+        )
     else:
         raise ValueError(f"Unknown metric: {metric}")
 
-    best = (None, None, -float("inf"))  # best_hp, best_G, best_score
+    best = (None, None, -float("inf"))  # best hp, best G, best score
     for hp in hps:
         G_pred = post_process(G, hp)
         score = score_fn(G_pred, G_true)

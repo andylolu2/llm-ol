@@ -10,6 +10,7 @@ cpu-run cmd cpus='8' mem='32G' time='6:00:00' *ARGS='':
 
     echo "Copying files to $tmp_dir"
     git ls-files --cached --others --exclude-standard | xargs -I {} cp --parents {} $tmp_dir
+    cp .env $tmp_dir
     ln -s /rds/user/cyal4/hpc-work/llm-ol/out $tmp_dir/out
     ln -s $(pwd)/corenlp $tmp_dir/corenlp
     cd $tmp_dir
@@ -28,8 +29,9 @@ gpu-run cmd gpus='1' time='6:00:00' *ARGS='':
 
     echo "Copying files to $tmp_dir"
     git ls-files --cached --others --exclude-standard | xargs -I {} cp -r --parents {} $tmp_dir
+    cp .env $tmp_dir
     ln -s /rds/user/cyal4/hpc-work/llm-ol/out $tmp_dir/out
-    ln -s ./corenlp $tmp_dir/corenlp
+    ln -s $(pwd)/corenlp $tmp_dir/corenlp
     cd $tmp_dir
 
     out=$(echo {{cmd}} | sed 's/[^a-zA-Z0-9]/_/g')

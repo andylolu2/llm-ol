@@ -49,25 +49,25 @@ def parse_hierarchy(hierarchy_str: str):
     return relations, total, num_invalid
 
 
-def prune_edges(G: nx.DiGraph, node, percentile_to_keep: float):
-    assert 0 <= percentile_to_keep <= 1
+# def prune_edges(G: nx.DiGraph, node, percentile_to_keep: float):
+#     assert 0 <= percentile_to_keep <= 1
 
-    edges = []
-    weights = []
-    for u, v, data in G.out_edges(node, data=True):
-        edges.append((u, v))
-        weights.append(data["weight"])
-    weights = np.array(weights)
-    idx = np.argsort(weights)[::-1]
-    weights = weights[idx]
-    edges = [edges[i] for i in idx]
+#     edges = []
+#     weights = []
+#     for u, v, data in G.out_edges(node, data=True):
+#         edges.append((u, v))
+#         weights.append(data["weight"])
+#     weights = np.array(weights)
+#     idx = np.argsort(weights)[::-1]
+#     weights = weights[idx]
+#     edges = [edges[i] for i in idx]
 
-    p = weights / weights.sum()
-    # We do p.cumsum() - p to include the edge on boundary
-    to_remove = [
-        edges[i] for i in np.argwhere(p.cumsum() - p > percentile_to_keep).flatten()
-    ]
-    return to_remove
+#     p = weights / weights.sum()
+#     # We do p.cumsum() - p to include the edge on boundary
+#     to_remove = [
+#         edges[i] for i in np.argwhere(p.cumsum() - p > percentile_to_keep).flatten()
+#     ]
+#     return to_remove
 
 
 def main(_):
