@@ -42,7 +42,7 @@ class Trainer(SFTTrainer):
             loss = torch.nn.functional.cross_entropy(
                 shift_logits, shift_labels, reduction="none"
             ).reshape(b, s - 1)
-            loss = (loss * shift_weights).sum(1).mean()
+            loss = (loss * shift_weights).sum() / shift_weights.sum()
 
         return (loss, outputs) if return_outputs else loss
 
@@ -62,7 +62,7 @@ class Trainer(SFTTrainer):
     ):
         edge_counts = defaultdict(int)
         for example in dataset:
-            for path in example["paths"]:
+            for path in example["paths"]:  # type: ignore
                 for u, v in zip(path[:-1], path[1:]):
                     edge_counts[(u, v)] += 1
         edge_weights = {k: 1 / v for k, v in edge_counts.items()}
@@ -72,13 +72,28 @@ class Trainer(SFTTrainer):
         edge_weights = {k: v / mean_weight for k, v in edge_weights.items()}
 
         def tokenize(example: dict[str, Any]):
-            prompt = PROMPT_TEMPLATE.render(
-                title=example["title"], abstract=example["abstract"]
-            )
-            parts = [
-                (tokenizer.bos_token, 0),
-                (f"[INST] {prompt} [/INST]", 0),
+            # Tokens and their corresponding loss weights
+            input_ids = []
+            weights = []
+
+            def add_part(text: str, w):
+                part_tokens = tokenizer.encode(text, add_special_tokens=False)
+                input_ids.extend(part_tokens)
+                weights.extend([float(w)] * len(part_tokens))
+
+            # input prompt
+            messages = [
+                {
+                    "role": "user",
+                    "content": PROMPT_TEMPLATE.render(
+                        title=example["title"], abstract=example["abstract"]
+                    ),
+                }
             ]
+            prompt = tokenizer.apply_chat_template(messages, tokenize=False)
+            add_part(prompt, 0)
+
+            # paths to predict
             example_weights = []
             for path in example["paths"]:
                 for u, v in zip(path[:-1], path[1:]):
@@ -86,19 +101,12 @@ class Trainer(SFTTrainer):
             mean_weight = np.mean(example_weights)
 
             for path in example["paths"]:
-                parts.append((path[0], mean_weight))
+                add_part(path[0], mean_weight)
                 for u, v in zip(path[:-1], path[1:]):
-                    parts.append(("->", mean_weight))
-                    parts.append((v, edge_weights[(u, v)]))
-                parts.append(("\n", mean_weight))
-            parts.append((f"{tokenizer.eos_token}", mean_weight))
-
-            input_ids = []
-            weights = []
-            for part, w in parts:
-                part_tokens = tokenizer.encode(part, add_special_tokens=False)
-                input_ids += part_tokens
-                weights += [w] * len(part_tokens)
+                    add_part("->", edge_weights[(u, v)])
+                    add_part(v, edge_weights[(u, v)])
+                add_part("\n", mean_weight)
+            add_part(tokenizer.eos_token, mean_weight)
             return {"input_ids": input_ids, "weights": weights}
 
         dataset = dataset.map(tokenize, num_proc=self.dataset_num_proc)
@@ -127,7 +135,7 @@ class DataCollator(DataCollatorForCompletionOnlyLM):
         input_ids = torch.tensor(input_ids)
         weights = torch.tensor(weights)
         labels = input_ids.clone()
-        labels[(input_ids == self.tokenizer.pad_token_id) | (weights == 0)] = -100
+        labels[weights == 0] = -100
         return {"input_ids": input_ids, "labels": labels, "weights": weights}
 
 

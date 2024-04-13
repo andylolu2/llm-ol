@@ -33,8 +33,8 @@ def get_config():
         max_seq_length=2048,
         lora=dict(
             rank=32,
-            alpha=32,
-            dropout=0.1,
+            alpha=16,
+            dropout=0,
         ),
     )
 

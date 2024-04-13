@@ -66,20 +66,15 @@ def random_subgraph(
     undirected: bool = True,
     max_tries: int = 1000,
 ):
-    if undirected:
-        G = G.to_undirected()
     for _ in range(max_tries):
         root = random.choice(list(G.nodes))
-        G_sub = nx.ego_graph(G, root, radius=radius)
+        G_sub = nx.ego_graph(G, root, radius, undirected=undirected)
 
         if min_size <= len(G_sub) <= max_size:
             return G_sub
 
-    logging.warning(
-        "Failed to find a subgraph with %d <= size <= %d after %d tries",
-        min_size,
-        max_size,
-        max_tries,
+    raise ValueError(
+        f"Failed to find a subgraph with {min_size} <= size <= {max_size} after {max_tries} tries"
     )
 
 
