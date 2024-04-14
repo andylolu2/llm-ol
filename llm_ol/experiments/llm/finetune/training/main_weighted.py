@@ -202,7 +202,14 @@ def main(_):
         max_seq_length=config.train.max_seq_length,
         dataset_num_proc=16,
         train_dataset=dataset_from_file(config.data.train_file),
-        eval_dataset=dataset_from_file(config.data.eval_file, config.data.eval_size),
+        eval_dataset={
+            "in_domain": dataset_from_file(
+                config.data.train_file, config.data.eval_size
+            ),
+            "out_of_domain": dataset_from_file(
+                config.data.eval_file, config.data.eval_size
+            ),
+        },
         formatting_func=lambda: None,
         dataset_kwargs={
             "add_special_tokens": False,

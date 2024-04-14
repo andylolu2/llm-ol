@@ -3,6 +3,7 @@ import graph_tool  # isort: skip
 
 from collections import Counter, defaultdict
 from dataclasses import dataclass
+from functools import lru_cache
 from itertools import product
 
 import networkx as nx
@@ -17,6 +18,13 @@ from llm_ol.eval.graph_metrics import (
     graph_similarity,
     node_f1,
 )
+
+nlp = spacy.load("en_core_web_sm", enable=["tagger", "attribute_ruler", "lemmatizer"])
+
+
+@lru_cache(maxsize=None)
+def lemmatize(txt: str) -> str:
+    return " ".join([token.lemma_ for token in nlp(txt)])
 
 
 @dataclass
@@ -58,11 +66,11 @@ def post_process(G: nx.DiGraph, hp: PostProcessHP) -> nx.DiGraph:
         )
 
         titles = list({title(n) for n in G.nodes})
-        lemmas = [
-            " ".join([tok.lemma_ for tok in doc])
-            for doc in nlp.pipe(titles, batch_size=1000)
-        ]
-        title_to_lemma = {title: lemma for title, lemma in zip(titles, lemmas)}
+        # lemmas = [
+        #     " ".join([tok.lemma_ for tok in doc])
+        #     for doc in nlp.pipe(titles, batch_size=5000)
+        # ]
+        title_to_lemma = {title: lemmatize(title) for title in titles}
 
         # Lemma to counter of labels that map to the lemma
         lemma_to_title_counts = defaultdict(Counter)
@@ -99,15 +107,24 @@ def post_process(G: nx.DiGraph, hp: PostProcessHP) -> nx.DiGraph:
             edges_to_remove.add((u, v))
         if hp.remove_inverse_edges and G.has_edge(v, u) and weight(v, u) > weight(u, v):
             edges_to_remove.add((u, v))
-    edges = list(G.edges)
-    weights = np.array([weight(u, v) for u, v in edges])
-    bottom_indices = np.argpartition(weights, int(hp.edge_percentile * len(edges)))[
-        : int(hp.edge_percentile * len(edges))
-    ]
-    edges_to_remove |= {edges[i] for i in bottom_indices}
+    if hp.edge_percentile > 0:
+        if hp.edge_percentile == 1:
+            edges_to_remove |= set(G.edges)
+        else:
+            edges = list(G.edges)
+            weights = np.array([weight(u, v) for u, v in edges])
+            bottom_indices = np.argpartition(
+                weights, int(hp.edge_percentile * len(edges))
+            )[: int(hp.edge_percentile * len(edges))]
+            edges_to_remove |= {edges[i] for i in bottom_indices}
     for n in G.nodes:
         edges_to_remove |= prune_edges_out_from_node(G, n, hp.percentile_threshold)
     G.remove_edges_from(edges_to_remove)
+
+    if hp.add_root and "root" not in G.graph:
+        centrality = central_nodes(G)
+        root, _, _ = centrality[0]
+        G.graph["root"] = root
 
     if hp.prune_unconnected_nodes:
         if "root" in G.graph:
@@ -117,11 +134,6 @@ def post_process(G: nx.DiGraph, hp: PostProcessHP) -> nx.DiGraph:
         else:
             largest_cc = max(nx.weakly_connected_components(G), key=len)
             G = G.subgraph(largest_cc)
-
-    if hp.add_root and "root" not in G.graph:
-        centrality = central_nodes(G)
-        root, _, _ = centrality[0]
-        G.graph["root"] = root
 
     return G
 

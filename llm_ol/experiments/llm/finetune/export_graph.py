@@ -14,7 +14,6 @@ flags.DEFINE_string(
     "hierarchy_file", None, "Path to the hierarchy directory", required=True
 )
 flags.DEFINE_string("output_dir", None, "Path to the output directory", required=True)
-flags.DEFINE_integer("prune_threshold", 0, "Prune weight")
 
 pattern = re.compile(r"Main topic classifications( -> ((?!(\n|->)).)+)+")
 empty_pattern = re.compile(r"\s*")
@@ -83,18 +82,6 @@ def main(_):
         G.add_node(parent, title=parent)
         G.add_node(child, title=child)
         G.add_edge(parent, child, weight=count)
-
-    # Prune graph
-    # edges_to_remove = set()
-    # for u, v, data in G.edges(data=True):
-    #     if data["weight"] <= FLAGS.prune_threshold:
-    #         edges_to_remove.add((u, v))
-    # G.remove_edges_from(edges_to_remove)
-    # logging.info("Removed %s edges", len(edges_to_remove))
-
-    # largest_cc = max(nx.weakly_connected_components(G), key=len)
-    # logging.info("Removed %s unconnected nodes", len(G) - len(largest_cc))
-    # G = G.subgraph(largest_cc).copy()
 
     data_model.save_graph(G, out_dir / "graph.json")
 
