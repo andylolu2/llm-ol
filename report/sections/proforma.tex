@@ -1,0 +1,113 @@
+\begin{sffamily} % use a sans-serif font for the pro-forma cover sheet
+
+    \begin{titlepage}
+        \makeatletter
+
+        % University logo with shield hanging in left margin
+        \hspace*{-14mm}\includegraphics[width=65mm]{logo-dcst-colour.pdf}
+
+        \ifsubmission
+
+            % submission proforma cover page for blind marking
+            \begin{Large}
+                \vspace{20mm}
+                Research project report title page
+
+                \vspace{35mm}
+                Candidate \candidatenumber
+
+                \vspace{42mm}
+                \textsl{``\@title''}
+
+            \end{Large}
+
+        \else
+
+            % regular cover page
+            \begin{center}
+                \Huge
+                \vspace{\fill}
+
+                \@title
+                \vspace{\fill}
+
+                \@author
+                \vspace{10mm}
+
+                \Large
+                \college
+                \vspace{\fill}
+
+                \@date
+                \vspace{\fill}
+
+            \end{center}
+
+        \fi
+
+        \vspace{\fill}
+        \begin{center}
+            Submitted in partial fulfillment of the requirements for the\\
+            \course
+        \end{center}
+
+        \makeatother
+    \end{titlepage}
+
+    \newpage
+
+    Total page count: \pageref{lastpage}
+
+    % calculate number of pages from
+    % \label{firstcontentpage} to \label{lastcontentpage} inclusive
+    \makeatletter
+    \@tempcnta=\getpagerefnumber{lastcontentpage}\relax%
+    \advance\@tempcnta by -\getpagerefnumber{firstcontentpage}%
+    \advance\@tempcnta by 1%
+    \xdef\contentpages{\the\@tempcnta}%
+    \makeatother
+
+    Main chapters (excluding front-matter, references and appendix):
+    \contentpages~pages
+    (pp~\pageref{firstcontentpage}--\pageref{lastcontentpage})
+
+    Main chapters word count: 467\footnote{Computed with \texttt{texcount}.}
+
+\end{sffamily}
+
+\vspace{\fill}
+\onehalfspacing
+\ifsubmission\else\makeatletter
+    \textbf{\Huge Declaration}
+    \vspace{40pt}
+
+    I, \@author\ of \college, being a candidate for the \course, hereby
+    declare that this report and the work described in it are my own work,
+    unaided except as may be specified below, and that the report does not
+    contain material that has already been used to any substantial extent
+    for a comparable purpose.
+
+    The code for this project is written with the assistance of GitHub Copilot.
+
+    \bigskip
+    \textbf{Signed:} \@author
+
+    \bigskip
+    \textbf{Date:} \today
+    \vspace{\fill}
+    \makeatother\fi
+
+\chapter*{Abstract}
+
+Prior to recent progress, Ontology Learning (OL) has mostly been tackled with rule-based methods which scale poorly. Recent work demonstrated potential for applying Large Language Models (LLMs) to several sub-tasks of OL. This project aims to extend this idea to build a complete system for OL by leveraging the flexibility of LLMs, bypassing the needs for specialist models and large training datasets. If successful, this approach, by the virtue of the generality of LLMs, will be applicable to corpuses other than Wikipedia with minimal re-training and modifications.
+
+\ifsubmission\else
+    % not included in submission for blind marking:
+
+    \chapter*{Acknowledgements}
+
+    This project would not have been possible without the wonderful
+    support of \ldots [optional]
+
+\fi
+\cleardoublepage % preserve page numbers after missing acknowledgements

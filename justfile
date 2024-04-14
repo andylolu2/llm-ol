@@ -50,3 +50,6 @@ clear-nb:
 
 code-count:
     cloc --vcs git
+
+tex-count level="chapter":
+    texcount -merge -sub={{level}} -dir=report/ report/report.tex
