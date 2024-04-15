@@ -23,8 +23,9 @@ s = """The following is an article's title and abstract. Your task is to assign 
 A category is typically represented by a word or a short phrase, representing broader topics/concepts that the article is about. \
 A category hierarchy represented by a collection of paths from the generic root category "Main topic classifications" \
 to a specific category suitable for the article. The topics titles should become more and more specific as you move from the root to the leaf. \
-{% for example in examples %}
 
+{% if examples|length > 0 %}
+{% for example in examples %}
 ### EXAMPLE {{ loop.index }} ###
 ### ARTICLE ###
 Title: {{ example['title'] }}
@@ -35,13 +36,24 @@ Title: {{ example['title'] }}
 {% endfor %}
 ### END EXAMPLE {{ loop.index }} ###
 {% endfor %}
+{% else %}
+You must answer in the format of:
+Main topic classifications -> Broad topic 1 -> Subtopic 1 -> ... -> Most specific topic 1
+Main topic classifications -> Borad topic 2 -> Subtopic 2 -> ... -> Most specific topic 2
+...
+{% endif %}
 
 ### ARTICLE ###
 Title: {{ title }}
 {{ abstract }}
 ### END ARTICLE ###
 
-Provide a category hierarchy for the above article. Use the same format as the examples above."""
+Provide a category hierarchy for the above article. \
+{% if examples|length > 0 %}
+Use the same format as the examples above.
+{% else %}
+Use the format described above.
+{% endif %}"""
 PROMPT_TEMPLATE = load_template(s)
 
 

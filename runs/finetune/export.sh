@@ -7,7 +7,7 @@ if [ -f .env ]; then
     set +o allexport
 fi
 
-exp_dir=out/experiments/finetune/v4/16500
+exp_dir=out/experiments/finetune/v6/10000
 
 python llm_ol/experiments/llm/finetune/export_graph.py \
     --hierarchy_file $exp_dir/categorised_pages.jsonl \

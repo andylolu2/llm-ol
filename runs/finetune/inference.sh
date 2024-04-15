@@ -8,7 +8,7 @@ if [ -f .env ]; then
 fi
 
 exp_dir=out/experiments/finetune/v6
-step=16500
+step=10000
 model=$exp_dir/train/checkpoint-$step
 
 echo "Running inference on $model"

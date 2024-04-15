@@ -29,7 +29,7 @@ def clean_up_graph(G: nx.Graph):
     G = G.subgraph(nodes_to_keep)
 
     # Remove nodes with no pages or descendants that have pages.
-    nodes_with_pages = set(n for n, pages in G.nodes(data="pages") if len(pages) > 0)
+    nodes_with_pages = set(n for n, pages in G.nodes(data="pages") if len(pages) > 0)  # type: ignore
     nodes_to_keep = set(
         nx.multi_source_dijkstra_path_length(
             G.reverse() if isinstance(G, nx.DiGraph) else G, nodes_with_pages
@@ -72,7 +72,7 @@ def save_graph(
         json.dump(nx.node_link_data(G), f)
 
 
-def load_graph(save_file: Path | str, depth: int | None = None) -> nx.Graph:
+def load_graph(save_file: Path | str, depth: int | None = None) -> nx.DiGraph:
     """Load graph from file. Optionally limit the depth of the graph.
 
     Args:

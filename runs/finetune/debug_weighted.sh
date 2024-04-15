@@ -15,4 +15,4 @@ python llm_ol/experiments/llm/finetune/training/main_weighted.py \
     --config.train.epochs 0.1 \
     --config.data.train_file out/experiments/llm/v2/train_dataset.jsonl \
     --config.data.eval_file out/experiments/llm/v2/eval_dataset.jsonl \
-    --config.output_dir out/experiments/finetune/debug
+    --config.output_dir out/experiments/finetune/debug/train

@@ -14,7 +14,11 @@ from transformers import AutoModelForCausalLM, AutoTokenizer, TrainingArguments
 from trl import DataCollatorForCompletionOnlyLM, SFTTrainer
 
 from llm_ol.experiments.llm.finetune.training.utils import GenerateSamplesCallback
-from llm_ol.experiments.llm.templates import _MISTRAL_TEMPLATE, PROMPT_TEMPLATE
+from llm_ol.experiments.llm.templates import (
+    _MISTRAL_TEMPLATE,
+    PROMPT_TEMPLATE,
+    RESPONSE_TEMPLATE,
+)
 from llm_ol.utils import setup_logging
 
 FLAGS = flags.FLAGS
@@ -71,49 +75,83 @@ class Trainer(SFTTrainer):
         mean_weight = np.mean(list(edge_weights.values()))
         edge_weights = {k: v / mean_weight for k, v in edge_weights.items()}
 
-        def tokenize(example: dict[str, Any]):
-            # Tokens and their corresponding loss weights
-            input_ids = []
+        def tokenize_one(example: dict[str, Any]):
+
+            prompt = PROMPT_TEMPLATE.render(
+                title=example["title"], abstract=example["abstract"]
+            )
+            response = RESPONSE_TEMPLATE.render(paths=example["paths"])
+            messages = [
+                {"role": "user", "content": prompt},
+                {"role": "assistant", "content": response},
+            ]
+            input_ids = tokenizer.apply_chat_template(messages, tokenize=True)
+
             weights = []
 
-            def add_part(text: str, w):
-                part_tokens = tokenizer.encode(text, add_special_tokens=False)
-                input_ids.extend(part_tokens)
-                weights.extend([float(w)] * len(part_tokens))
+            inst_end = [733, 28748, 16289, 28793]  # _[/INST]
+            arrow = 3193  # _->
+            linebreak = 13  # \n
 
-            # input prompt
-            messages = [
-                {
-                    "role": "user",
-                    "content": PROMPT_TEMPLATE.render(
-                        title=example["title"], abstract=example["abstract"]
-                    ),
-                }
-            ]
-            prompt = tokenizer.apply_chat_template(messages, tokenize=False)
-            add_part(prompt, 0)
+            def find_index(list_, sublist):
+                for i in range(len(list_) - len(sublist) + 1):
+                    if list_[i : i + len(sublist)] == sublist:
+                        return i
+                raise ValueError(f"Sublist {sublist} not found in list")
 
-            # paths to predict
-            example_weights = []
-            for path in example["paths"]:
-                for u, v in zip(path[:-1], path[1:]):
-                    example_weights.append(edge_weights[(u, v)])
-            mean_weight = np.mean(example_weights)
+            resp_start_idx = find_index(input_ids, inst_end) + len(inst_end)
+            weights = [0] * resp_start_idx
 
-            for path in example["paths"]:
-                add_part(path[0], mean_weight)
-                for u, v in zip(path[:-1], path[1:]):
-                    add_part("->", edge_weights[(u, v)])
-                    add_part(v, edge_weights[(u, v)])
-                add_part("\n", mean_weight)
-            add_part(tokenizer.eos_token, mean_weight)
+            prev_word = None
+            word_ids = []
+            for token_id in input_ids[resp_start_idx:]:
+                if token_id == arrow or token_id == linebreak:
+                    word = tokenizer.decode(word_ids)
+                    assert "->" not in word
+                    if prev_word is not None:
+                        weight = edge_weights[(prev_word, word)]
+                        weights += [weight] * len(word_ids)  # weight for this edge
+                    else:  # First word in the path
+                        weights += [1] * len(word_ids)
+                    weights += [1]  # weight for the arrow or linebreak
+
+                    word_ids = []
+                    prev_word = word if token_id == arrow else None
+                elif token_id == tokenizer.eos_token_id:
+                    assert len(word_ids) == 0
+                    weights += [1]
+                else:  # token is part of a word
+                    word_ids.append(token_id)
+
+            assert len(input_ids) == len(weights)
             return {"input_ids": input_ids, "weights": weights}
 
-        dataset = dataset.map(tokenize, num_proc=self.dataset_num_proc)
+        def tokenize(examples: dict[str, list[Any]]):
+            # dict of lists to list of dicts
+            examples_list = [dict(zip(examples, t)) for t in zip(*examples.values())]
+
+            results = []
+            for example in examples_list:
+                try:
+                    results.append(tokenize_one(example))
+                except Exception as e:
+                    logging.warning(f"Error reweighting example: {example} {repr(e)}")
+
+            # list of dicts to dict of lists
+            return {k: [d[k] for d in results] for k in results[0]}
+
+        logging.info("Dataset size: %d", len(dataset))
+        dataset = dataset.map(
+            tokenize,
+            num_proc=self.dataset_num_proc,
+            batched=True,
+            remove_columns=dataset.column_names,
+        )
         dataset = dataset.filter(
             lambda ex: len(ex["input_ids"]) <= max_seq_length,
             num_proc=self.dataset_num_proc,
         )
+        logging.info("Dataset size after tokenization and filtering: %d", len(dataset))
         return dataset
 
 
@@ -160,7 +198,7 @@ def main(_):
         use_cache=False,
         device_map={"": device_string} if torch.cuda.is_available() else "auto",
         torch_dtype="auto",
-        attn_implementation="flash_attention_2",
+        attn_implementation="flash_attention_2" if torch.cuda.is_available() else None,
     )
     model = get_peft_model(
         model,
