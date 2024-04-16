@@ -46,7 +46,7 @@ class Trainer(SFTTrainer):
             loss = torch.nn.functional.cross_entropy(
                 shift_logits, shift_labels, reduction="none"
             ).reshape(b, s - 1)
-            loss = (loss * shift_weights).sum() / shift_weights.sum()
+            loss = (loss * shift_weights).sum()
 
         return (loss, outputs) if return_outputs else loss
 
@@ -71,9 +71,9 @@ class Trainer(SFTTrainer):
                     edge_counts[(u, v)] += 1
         edge_weights = {k: 1 / v for k, v in edge_counts.items()}
 
-        # ensure that the mean weight is 1
-        mean_weight = np.mean(list(edge_weights.values()))
-        edge_weights = {k: v / mean_weight for k, v in edge_weights.items()}
+        # rescale such that the maximum weight is 1
+        max_weight = max(edge_weights.values())
+        edge_weights = {k: v / max_weight for k, v in edge_weights.items()}
 
         def tokenize_one(example: dict[str, Any]):
 
@@ -86,6 +86,13 @@ class Trainer(SFTTrainer):
                 {"role": "assistant", "content": response},
             ]
             input_ids = tokenizer.apply_chat_template(messages, tokenize=True)
+
+            # Compute mean weight to use for "Main topic classifications", "->", "\n", "</s>"
+            example_weights = []
+            for path in example["paths"]:
+                for u, v in zip(path[:-1], path[1:]):
+                    example_weights.append(edge_weights[(u, v)])
+            mean_weight = np.mean(example_weights)
 
             weights = []
 
@@ -112,14 +119,14 @@ class Trainer(SFTTrainer):
                         weight = edge_weights[(prev_word, word)]
                         weights += [weight] * len(word_ids)  # weight for this edge
                     else:  # First word in the path
-                        weights += [1] * len(word_ids)
-                    weights += [1]  # weight for the arrow or linebreak
+                        weights += [mean_weight] * len(word_ids)
+                    weights += [mean_weight]  # weight for "->" or "\n"
 
                     word_ids = []
                     prev_word = word if token_id == arrow else None
                 elif token_id == tokenizer.eos_token_id:
                     assert len(word_ids) == 0
-                    weights += [1]
+                    weights += [mean_weight]
                 else:  # token is part of a word
                     word_ids.append(token_id)
 

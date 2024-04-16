@@ -6,6 +6,9 @@ import scienceplots
 
 plt.style.use(["science", "grid"])
 
+plt.rcParams["lines.marker"] = "o"
+plt.rcParams["lines.markersize"] = 4
+
 
 def sized_subplots(
     n_axes: int = 1, n_cols: int = 1, ax_size: tuple[int, int] = (5, 4)
