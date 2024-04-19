@@ -52,7 +52,7 @@ def main(_):
     # centrality = central_nodes(G)
     # G.graph["root"] = centrality[0][0]
     # logging.info("Root node: %s", G.graph["root"])
-    # G.graph["root"] = None
+    G.graph["root"] = None
 
     data_model.save_graph(G, Path(FLAGS.output_dir) / "graph.json")
 

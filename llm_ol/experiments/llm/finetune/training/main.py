@@ -99,7 +99,7 @@ def main(_):
         data_collator=collator,
         max_seq_length=config.train.max_seq_length,
         dataset_num_proc=16,
-        train_dataset=dataset_from_file(config.data.train_file),
+        train_dataset=dataset_from_file(config.data.train_file, config.data.train_size),
         eval_dataset=dataset_from_file(config.data.eval_file, config.data.eval_size),
         dataset_kwargs={
             "add_special_tokens": False,

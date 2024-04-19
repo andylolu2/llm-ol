@@ -7,7 +7,7 @@ if [ -f .env ]; then
     set +o allexport
 fi
 
-exp_dir=out/experiments/prompting/v6/eval
+exp_dir=out/experiments/prompting/v6/test
 
 python llm_ol/experiments/llm/prompting/export_graph.py \
     --hierarchy_file $exp_dir/categorised_pages.jsonl \

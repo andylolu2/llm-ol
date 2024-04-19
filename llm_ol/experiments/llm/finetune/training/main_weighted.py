@@ -16,7 +16,7 @@ from trl import DataCollatorForCompletionOnlyLM, SFTTrainer
 from llm_ol.experiments.llm.finetune.training.utils import GenerateSamplesCallback
 from llm_ol.experiments.llm.templates import (
     _MISTRAL_TEMPLATE,
-    PROMPT_TEMPLATE,
+    PROMPT_TEMPLATE_FULL,
     RESPONSE_TEMPLATE,
 )
 from llm_ol.utils import setup_logging
@@ -77,8 +77,8 @@ class Trainer(SFTTrainer):
 
         def tokenize_one(example: dict[str, Any]):
 
-            prompt = PROMPT_TEMPLATE.render(
-                title=example["title"], abstract=example["abstract"]
+            prompt = PROMPT_TEMPLATE_FULL.render(
+                title=example["title"], abstract=example["abstract"], examples=[]
             )
             response = RESPONSE_TEMPLATE.render(paths=example["paths"])
             messages = [
@@ -246,7 +246,7 @@ def main(_):
         data_collator=collator,
         max_seq_length=config.train.max_seq_length,
         dataset_num_proc=16,
-        train_dataset=dataset_from_file(config.data.train_file),
+        train_dataset=dataset_from_file(config.data.train_file, config.data.train_size),
         eval_dataset={
             "in_domain": dataset_from_file(
                 config.data.train_file, config.data.eval_size

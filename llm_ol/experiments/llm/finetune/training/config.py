@@ -20,6 +20,7 @@ def get_config():
     config.data = dict(
         train_file=config_dict.placeholder(str),
         eval_file=config_dict.placeholder(str),
+        train_size=config_dict.placeholder(int),
         eval_size=1024,
     )
 

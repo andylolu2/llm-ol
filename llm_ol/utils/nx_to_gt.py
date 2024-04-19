@@ -2,6 +2,7 @@ from typing import Hashable
 
 import graph_tool as gt
 import networkx as nx
+from absl import logging
 
 
 def get_gt_type(value):

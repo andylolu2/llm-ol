@@ -7,8 +7,8 @@ if [ -f .env ]; then
     set +o allexport
 fi
 
-exp_dir=out/experiments/finetune/v8
-step=30000
+exp_dir=out/experiments/finetune/v9
+step=15000
 model=$exp_dir/train/checkpoint-$step
 
 echo "Running inference on $model"

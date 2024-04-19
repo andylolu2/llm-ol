@@ -7,7 +7,16 @@ if [ -f .env ]; then
     set +o allexport
 fi
 
-python llm_ol/eval/eval_single_graph.py \
-    --graph_file out/experiments/hearst/v2/graph.json \
-    --ground_truth_graph_file out/data/wikipedia/v2/train_test_split/test_graph.json \
-    --output_dir out/experiments/hearst/v2
+# python llm_ol/eval/eval_single_graph.py \
+#     --graph_file out/experiments/hearst/v2/graph.json \
+#     --ground_truth_graph_file out/data/wikipedia/v2/train_test_split/test_graph.json \
+#     --output_dir out/experiments/hearst/v2
+
+split=test
+exp_dir=out/experiments/hearst/v2/$split
+
+python llm_ol/eval/hp_search.py \
+    --graph $exp_dir/graph.json \
+    --graph_true out/data/wikipedia/v2/train_${split}_split/test_graph.json \
+    --output_dir $exp_dir \
+    --ignore_root

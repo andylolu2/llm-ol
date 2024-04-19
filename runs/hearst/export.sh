@@ -7,7 +7,7 @@ if [ -f .env ]; then
     set +o allexport
 fi
 
-dir=out/experiments/hearst/v2/test
+dir=out/experiments/hearst/v2/eval
 
 python llm_ol/experiments/hearst/export_graph.py \
     --extraction_dir $dir/extractions \

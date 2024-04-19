@@ -3,7 +3,6 @@ import random
 import graph_tool.all as gt
 import networkx as nx
 import torch
-from absl import logging
 from torch_geometric.data import Batch
 from torch_geometric.nn import GCNConv
 from torch_geometric.utils import from_networkx
@@ -105,6 +104,8 @@ def graph_similarity(
     embedding_model: str = "sentence-transformers/all-MiniLM-L6-v2",
     direction: str = "forward",
 ) -> float:
+    if len(G1) == 0 or len(G2) == 0:
+        return 0
 
     def nx_to_vec(G: nx.Graph, n_iters) -> torch.Tensor:
         """Compute a graph embedding of shape (n_nodes embed_dim).
