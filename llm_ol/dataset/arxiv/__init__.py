@@ -1,11 +1,5 @@
-from pathlib import Path
-
-import networkx as nx
-
-from llm_ol.dataset import data_model
-
-ROOT_CATEGORY_ID = "root"
-ROOT_CATEGORY_NAME = "Root"
+ROOT_CATEGORY_ID = "Main topic classifications"
+ROOT_CATEGORY_NAME = "Main topic classifications"
 
 ALIASES = [
     ["math.MP", "math-ph"],

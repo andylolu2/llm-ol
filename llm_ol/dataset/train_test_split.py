@@ -79,15 +79,18 @@ def main(_):
         }
         edges_train = edges & G_train.edges
         edges_test = edges & G_test.edges
-        logging.info(
-            "Depth %d: %.2f%% edges in train, %.2f%% edges in test. %.2f%% shared edges. %.2f%% covered edges. Total %d edges.\n",
-            i,
-            len(edges_train) / len(edges) * 100,
-            len(edges_test) / len(edges) * 100,
-            len(edges_train & edges_test) / len(edges) * 100,
-            len(edges_train | edges_test) / len(edges) * 100,
-            len(edges),
-        )
+        try:
+            logging.info(
+                "Depth %d: %.2f%% edges in train, %.2f%% edges in test. %.2f%% shared edges. %.2f%% covered edges. Total %d edges.\n",
+                i,
+                len(edges_train) / len(edges) * 100,
+                len(edges_test) / len(edges) * 100,
+                len(edges_train & edges_test) / len(edges) * 100,
+                len(edges_train | edges_test) / len(edges) * 100,
+                len(edges),
+            )
+        except ZeroDivisionError:
+            logging.info("Depth %d: No edges\n", i)
 
     logging.info(
         "Overall: %.2f%% nodes in train, %.2f%% nodes in test. %.2f%% shared nodes. %.2f%% covered nodes. Total %d nodes.",

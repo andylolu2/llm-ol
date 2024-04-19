@@ -7,7 +7,7 @@ if [ -f .env ]; then
     set +o allexport
 fi
 
-arxiv_dir=out/data/arxiv/v1
+arxiv_dir=out/data/arxiv/v2
 
 python llm_ol/dataset/arxiv/export_graph.py \
     --categories_file $arxiv_dir/categories/raw_categories.json \

@@ -23,6 +23,8 @@ def get_gt_type(value):
         case str():
             return "string"
         case list():
+            if len(value) == 0:
+                return "object"
             inner_type = get_gt_type(value[0])
             if inner_type in ("bool", "long", "float", "string"):
                 return f"vector<{inner_type}>"

@@ -69,7 +69,7 @@ class GenerateSamplesCallback(TrainerCallback):
             logging.info("Sample %d: %s", i, sample)
             samples.append(sample)
 
-        if len(samples) > 0:
+        if len(samples) > 0 and wandb.run is not None:
             table = wandb.Table(
                 columns=list(samples[0].keys()),
                 data=[list(s.values()) for s in samples],

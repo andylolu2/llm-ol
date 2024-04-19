@@ -147,7 +147,7 @@ def main(_):
     trainer.train()  # type: ignore
 
     # Save the final model
-    trainer.save_model(str(Path(config.output_dir) / "final"))
+    trainer.save_model(str(Path(config.output_dir) / "checkpoint-final"))
 
 
 if __name__ == "__main__":

@@ -38,7 +38,8 @@ def paths_from_root(
 
     try:
         paths = gt.all_paths(G_gt, source=root_idx, target=page_node, cutoff=cutoff)
-        paths = [path[:-1] for path in paths]
+        paths = {tuple(path[:-1]) for path in paths}
+        paths = [list(path) for path in paths]
         random.shuffle(paths)
         return paths
     finally:

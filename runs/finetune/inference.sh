@@ -7,8 +7,8 @@ if [ -f .env ]; then
     set +o allexport
 fi
 
-exp_dir=out/experiments/finetune/v9
-step=15000
+exp_dir=out/experiments/finetune/v4
+step=final
 model=$exp_dir/train/checkpoint-$step
 
 echo "Running inference on $model"
@@ -19,6 +19,6 @@ if [ ! -d "$model/merged" ]; then
 fi
 
 python llm_ol/experiments/llm/finetune/inference.py \
-    --test_dataset out/experiments/llm/v2/eval_dataset.jsonl \
+    --test_dataset out/experiments/llm/v2/test_dataset.jsonl \
     --model $model/merged \
     --output_dir $exp_dir/$step

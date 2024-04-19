@@ -8,7 +8,7 @@ from absl import app, flags, logging
 from vllm import LLM, SamplingParams
 
 from llm_ol.experiments.llm.templates import PROMPT_TEMPLATE_FULL
-from llm_ol.utils import batch, load_template, setup_logging, textpbar
+from llm_ol.utils import batch, setup_logging, textpbar
 
 FLAGS = flags.FLAGS
 flags.DEFINE_string(

@@ -7,20 +7,24 @@ if [ -f .env ]; then
     set +o allexport
 fi
 
-python llm_ol/experiments/llm/build_dataset.py \
-    --graph_file out/data/wikipedia/v2/train_eval_split/train_graph.json \
-    --cutoff 5 \
-    --num_workers 16 \
-    --output_file out/experiments/llm/v2/train_dataset.jsonl
+dataset=arxiv/v2
+cutoff=4  # use 5 for wikipedia
+output_dir=out/experiments/llm/arxiv
 
 python llm_ol/experiments/llm/build_dataset.py \
-    --graph_file out/data/wikipedia/v2/train_eval_split/test_graph.json \
-    --cutoff 5 \
+    --graph_file out/data/$dataset/train_eval_split/train_graph.json \
+    --cutoff $cutoff \
     --num_workers 16 \
-    --output_file out/experiments/llm/v2/eval_dataset.jsonl
+    --output_file $output_dir/train_dataset.jsonl
 
 python llm_ol/experiments/llm/build_dataset.py \
-    --graph_file out/data/wikipedia/v2/train_test_split/test_graph.json \
-    --cutoff 5 \
+    --graph_file out/data/$dataset/train_eval_split/test_graph.json \
+    --cutoff $cutoff \
     --num_workers 16 \
-    --output_file out/experiments/llm/v2/test_dataset.jsonl
+    --output_file $output_dir/eval_dataset.jsonl
+
+python llm_ol/experiments/llm/build_dataset.py \
+    --graph_file out/data/$dataset/train_test_split/test_graph.json \
+    --cutoff $cutoff \
+    --num_workers 16 \
+    --output_file $output_dir/test_dataset.jsonl

@@ -11,12 +11,13 @@ from datasets import Dataset, load_dataset
 from ml_collections import config_flags
 from peft import LoraConfig, get_peft_model
 from transformers import AutoModelForCausalLM, AutoTokenizer, TrainingArguments
+from transformers.trainer_utils import get_last_checkpoint
 from trl import DataCollatorForCompletionOnlyLM, SFTTrainer
 
 from llm_ol.experiments.llm.finetune.training.utils import GenerateSamplesCallback
 from llm_ol.experiments.llm.templates import (
     _MISTRAL_TEMPLATE,
-    PROMPT_TEMPLATE_FULL,
+    PROMPT_TEMPLATE,
     RESPONSE_TEMPLATE,
 )
 from llm_ol.utils import setup_logging
@@ -76,9 +77,8 @@ class Trainer(SFTTrainer):
         edge_weights = {k: v / max_weight for k, v in edge_weights.items()}
 
         def tokenize_one(example: dict[str, Any]):
-
-            prompt = PROMPT_TEMPLATE_FULL.render(
-                title=example["title"], abstract=example["abstract"], examples=[]
+            prompt = PROMPT_TEMPLATE.render(
+                title=example["title"], abstract=example["abstract"]
             )
             response = RESPONSE_TEMPLATE.render(paths=example["paths"])
             messages = [
@@ -266,7 +266,7 @@ def main(_):
         ],
         args=TrainingArguments(
             output_dir=config.output_dir,
-            overwrite_output_dir=True,
+            overwrite_output_dir=False,
             optim="adamw_torch_fused",
             learning_rate=config.train.learning_rate,
             lr_scheduler_type="constant_with_warmup",
@@ -299,11 +299,16 @@ def main(_):
             config=config.to_dict(),
             save_code=True,
         )
-    trainer.evaluate()
-    trainer.train()  # type: ignore
+
+    checkpoint_path = get_last_checkpoint(config.output_dir)
+    if checkpoint_path is not None:
+        trainer._load_from_checkpoint(checkpoint_path)
+    else:  # new run
+        trainer.evaluate()
+    trainer.train(resume_from_checkpoint=True)  # type: ignore
 
     # Save the final model
-    trainer.save_model(str(Path(config.output_dir) / "final"))
+    trainer.save_model(str(Path(config.output_dir) / "checkpoint-final"))
 
 
 if __name__ == "__main__":

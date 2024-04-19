@@ -51,6 +51,7 @@ def post_process(G: nx.DiGraph, hp: PostProcessHP) -> nx.DiGraph:
             If the graph does not have a root, the largest weakly connected component is kept.
         add_root: Add a root node to the graph if it does not have one.
     """
+    G_original = G
     G = G.copy()  # type: ignore
 
     def weight(u, v):
@@ -128,11 +129,13 @@ def post_process(G: nx.DiGraph, hp: PostProcessHP) -> nx.DiGraph:
             edges_to_remove |= {edges[i] for i in bottom_indices}
     for n in G.nodes:
         edges_to_remove |= prune_edges_out_from_node(G, n, hp.relative_percentile)
-    G = nx.edge_subgraph(G, G.edges - edges_to_remove)
+    G = nx.edge_subgraph(G, G.edges - edges_to_remove).copy()
 
     if hp.prune_unconnected_nodes:
         if "root" in G.graph:
             root = G.graph["root"]
+            if root not in G:
+                G.add_node(root, **G_original.nodes[root])
             connected = nx.descendants(G, root) | {root}
             G = G.subgraph(connected)
         else:

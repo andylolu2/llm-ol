@@ -39,7 +39,7 @@ def main(_):
             continue
         key = arxiv.normalise(key)
         G.add_node(key)
-        G.add_edge("root", key)
+        G.add_edge(arxiv.ROOT_CATEGORY_ID, key)
 
     for key, value in ARCHIVES.items():
         id_to_name[key] = value["name"]

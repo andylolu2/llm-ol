@@ -7,12 +7,13 @@ if [ -f .env ]; then
     set +o allexport
 fi
 
-split=eval
-exp_dir=out/experiments/hearst/v2/$split
+split=test
+dataset=arxiv/v2
+exp_dir=out/experiments/hearst/v3/$split
 
 python llm_ol/experiments/hearst/make_txt.py \
-    --graph_file out/data/wikipedia/v2/train_${split}_split/train_graph.json \
-    --graph_file out/data/wikipedia/v2/train_${split}_split/test_graph.json \
+    --graph_file out/data/$dataset/train_${split}_split/train_graph.json \
+    --graph_file out/data/$dataset/train_${split}_split/test_graph.json \
     --output_dir $exp_dir/abstracts
 
 dir $exp_dir/abstracts/*.txt | sort -V > $exp_dir/abstract-list.txt

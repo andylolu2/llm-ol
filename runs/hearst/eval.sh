@@ -12,7 +12,7 @@ fi
 #     --ground_truth_graph_file out/data/wikipedia/v2/train_test_split/test_graph.json \
 #     --output_dir out/experiments/hearst/v2
 
-split=test
+split=eval
 exp_dir=out/experiments/hearst/v2/$split
 
 python llm_ol/eval/hp_search.py \
