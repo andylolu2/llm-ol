@@ -27,6 +27,6 @@ java \
     -outputDirectory $exp_dir/extractions \
     -outputFormat conll \
     -output.columns ner \
-    -threads 32
+    -threads 16
 
 # Add -noClobber if you want to avoid overwriting existing files

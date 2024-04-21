@@ -32,6 +32,7 @@ def get_config():
         grad_acc_steps=1,
         batch_size=16,
         max_seq_length=2048,
+        group_by_length=True,
         lora=dict(
             rank=32,
             alpha=16,

@@ -246,13 +246,15 @@ def main(_):
         data_collator=collator,
         max_seq_length=config.train.max_seq_length,
         dataset_num_proc=16,
-        train_dataset=dataset_from_file(config.data.train_file, config.data.train_size),
+        train_dataset=dataset_from_file(
+            config.data.train_file, config.data.train_size, config.seed
+        ),
         eval_dataset={
             "in_domain": dataset_from_file(
-                config.data.train_file, config.data.eval_size
+                config.data.train_file, config.data.eval_size, config.seed + 1
             ),
             "out_of_domain": dataset_from_file(
-                config.data.eval_file, config.data.eval_size
+                config.data.eval_file, config.data.eval_size, config.seed
             ),
         },
         formatting_func=lambda: None,
@@ -278,7 +280,7 @@ def main(_):
             gradient_checkpointing_kwargs={"use_reentrant": False},
             gradient_accumulation_steps=config.train.grad_acc_steps,
             ddp_find_unused_parameters=False,
-            group_by_length=True,
+            group_by_length=config.train.group_by_length,
             remove_unused_columns=False,
             fp16=torch.cuda.is_available() and not torch.cuda.is_bf16_supported(),
             bf16=torch.cuda.is_available() and torch.cuda.is_bf16_supported(),
@@ -300,12 +302,10 @@ def main(_):
             save_code=True,
         )
 
-    checkpoint_path = get_last_checkpoint(config.output_dir)
-    if checkpoint_path is not None:
-        trainer._load_from_checkpoint(checkpoint_path)
-    else:  # new run
+    resume_from_checkpoint = get_last_checkpoint(config.output_dir) is not None
+    if not resume_from_checkpoint:
         trainer.evaluate()
-    trainer.train(resume_from_checkpoint=True)  # type: ignore
+    trainer.train(resume_from_checkpoint=resume_from_checkpoint)  # type: ignore
 
     # Save the final model
     trainer.save_model(str(Path(config.output_dir) / "checkpoint-final"))
