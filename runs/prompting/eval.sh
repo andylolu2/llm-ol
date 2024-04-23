@@ -8,7 +8,7 @@ if [ -f .env ]; then
 fi
 
 split=test
-exp_dir=out/experiments/prompting/v7/$split
+exp_dir=out/experiments/prompting/v5/$split
 
 python llm_ol/eval/hp_search.py \
     --graph $exp_dir/graph.json \

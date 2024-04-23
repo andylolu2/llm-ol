@@ -1,3 +1,4 @@
+import random
 from collections import defaultdict
 from pathlib import Path
 from typing import Any
@@ -31,25 +32,11 @@ class Trainer(SFTTrainer):
         """Custom loss."""
         if not model.training:
             outputs = model(input_ids=inputs["input_ids"], labels=inputs["labels"])
-            loss = outputs.loss
         else:
-            outputs = model(input_ids=inputs["input_ids"])
-            logits = outputs.logits
-            b, s, v = logits.shape
-            shift_logits = logits[..., :-1, :].reshape(b * (s - 1), v)
-            shift_labels = inputs["labels"][..., 1:].reshape(b * (s - 1))
-            shift_weights = inputs["weights"][..., 1:]
-
-            # Ensure tensors are on the same device
-            shift_labels = shift_labels.to(shift_logits.device)
-            shift_weights = shift_weights.to(shift_logits.device)
-
-            loss = torch.nn.functional.cross_entropy(
-                shift_logits, shift_labels, reduction="none"
-            ).reshape(b, s - 1)
-            loss = (loss * shift_weights).sum()
-
-        return (loss, outputs) if return_outputs else loss
+            outputs = model(
+                input_ids=inputs["input_ids"], labels=inputs["labels_detailed"]
+            )
+        return (outputs.loss, outputs) if return_outputs else outputs.loss
 
     def _prepare_dataset(
         self,
@@ -70,11 +57,9 @@ class Trainer(SFTTrainer):
             for path in example["paths"]:  # type: ignore
                 for u, v in zip(path[:-1], path[1:]):
                     edge_counts[(u, v)] += 1
-        edge_weights = {k: 1 / v for k, v in edge_counts.items()}
-
-        # rescale such that the maximum weight is 1
-        max_weight = max(edge_weights.values())
-        edge_weights = {k: v / max_weight for k, v in edge_weights.items()}
+        # rescale such that each edge occurs on average `mean_edge_count` times
+        mean_edge_count = np.mean(list(edge_counts.values()))
+        edge_weights = {k: mean_edge_count / v for k, v in edge_counts.items()}
 
         def tokenize_one(example: dict[str, Any]):
             prompt = PROMPT_TEMPLATE.render(
@@ -87,15 +72,6 @@ class Trainer(SFTTrainer):
             ]
             input_ids = tokenizer.apply_chat_template(messages, tokenize=True)
 
-            # Compute mean weight to use for "Main topic classifications", "->", "\n", "</s>"
-            example_weights = []
-            for path in example["paths"]:
-                for u, v in zip(path[:-1], path[1:]):
-                    example_weights.append(edge_weights[(u, v)])
-            mean_weight = np.mean(example_weights)
-
-            weights = []
-
             inst_end = [733, 28748, 16289, 28793]  # _[/INST]
             arrow = 3193  # _->
             linebreak = 13  # \n
@@ -107,7 +83,10 @@ class Trainer(SFTTrainer):
                 raise ValueError(f"Sublist {sublist} not found in list")
 
             resp_start_idx = find_index(input_ids, inst_end) + len(inst_end)
-            weights = [0] * resp_start_idx
+            ignores = [True] * resp_start_idx + [False] * (
+                len(input_ids) - resp_start_idx
+            )
+            ignores_detailed = [True] * resp_start_idx
 
             prev_word = None
             word_ids = []
@@ -116,25 +95,29 @@ class Trainer(SFTTrainer):
                     word = tokenizer.decode(word_ids)
                     assert "->" not in word
                     if prev_word is not None:
-                        weight = edge_weights[(prev_word, word)]
-                        weights += [weight] * len(word_ids)  # weight for this edge
+                        ignore = random.random() > edge_weights[(prev_word, word)]
+                        ignores_detailed += [ignore] * len(word_ids)
                     else:  # First word in the path
-                        weights += [mean_weight] * len(word_ids)
-                    weights += [mean_weight]  # weight for "->" or "\n"
+                        ignores_detailed += [False] * len(word_ids)
+                    ignores_detailed += [False]  # "->" or "\n"
 
                     word_ids = []
                     prev_word = word if token_id == arrow else None
                 elif token_id == tokenizer.eos_token_id:
                     assert len(word_ids) == 0
-                    weights += [mean_weight]
+                    ignores_detailed += [False]
                 else:  # token is part of a word
                     word_ids.append(token_id)
 
-            assert len(input_ids) == len(weights)
-            return {"input_ids": input_ids, "weights": weights}
+            assert len(input_ids) == len(ignores_detailed)
+            return {
+                "input_ids": input_ids,
+                "ignores": ignores,
+                "ignores_detailed": ignores_detailed,
+            }
 
         def tokenize(examples: dict[str, list[Any]]):
-            # dict of lists to list of dicts
+            # dict of lists -> list of dicts
             examples_list = [dict(zip(examples, t)) for t in zip(*examples.values())]
 
             results = []
@@ -144,7 +127,7 @@ class Trainer(SFTTrainer):
                 except Exception as e:
                     logging.warning(f"Error reweighting example: {example} {repr(e)}")
 
-            # list of dicts to dict of lists
+            # list of dicts -> dict of lists
             return {k: [d[k] for d in results] for k in results[0]}
 
         logging.info("Dataset size: %d", len(dataset))
@@ -172,16 +155,21 @@ class DataCollator(DataCollatorForCompletionOnlyLM):
         max_length = min(max_length, self.tokenizer.model_max_length)
 
         input_ids = []
-        weights = []
+        ignores_detailed = []
+        ignores = []
         for ex in examples:
             diff = max_length - len(ex["input_ids"])
             input_ids.append(ex["input_ids"] + [self.tokenizer.pad_token_id] * diff)
-            weights.append(ex["weights"] + [0] * diff)
+            ignores.append(ex["ignores"] + [True] * diff)
+            ignores_detailed.append(ex["ignores_detailed"] + [True] * diff)
         input_ids = torch.tensor(input_ids)
-        weights = torch.tensor(weights)
-        labels = input_ids.clone()
-        labels[weights == 0] = -100
-        return {"input_ids": input_ids, "labels": labels, "weights": weights}
+        ignores = torch.tensor(ignores)
+        ignores_detailed = torch.tensor(ignores_detailed)
+        return {
+            "input_ids": input_ids,
+            "labels": torch.where(ignores, -100, input_ids),
+            "labels_detailed": torch.where(ignores_detailed, -100, input_ids),
+        }
 
 
 def dataset_from_file(
@@ -197,6 +185,7 @@ def dataset_from_file(
 def main(_):
     config = FLAGS.config
     logging.info("Config:\n%s", config)
+    random.seed(config.seed)
     setup_logging(config.output_dir, "main")
 
     device_string = PartialState().process_index

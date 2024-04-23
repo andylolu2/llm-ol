@@ -1,4 +1,4 @@
-from typing import Literal, overload
+from typing import Any, Literal, overload
 
 from pydantic import BaseModel
 
@@ -21,7 +21,7 @@ class PromptingExperiment(Experiment):
 
 
 class FinetuneExperiment(Experiment):
-    step: int
+    step: Any
     reweighted: bool
 
 
@@ -101,6 +101,7 @@ prompting_experiments = [
         train_input="out/data/wikipedia/v2/train_eval_split/train_graph.json",
         eval_ground_truth="out/data/wikipedia/v2/train_eval_split/test_graph.json",
         test_ground_truth="out/data/wikipedia/v2/train_test_split/test_graph.json",
+        test_hp_result="out/experiments/prompting/v5/test/hp_search.jsonl",
     ),
     PromptingExperiment(
         name="3 shot",
@@ -111,6 +112,7 @@ prompting_experiments = [
         train_input="out/data/wikipedia/v2/train_eval_split/train_graph.json",
         eval_ground_truth="out/data/wikipedia/v2/train_eval_split/test_graph.json",
         test_ground_truth="out/data/wikipedia/v2/train_test_split/test_graph.json",
+        test_hp_result="out/experiments/prompting/v6/test/hp_search.jsonl",
     ),
 ]
 
@@ -145,6 +147,17 @@ finetune_experiments = [
         eval_ground_truth="out/data/wikipedia/v2/train_eval_split/test_graph.json",
         test_ground_truth="out/data/wikipedia/v2/train_test_split/test_graph.json",
         eval_hp_result="out/experiments/finetune/v4/16500/eval/hp_search.jsonl",
+    ),
+    FinetuneExperiment(
+        name="Finetune",
+        dataset="wikipedia/v2",
+        step="final",
+        reweighted=False,
+        test_output="out/experiments/finetune/v4/final/test/graph.json",
+        train_input="out/data/wikipedia/v2/train_eval_split/train_graph.json",
+        eval_ground_truth="out/data/wikipedia/v2/train_eval_split/test_graph.json",
+        test_ground_truth="out/data/wikipedia/v2/train_test_split/test_graph.json",
+        test_hp_result="out/experiments/finetune/v4/final/test/hp_search.jsonl",
     ),
     FinetuneExperiment(
         name="Finetune weighted step 5000",
@@ -244,6 +257,38 @@ finetune_experiments = [
         test_ground_truth="out/data/wikipedia/v2/train_test_split/test_graph.json",
         eval_hp_result="out/experiments/finetune/v9/15000/eval/hp_search.jsonl",
         version=3,
+    ),
+    FinetuneExperiment(
+        name="Finetune reweighted",
+        dataset="wikipedia/v2",
+        step="final",
+        reweighted=True,
+        test_output="out/experiments/finetune/v9/final/test/graph.json",
+        train_input="out/data/wikipedia/v2/train_eval_split/train_graph.json",
+        eval_ground_truth="out/data/wikipedia/v2/train_eval_split/test_graph.json",
+        test_ground_truth="out/data/wikipedia/v2/train_test_split/test_graph.json",
+        test_hp_result="out/experiments/finetune/v9/final/test/hp_search.jsonl",
+        version=3,
+    ),
+    FinetuneExperiment(
+        name="Finetune arxiv",
+        dataset="arxiv/v2",
+        step="final",
+        reweighted=False,
+        test_output="out/experiments/finetune/arxiv/v2/192/test/graph.json",
+        train_input="out/data/arxiv/v2/train_eval_split/train_graph.json",
+        eval_ground_truth="out/data/arxiv/v2/train_eval_split/test_graph.json",
+        test_ground_truth="out/data/arxiv/v2/train_test_split/test_graph.json",
+    ),
+    FinetuneExperiment(
+        name="Finetune arxiv reweighted",
+        dataset="arxiv/v2",
+        step="final",
+        reweighted=True,
+        test_output="out/experiments/finetune/arxiv/v1/320/test/graph.json",
+        train_input="out/data/arxiv/v2/train_eval_split/train_graph.json",
+        eval_ground_truth="out/data/arxiv/v2/train_eval_split/test_graph.json",
+        test_ground_truth="out/data/arxiv/v2/train_test_split/test_graph.json",
     ),
 ]
 

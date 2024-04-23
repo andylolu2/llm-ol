@@ -16,9 +16,9 @@ fi
 #     --skip_eigenspectrum \
 #     --skip_central_nodes
 
-# step=5000
-split=eval
-exp_dir=out/experiments/finetune/v4/16500/$split
+step=final
+split=test
+exp_dir=out/experiments/finetune/v9/$step/$split
 
 python llm_ol/eval/hp_search.py \
     --graph $exp_dir/graph.json \

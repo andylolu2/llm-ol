@@ -184,11 +184,12 @@ def hp_search(G: nx.DiGraph, G_true: nx.DiGraph, metric: str = "edge_f1", **kwar
         score_fn = edge_f1
     elif metric == "node_f1":
         score_fn = node_f1
-    elif metric == "graph_similarity":
+    elif metric.startswith("graph_similarity"):
+        n_iters = int(metric.split("_")[-1])
         G = embed_graph(G)  # type: ignore
         G_true = embed_graph(G_true)  # type: ignore
         score_fn = lambda G_pred, G_true: graph_similarity(
-            G_pred, G_true, direction="forward"
+            G_pred, G_true, direction="reverse", n_iters=n_iters
         )
     else:
         raise ValueError(f"Unknown metric: {metric}")

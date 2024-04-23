@@ -17,7 +17,7 @@ flags.DEFINE_string("model", None, "Model to use for inference.", required=True)
 
 def main(_):
     out_dir = Path(FLAGS.output_dir)
-    setup_logging(out_dir, "main", flags=FLAGS)
+    setup_logging(out_dir, "inference", flags=FLAGS)
     out_file = out_dir / "categorised_pages.jsonl"
 
     logging.info(
