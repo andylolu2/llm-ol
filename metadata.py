@@ -1,3 +1,4 @@
+import json
 from typing import Any, Literal, overload
 
 from pydantic import BaseModel
@@ -14,6 +15,21 @@ class Experiment(BaseModel):
     eval_hp_result: str | None = None
     test_hp_result: str | None = None
     version: int = 1
+
+    @property
+    def best_hp(self) -> dict[str, Any]:
+        best_score, best_abs_percentile, best_rel_percentile = float("-inf"), None, None
+        with open(self.eval_hp_result) as f:
+            for line in f:
+                item = json.loads(line)
+                if item["graph_similarity"] > best_score:
+                    best_score = item["graph_similarity"]
+                    best_abs_percentile = item["absolute_percentile"]
+                    best_rel_percentile = item["relative_percentile"]
+        return {
+            "absolute_percentile": best_abs_percentile,
+            "relative_percentile": best_rel_percentile,
+        }
 
 
 class PromptingExperiment(Experiment):
@@ -34,6 +50,10 @@ def query(**kwargs) -> Experiment:
 
 
 @overload
+def query_multiple(exp: Literal["memorisation"], **kwargs) -> list[Experiment]: ...
+
+
+@overload
 def query_multiple(exp: Literal["hearst"], **kwargs) -> list[Experiment]: ...
 
 
@@ -47,9 +67,15 @@ def query_multiple(
 def query_multiple(exp: Literal["finetune"], **kwargs) -> list[FinetuneExperiment]: ...
 
 
+@overload
+def query_multiple(exp: Literal["all"], **kwargs) -> list[Experiment]: ...
+
+
 def query_multiple(exp: str = "all", **kwargs):
     if exp == "hearst":
         experiments = hearst_experiments
+    elif exp == "memorisation":
+        experiments = memorisation_experiments
     elif exp == "prompting":
         experiments = prompting_experiments
     elif exp == "finetune":
@@ -64,6 +90,19 @@ def query_multiple(exp: str = "all", **kwargs):
 
     return matches
 
+
+memorisation_experiments = [
+    Experiment(
+        name="Memorisation",
+        dataset="wikipedia/v2",
+        test_output="out/experiments/memorisation/wiki/graph.json",
+        train_input="out/data/wikipedia/v2/train_eval_split/train_graph.json",
+        eval_ground_truth="out/data/wikipedia/v2/train_eval_split/test_graph.json",
+        test_ground_truth="out/data/wikipedia/v2/train_test_split/test_graph.json",
+        eval_hp_result="out/experiments/memorisation/wiki/eval/hp_search.jsonl",
+        test_hp_result="out/experiments/memorisation/wiki/test/hp_search.jsonl",
+    ),
+]
 
 hearst_experiments = [
     Experiment(
@@ -273,23 +312,41 @@ finetune_experiments = [
     FinetuneExperiment(
         name="Finetune arxiv",
         dataset="arxiv/v2",
-        step="final",
+        step=192,
         reweighted=False,
+        eval_output="out/experiments/finetune/arxiv/v2/192/eval/graph.json",
         test_output="out/experiments/finetune/arxiv/v2/192/test/graph.json",
         train_input="out/data/arxiv/v2/train_eval_split/train_graph.json",
         eval_ground_truth="out/data/arxiv/v2/train_eval_split/test_graph.json",
         test_ground_truth="out/data/arxiv/v2/train_test_split/test_graph.json",
+        eval_hp_result="out/experiments/finetune/arxiv/v2/192/eval/hp_search.jsonl",
     ),
     FinetuneExperiment(
         name="Finetune arxiv reweighted",
         dataset="arxiv/v2",
-        step="final",
+        step=320,
         reweighted=True,
         test_output="out/experiments/finetune/arxiv/v1/320/test/graph.json",
         train_input="out/data/arxiv/v2/train_eval_split/train_graph.json",
         eval_ground_truth="out/data/arxiv/v2/train_eval_split/test_graph.json",
         test_ground_truth="out/data/arxiv/v2/train_test_split/test_graph.json",
     ),
+    FinetuneExperiment(
+        name="Finetune arxiv masked",
+        dataset="arxiv/v2",
+        step=288,
+        reweighted=True,
+        test_output="out/experiments/finetune/arxiv/v3/288/test/graph.json",
+        train_input="out/data/arxiv/v2/train_eval_split/train_graph.json",
+        eval_ground_truth="out/data/arxiv/v2/train_eval_split/test_graph.json",
+        test_ground_truth="out/data/arxiv/v2/train_test_split/test_graph.json",
+        version=2,
+    ),
 ]
 
-all_experiments = prompting_experiments + finetune_experiments
+all_experiments = (
+    memorisation_experiments
+    + hearst_experiments
+    + prompting_experiments
+    + finetune_experiments
+)

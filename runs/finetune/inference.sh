@@ -7,10 +7,10 @@ if [ -f .env ]; then
     set +o allexport
 fi
 
-exp_dir=out/experiments/finetune/arxiv/v2
-step=192
-split=eval
-dataset=arxiv
+exp_dir=out/experiments/finetune/v10
+step=final
+split=test
+dataset=v2
 model=$exp_dir/train/checkpoint-$step
 
 echo "Running inference on $model"

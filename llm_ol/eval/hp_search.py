@@ -3,6 +3,7 @@ import graph_tool  # isort: skip
 
 import dataclasses
 import json
+from functools import partial
 from itertools import product
 from pathlib import Path
 
@@ -48,7 +49,7 @@ def main(_):
         "edge_f1": edge_f1,
         "edge_precision": edge_precision,
         "edge_recall": edge_recall,
-        "graph_similarity": graph_similarity,
+        "graph_similarity": partial(graph_similarity, direction="undirected"),
     }
 
     if "graph_similarity" in metrics:

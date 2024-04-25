@@ -10,11 +10,18 @@ fi
 # python llm_ol/experiments/llm/finetune/export_model.py \
 #     --checkpoint_dir out/experiments/finetune/v4/train/checkpoint-final
 
-# accelerate launch --multi_gpu llm_ol/experiments/llm/finetune/training/main_weighted.py \
-accelerate launch --multi_gpu llm_ol/experiments/llm/finetune/training/main.py \
+base_model=out/experiments/finetune/v10/train/checkpoint-final
+
+if [ ! -d "$base_model/merged" ]; then
+    python llm_ol/experiments/llm/finetune/export_model.py \
+        --checkpoint_dir $base_model
+fi
+
+# accelerate launch --multi_gpu llm_ol/experiments/llm/finetune/training/main.py \
+accelerate launch --multi_gpu llm_ol/experiments/llm/finetune/training/main_weighted.py \
     --config llm_ol/experiments/llm/finetune/training/config.py \
-    --config.wandb.notes "Arxiv adaptation" \
-    --config.model.name out/experiments/finetune/v4/train/checkpoint-final/merged \
+    --config.wandb.notes "Arxiv masked adaptation" \
+    --config.model.name $base_model/merged \
     --config.train.epochs 3 \
     --config.train.batch_size 8 \
     --config.train.group_by_length=False \
@@ -28,5 +35,5 @@ accelerate launch --multi_gpu llm_ol/experiments/llm/finetune/training/main.py \
     --config.eval.eval_steps 32 \
     --config.data.train_file out/experiments/llm/arxiv/train_dataset.jsonl \
     --config.data.eval_file out/experiments/llm/arxiv/eval_dataset.jsonl \
-    --config.output_dir out/experiments/finetune/arxiv/v2/train
+    --config.output_dir out/experiments/finetune/arxiv/v3/train
 

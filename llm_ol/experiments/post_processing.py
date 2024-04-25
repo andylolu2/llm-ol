@@ -189,7 +189,7 @@ def hp_search(G: nx.DiGraph, G_true: nx.DiGraph, metric: str = "edge_f1", **kwar
         G = embed_graph(G)  # type: ignore
         G_true = embed_graph(G_true)  # type: ignore
         score_fn = lambda G_pred, G_true: graph_similarity(
-            G_pred, G_true, direction="reverse", n_iters=n_iters
+            G_pred, G_true, direction="undirected", n_iters=n_iters
         )
     else:
         raise ValueError(f"Unknown metric: {metric}")
