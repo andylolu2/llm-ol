@@ -3,7 +3,6 @@ import graph_tool  # isort: skip
 
 import dataclasses
 import json
-from functools import partial
 from itertools import product
 from pathlib import Path
 
@@ -12,9 +11,8 @@ from absl import app, flags, logging
 
 from llm_ol.dataset import data_model
 from llm_ol.eval.graph_metrics import (
-    edge_f1,
-    edge_precision,
-    edge_recall,
+    edge_prec_recall_f1,
+    edge_similarity,
     embed_graph,
     graph_similarity,
 )
@@ -29,9 +27,6 @@ flags.DEFINE_string(
 flags.DEFINE_integer("num_samples", 11, "Number of thresholds to evaluate.")
 flags.DEFINE_string("output_dir", None, "Path to the output directory", required=True)
 flags.DEFINE_bool("ignore_root", False, "Ignore the root node of `graph`.")
-flags.DEFINE_bool(
-    "add_root", False, "Add a root node to the graph if it does not have one."
-)
 
 
 def main(_):
@@ -45,38 +40,45 @@ def main(_):
     if FLAGS.ignore_root:
         G.graph.pop("root", None)
 
-    metrics = {
-        "edge_f1": edge_f1,
-        "edge_precision": edge_precision,
-        "edge_recall": edge_recall,
-        "graph_similarity": partial(graph_similarity, direction="undirected"),
-    }
+    G = embed_graph(G)
+    G_true = embed_graph(G_true)
 
-    if "graph_similarity" in metrics:
-        G = embed_graph(G)
-        G_true = embed_graph(G_true)
+    absolute_percentiles = 1 - np.geomspace(
+        1 / G.number_of_edges(), 1, FLAGS.num_samples
+    )
+    relative_percentiles = 1 - np.geomspace(0.1, 1, FLAGS.num_samples) + 0.1
 
-    absolute_percentiles = 1 - np.geomspace(1 / G.number_of_edges(), 1, 11)
-    relative_percentiles = 1 - np.geomspace(0.1, 1, 11) + 0.1
-
-    computed = set()
     if out_file.exists():
-        with out_file.open("r") as f:
-            for line in f:
-                item = json.loads(line)
-                computed.add((item["absolute_percentile"], item["relative_percentile"]))
+        out_file.unlink()
 
     for absolute_percentile, relative_percentile in product(
         absolute_percentiles, relative_percentiles
     ):
-        if (absolute_percentile, relative_percentile) in computed:
-            continue
         hp = PostProcessHP(
-            absolute_percentile, relative_percentile, add_root=FLAGS.add_root
+            absolute_percentile,
+            relative_percentile,
+            add_root=False,
+            prune_unconnected_nodes=False,
         )
         G_pruned = post_process(G, hp)
-        metric_values = {name: fn(G_pruned, G_true) for name, fn in metrics.items()}
-        item = {**dataclasses.asdict(hp), **metric_values}
+
+        precision, recall, f1 = edge_prec_recall_f1(G_pruned, G_true)
+        edge_sim, fuzzy_precision, fuzzy_recall, fuzzy_f1 = edge_similarity(
+            G_pruned, G_true, match_threshold=0.8
+        )
+        graph_sim = graph_similarity(G_pruned, G_true, direction="undirected")
+
+        item = {
+            "graph_similarity": graph_sim,
+            "edge_f1": f1,
+            "edge_precision": precision,
+            "edge_recall": recall,
+            "edge_similarity": edge_sim,
+            "fuzzy_edge_f1": fuzzy_f1,
+            "fuzzy_edge_precision": fuzzy_precision,
+            "fuzzy_edge_recall": fuzzy_recall,
+            "hp": dataclasses.asdict(hp),
+        }
 
         logging.info("Results: %s", json.dumps(item, indent=2))
         with out_file.open("a") as f:

@@ -50,11 +50,9 @@ def query(**kwargs) -> Experiment:
 
 
 @overload
-def query_multiple(exp: Literal["memorisation"], **kwargs) -> list[Experiment]: ...
-
-
-@overload
-def query_multiple(exp: Literal["hearst"], **kwargs) -> list[Experiment]: ...
+def query_multiple(
+    exp: Literal["memorisation", "hearst", "rebel", "all"], **kwargs
+) -> list[Experiment]: ...
 
 
 @overload
@@ -67,13 +65,11 @@ def query_multiple(
 def query_multiple(exp: Literal["finetune"], **kwargs) -> list[FinetuneExperiment]: ...
 
 
-@overload
-def query_multiple(exp: Literal["all"], **kwargs) -> list[Experiment]: ...
-
-
 def query_multiple(exp: str = "all", **kwargs):
     if exp == "hearst":
         experiments = hearst_experiments
+    elif exp == "rebel":
+        experiments = rebel_experiments
     elif exp == "memorisation":
         experiments = memorisation_experiments
     elif exp == "prompting":
@@ -118,6 +114,20 @@ hearst_experiments = [
     ),
 ]
 
+rebel_experiments = [
+    Experiment(
+        name="Rebel",
+        dataset="wikipedia/v2",
+        eval_output="out/experiments/rebel/v1/eval/graph.json",
+        test_output="out/experiments/rebel/v1/test/graph.json",
+        train_input="out/data/wikipedia/v2/train_eval_split/train_graph.json",
+        eval_ground_truth="out/data/wikipedia/v2/train_eval_split/test_graph.json",
+        test_ground_truth="out/data/wikipedia/v2/train_test_split/test_graph.json",
+        eval_hp_result="out/experiments/rebel/v1/eval/hp_search.jsonl",
+        test_hp_result="out/experiments/rebel/v1/test/hp_search.jsonl",
+    ),
+]
+
 prompting_experiments = [
     PromptingExperiment(
         name="0 shot",
@@ -129,7 +139,7 @@ prompting_experiments = [
         eval_ground_truth="out/data/wikipedia/v2/train_eval_split/test_graph.json",
         test_ground_truth="out/data/wikipedia/v2/train_test_split/test_graph.json",
         eval_hp_result="out/experiments/prompting/v7/eval/hp_search.jsonl",
-        test_hp_result="out/experiments/prompting/v7/test/hp_search.jsonl",
+        # test_hp_result="out/experiments/prompting/v7/test/hp_search.jsonl",
     ),
     PromptingExperiment(
         name="1 shot",
@@ -140,7 +150,8 @@ prompting_experiments = [
         train_input="out/data/wikipedia/v2/train_eval_split/train_graph.json",
         eval_ground_truth="out/data/wikipedia/v2/train_eval_split/test_graph.json",
         test_ground_truth="out/data/wikipedia/v2/train_test_split/test_graph.json",
-        test_hp_result="out/experiments/prompting/v5/test/hp_search.jsonl",
+        eval_hp_result="out/experiments/prompting/v5/eval/hp_search.jsonl",
+        # test_hp_result="out/experiments/prompting/v5/test/hp_search.jsonl",
     ),
     PromptingExperiment(
         name="3 shot",
@@ -151,7 +162,8 @@ prompting_experiments = [
         train_input="out/data/wikipedia/v2/train_eval_split/train_graph.json",
         eval_ground_truth="out/data/wikipedia/v2/train_eval_split/test_graph.json",
         test_ground_truth="out/data/wikipedia/v2/train_test_split/test_graph.json",
-        test_hp_result="out/experiments/prompting/v6/test/hp_search.jsonl",
+        eval_hp_result="out/experiments/prompting/v6/eval/hp_search.jsonl",
+        # test_hp_result="out/experiments/prompting/v6/test/hp_search.jsonl",
     ),
 ]
 
@@ -196,6 +208,7 @@ finetune_experiments = [
         train_input="out/data/wikipedia/v2/train_eval_split/train_graph.json",
         eval_ground_truth="out/data/wikipedia/v2/train_eval_split/test_graph.json",
         test_ground_truth="out/data/wikipedia/v2/train_test_split/test_graph.json",
+        eval_hp_result="out/experiments/finetune/v4/final/eval/hp_search.jsonl",
         test_hp_result="out/experiments/finetune/v4/final/test/hp_search.jsonl",
     ),
     FinetuneExperiment(
@@ -310,6 +323,18 @@ finetune_experiments = [
         version=3,
     ),
     FinetuneExperiment(
+        name="Finetune masked",
+        dataset="wikipedia/v2",
+        step="final",
+        reweighted=True,
+        eval_output="out/experiments/finetune/v10/final/test/graph.json",
+        train_input="out/data/wikipedia/v2/train_eval_split/train_graph.json",
+        eval_ground_truth="out/data/wikipedia/v2/train_eval_split/test_graph.json",
+        test_ground_truth="out/data/wikipedia/v2/train_test_split/test_graph.json",
+        eval_hp_result="out/experiments/finetune/v10/final/eval/hp_search.jsonl",
+        version=4,
+    ),
+    FinetuneExperiment(
         name="Finetune arxiv",
         dataset="arxiv/v2",
         step=192,
@@ -347,6 +372,7 @@ finetune_experiments = [
 all_experiments = (
     memorisation_experiments
     + hearst_experiments
+    + rebel_experiments
     + prompting_experiments
     + finetune_experiments
 )

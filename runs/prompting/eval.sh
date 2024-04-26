@@ -7,9 +7,9 @@ if [ -f .env ]; then
     set +o allexport
 fi
 
-split=test
-dataset=arxiv/v2
-exp_dir=out/experiments/prompting/arxiv/v1/$split
+split=eval
+dataset=wikipedia/v2
+exp_dir=out/experiments/prompting/v7/$split
 
 python llm_ol/eval/hp_search.py \
     --graph $exp_dir/graph.json \

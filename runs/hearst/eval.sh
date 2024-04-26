@@ -7,7 +7,7 @@ if [ -f .env ]; then
     set +o allexport
 fi
 
-split=eval
+split=test
 dataset=wikipedia/v2
 exp_dir=out/experiments/hearst/v2/$split
 

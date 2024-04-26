@@ -1,30 +1,17 @@
-# There some conflict between graph-tools and torch, need to import gt first
-import graph_tool  # isort: skip
-
-from collections import Counter, defaultdict
 from dataclasses import dataclass
-from functools import lru_cache
 from itertools import product
 
 import networkx as nx
 import numpy as np
-import spacy
 from absl import logging
 
 from llm_ol.eval.graph_metrics import (
     central_nodes,
-    edge_f1,
+    edge_prec_recall_f1,
     embed_graph,
     graph_similarity,
-    node_f1,
+    node_prec_recall_f1,
 )
-
-# nlp = spacy.load("en_core_web_sm", enable=["tagger", "attribute_ruler", "lemmatizer"])
-
-
-# @lru_cache(maxsize=None)
-# def lemmatize(txt: str) -> str:
-#     return " ".join([token.lemma_ for token in nlp(txt)])
 
 
 @dataclass
@@ -56,51 +43,6 @@ def post_process(G: nx.DiGraph, hp: PostProcessHP) -> nx.DiGraph:
 
     def weight(u, v):
         return G[u][v].get("weight", 1)
-
-    def title(n):
-        return G.nodes[n].get("title", n)
-
-    # if hp.merge_nodes_by_lemma:
-    #     # The lemmatizer requires "tagger" and "attribute_ruler"
-    #     nlp = spacy.load(
-    #         "en_core_web_sm", enable=["tagger", "attribute_ruler", "lemmatizer"]
-    #     )
-
-    #     titles = list({title(n) for n in G.nodes})
-    #     # lemmas = [
-    #     #     " ".join([tok.lemma_ for tok in doc])
-    #     #     for doc in nlp.pipe(titles, batch_size=5000)
-    #     # ]
-    #     title_to_lemma = {title: lemmatize(title) for title in titles}
-
-    #     # Lemma to counter of labels that map to the lemma
-    #     lemma_to_title_counts = defaultdict(Counter)
-    #     for n in G.nodes:
-    #         lemma_to_title_counts[title_to_lemma[title(n)]].update([title(n)])
-    #     n_to_normalized = {
-    #         n: lemma_to_title_counts[title_to_lemma[title(n)]].most_common(1)[0][0]
-    #         for n in G.nodes
-    #     }
-
-    #     G_normalized = nx.DiGraph()
-    #     if "root" in G.graph:
-    #         G_normalized.graph["root"] = n_to_normalized[G.graph["root"]]
-    #     for n, data in G.nodes(data=True):
-    #         n_normalized = n_to_normalized[n]
-    #         if not G_normalized.has_node(n_normalized) and title(n) == title(
-    #             n_normalized
-    #         ):
-    #             G_normalized.add_node(n_normalized, **data)
-    #     for u, v, data in G.edges(data=True):
-    #         u = n_to_normalized[u]
-    #         v = n_to_normalized[v]
-    #         assert G_normalized.has_node(u) and G_normalized.has_node(v), (u, v)
-    #         if G_normalized.has_edge(u, v):
-    #             G_normalized[u][v]["weight"] += data.get("weight", 1)
-    #         else:
-    #             G_normalized.add_edge(u, v, **data)
-
-    #     G = G_normalized
 
     if hp.prune_unconnected_nodes:
         if "root" in G.graph:
@@ -181,9 +123,9 @@ def hp_search(G: nx.DiGraph, G_true: nx.DiGraph, metric: str = "edge_f1", **kwar
     assert len(hps) > 0, "No hyperparameters to search over"
 
     if metric == "edge_f1":
-        score_fn = edge_f1
+        score_fn = lambda G_pred, G_true: edge_prec_recall_f1(G_pred, G_true)[2]
     elif metric == "node_f1":
-        score_fn = node_f1
+        score_fn = lambda G_pred, G_true: node_prec_recall_f1(G_pred, G_true)[2]
     elif metric.startswith("graph_similarity"):
         n_iters = int(metric.split("_")[-1])
         G = embed_graph(G)  # type: ignore

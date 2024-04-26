@@ -8,6 +8,6 @@ from .parallel_async_openai import ParallelAsyncOpenAI
 from .plotting import sized_subplots
 from .rate_limit import Resource
 from .textqdm import textpbar, textqdm
-from .types import PathLike
+from .types import Graph, PathLike
 
 device = "cuda" if torch.cuda.is_available() else "cpu"

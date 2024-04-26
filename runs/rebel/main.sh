@@ -6,8 +6,9 @@ if [ -f .env ]; then
     set +o allexport
 fi
 
-split=test
+split=eval
+dataset=arxiv
 
 python llm_ol/experiments/rebel/main.py \
-    --test_dataset out/experiments/llm/v2/${split}_dataset.jsonl \
-    --output_dir out/experiments/rebel/v1/${split}
+    --test_dataset out/experiments/llm/arxiv/${split}_dataset.jsonl \
+    --output_dir out/experiments/rebel/v2/${split}
