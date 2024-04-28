@@ -7,8 +7,6 @@ if [ -f .env ]; then
     set +o allexport
 fi
 
-# export OMP_NUM_THREADS=16
-
 split=test
 dataset=wikipedia/v2
 exp_dir=out/experiments/memorisation/wiki

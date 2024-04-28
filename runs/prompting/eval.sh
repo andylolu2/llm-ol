@@ -9,7 +9,7 @@ fi
 
 split=eval
 dataset=wikipedia/v2
-exp_dir=out/experiments/prompting/v7/$split
+exp_dir=out/experiments/prompting/v6/$split
 
 python llm_ol/eval/hp_search.py \
     --graph $exp_dir/graph.json \

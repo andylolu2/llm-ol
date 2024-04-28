@@ -7,10 +7,10 @@ if [ -f .env ]; then
 fi
 
 dataset=arxiv
-split=eval
+split=test
 
 python llm_ol/experiments/llm/prompting/main.py \
     --train_dataset out/experiments/llm/$dataset/train_dataset.jsonl \
     --test_dataset out/experiments/llm/$dataset/${split}_dataset.jsonl \
-    --k_shot 1 \
-    --output_dir out/experiments/prompting/arxiv/v2/${split}
+    --k_shot 3 \
+    --output_dir out/experiments/prompting/arxiv/v3/${split}

@@ -3,8 +3,9 @@ import random
 import graph_tool.all as gt
 import networkx as nx
 import torch
+from scipy.optimize import linear_sum_assignment
 from torch_geometric.data import Batch
-from torch_geometric.nn import GCNConv
+from torch_geometric.nn import SGConv
 from torch_geometric.utils import from_networkx
 
 from llm_ol.llm.embed import embed, load_embedding_model
@@ -103,9 +104,14 @@ def graph_similarity(
     n_iters: int = 3,
     embedding_model: str = "sentence-transformers/all-MiniLM-L6-v2",
     direction: str = "forward",
-) -> float:
+) -> float | None:
     if len(G1) == 0 or len(G2) == 0:
         return 0
+
+    # Skip computation if too slow. Time complexity is O(n^2 m)
+    n, m = min(len(G1), len(G2)), max(len(G1), len(G2))
+    if (n**2 * m) > 10000**3:
+        return None
 
     def nx_to_vec(G: nx.Graph, n_iters) -> torch.Tensor:
         """Compute a graph embedding of shape (n_nodes embed_dim).
@@ -125,15 +131,13 @@ def graph_similarity(
         pyg_G = from_networkx(G, group_node_attrs=["embed"])
 
         embed_dim = pyg_G.x.shape[1]
-        conv = GCNConv(embed_dim, embed_dim, bias=False).to(device)
+        conv = SGConv(embed_dim, embed_dim, K=n_iters, bias=False).to(device)
         conv.lin.weight.data = torch.eye(embed_dim, device=conv.lin.weight.device)
 
         pyg_batch = Batch.from_data_list([pyg_G])
         x, edge_index = pyg_batch.x, pyg_batch.edge_index  # type: ignore
         x, edge_index = x.to(device), edge_index.to(device)
-
-        for _ in range(n_iters):
-            x = conv(x, edge_index)
+        x = conv(x, edge_index)
 
         return x
 
@@ -151,10 +155,11 @@ def graph_similarity(
         x1 = x1 / x1.norm(dim=-1, keepdim=True)
         x2 = x2 / x2.norm(dim=-1, keepdim=True)
         sim = x1 @ x2.T
+        sim = sim.cpu().numpy()
 
-        # Aggregate similarity
-        sim = (sim.amax(0).mean() + sim.amax(1).mean()) / 2
-        return sim.item()
+        row_ind, col_ind = linear_sum_assignment(sim, maximize=True)
+        score = sim[row_ind, col_ind].sum().item() / max(sim.shape)
+        return score
 
     if direction == "forward":
         return sim(G1, G2)
@@ -176,7 +181,7 @@ def edge_similarity(
     embedding_model: str = "sentence-transformers/all-MiniLM-L6-v2",
     batch_size: int = 512,
     match_threshold: float = 0.9,
-) -> tuple[float, float, float, float]:
+) -> tuple[float, float, float, float] | tuple[None, None, None, None]:
     if len(G1) == 0 or len(G2) == 0:
         return 0, 0, 0, 0
 
@@ -211,19 +216,26 @@ def edge_similarity(
     sims = torch.cat(sims, dim=0)
 
     # Aggregate similarity
-    avg_sim = (sims.amax(0).mean() + sims.amax(1).mean()) / 2
+    # Skip computation if too slow. Time complexity is O(n^2 m)
+    n, m = min(sims.shape), max(sims.shape)
+    if (n**2 * m) > 10000**3:
+        return None, None, None, None
 
-    matched = sims >= match_threshold
-    # Number of edges in G1 that have a match in G2
-    num_matched_1 = int(matched.any(dim=1).sum().item())
-    precision = num_matched_1 / len(G1.edges)
-    # Number of edges in G2 that have a match in G1
-    num_matched_2 = int(matched.any(dim=0).sum().item())
-    recall = num_matched_2 / len(G2.edges)
+    row_ind, col_ind = linear_sum_assignment(sims.cpu().numpy(), maximize=True)
+    avg_sim = sims[row_ind, col_ind].sum().item() / m
+
+    matching_matrix = sims >= match_threshold
+    row_ind, col_ind = linear_sum_assignment(
+        matching_matrix.cpu().numpy(), maximize=True
+    )
+    num_matched = matching_matrix[row_ind, col_ind].sum().item()
+
+    precision = num_matched / len(G1.edges)
+    recall = num_matched / len(G2.edges)
 
     f1 = 2 * precision * recall / (precision + recall) if precision + recall > 0 else 0
 
-    return avg_sim.item(), precision, recall, f1
+    return avg_sim, precision, recall, f1
 
 
 def node_prec_recall_f1(G_pred: nx.Graph, G_true: nx.Graph):

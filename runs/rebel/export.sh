@@ -6,7 +6,7 @@ if [ -f .env ]; then
     set +o allexport
 fi
 
-exp_dir=out/experiments/rebel/v2/eval
+exp_dir=out/experiments/rebel/v2/test
 
 python llm_ol/experiments/rebel/export_graph.py \
     --input_file $exp_dir/categorised_pages.jsonl \

@@ -6,7 +6,7 @@ if [ -f .env ]; then
     set +o allexport
 fi
 
-split=eval
+split=test
 dataset=arxiv
 
 python llm_ol/experiments/rebel/main.py \

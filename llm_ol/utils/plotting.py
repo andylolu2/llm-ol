@@ -8,6 +8,7 @@ plt.style.use(["science", "grid"])
 
 plt.rcParams["lines.marker"] = "o"
 plt.rcParams["lines.markersize"] = 4
+plt.rcParams["font.family"] = "Times New Roman"
 
 
 def sized_subplots(

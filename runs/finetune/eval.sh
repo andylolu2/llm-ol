@@ -8,7 +8,7 @@ if [ -f .env ]; then
 fi
 
 step=final
-split=test
+split=eval
 dataset=wikipedia/v2
 exp_dir=out/experiments/finetune/v4/$step/$split
 

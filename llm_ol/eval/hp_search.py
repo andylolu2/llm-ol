@@ -64,7 +64,7 @@ def main(_):
 
         precision, recall, f1 = edge_prec_recall_f1(G_pruned, G_true)
         edge_sim, fuzzy_precision, fuzzy_recall, fuzzy_f1 = edge_similarity(
-            G_pruned, G_true, match_threshold=0.8
+            G_pruned, G_true, match_threshold=0.75**2
         )
         graph_sim = graph_similarity(G_pruned, G_true, direction="undirected")
 
