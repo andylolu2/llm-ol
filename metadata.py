@@ -21,9 +21,11 @@ class Experiment(BaseModel):
         with open(self.eval_hp_result) as f:
             for line in f:
                 item = json.loads(line)
-                if item[metric] > best_score:
+                if item[metric] is not None and item[metric] > best_score:
                     best_score = item[metric]
                     best_hp = item["hp"]
+        if best_hp is None:
+            raise ValueError(f"No best HP found for {self.name} on {self.dataset}")
         return best_hp
 
 
@@ -167,8 +169,8 @@ prompting_experiments = [
         train_input="out/data/wikipedia/v2/train_eval_split/train_graph.json",
         eval_ground_truth="out/data/wikipedia/v2/train_eval_split/test_graph.json",
         test_ground_truth="out/data/wikipedia/v2/train_test_split/test_graph.json",
-        # eval_hp_result="out/experiments/prompting/v7/eval/hp_search.jsonl",
-        # test_hp_result="out/experiments/prompting/v7/test/hp_search.jsonl",
+        eval_hp_result="out/experiments/prompting/v7/eval/hp_search.jsonl",
+        test_hp_result="out/experiments/prompting/v7/test/hp_search.jsonl",
     ),
     PromptingExperiment(
         name="0 shot",
@@ -192,7 +194,7 @@ prompting_experiments = [
         eval_ground_truth="out/data/wikipedia/v2/train_eval_split/test_graph.json",
         test_ground_truth="out/data/wikipedia/v2/train_test_split/test_graph.json",
         eval_hp_result="out/experiments/prompting/v5/eval/hp_search.jsonl",
-        # test_hp_result="out/experiments/prompting/v5/test/hp_search.jsonl",
+        test_hp_result="out/experiments/prompting/v5/test/hp_search.jsonl",
     ),
     PromptingExperiment(
         name="1 shot",
@@ -216,7 +218,7 @@ prompting_experiments = [
         eval_ground_truth="out/data/wikipedia/v2/train_eval_split/test_graph.json",
         test_ground_truth="out/data/wikipedia/v2/train_test_split/test_graph.json",
         eval_hp_result="out/experiments/prompting/v6/eval/hp_search.jsonl",
-        # test_hp_result="out/experiments/prompting/v6/test/hp_search.jsonl",
+        test_hp_result="out/experiments/prompting/v6/test/hp_search.jsonl",
     ),
     PromptingExperiment(
         name="3 shot",
@@ -269,6 +271,7 @@ finetune_experiments = [
         dataset="wikipedia/v2",
         step="final",
         reweighted=False,
+        eval_output="out/experiments/finetune/v4/final/eval/graph.json",
         test_output="out/experiments/finetune/v4/final/test/graph.json",
         train_input="out/data/wikipedia/v2/train_eval_split/train_graph.json",
         eval_ground_truth="out/data/wikipedia/v2/train_eval_split/test_graph.json",

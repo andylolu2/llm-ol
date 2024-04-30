@@ -14,6 +14,7 @@ from llm_ol.eval.graph_metrics import (
     edge_prec_recall_f1,
     edge_similarity,
     embed_graph,
+    graph_fuzzy_match,
     graph_similarity,
 )
 from llm_ol.experiments.post_processing import PostProcessHP, post_process
@@ -48,6 +49,10 @@ def main(_):
     )
     relative_percentiles = 1 - np.geomspace(0.1, 1, FLAGS.num_samples) + 0.1
 
+    # reverse to start with the most memory-intensive HPs
+    absolute_percentiles = absolute_percentiles[::-1]
+    relative_percentiles = relative_percentiles[::-1]
+
     if out_file.exists():
         out_file.unlink()
 
@@ -63,20 +68,43 @@ def main(_):
         G_pruned = post_process(G, hp)
 
         precision, recall, f1 = edge_prec_recall_f1(G_pruned, G_true)
-        edge_sim, fuzzy_precision, fuzzy_recall, fuzzy_f1 = edge_similarity(
-            G_pruned, G_true, match_threshold=0.75**2
+        soft_precision, soft_recall, soft_f1, hard_precision, hard_recall, hard_f1 = (
+            edge_similarity(G_pruned, G_true, match_threshold=0.75**2)
         )
-        graph_sim = graph_similarity(G_pruned, G_true, direction="undirected")
+        # edge_sim, fuzzy_precision, fuzzy_recall, fuzzy_f1 = edge_similarity(
+        #     G_pruned, G_true, match_threshold=0.75**2
+        # )
+        (
+            soft_graph_precision,
+            soft_graph_recall,
+            soft_graph_f1,
+            hard_graph_precision,
+            hard_graph_recall,
+            hard_graph_f1,
+        ) = graph_fuzzy_match(G_pruned, G_true, threshold=0.75, direction="undirected")
+        # graph_sim = graph_similarity(G_pruned, G_true)
 
         item = {
-            "graph_similarity": graph_sim,
+            # "graph_similarity": graph_sim,
             "edge_f1": f1,
             "edge_precision": precision,
             "edge_recall": recall,
-            "edge_similarity": edge_sim,
-            "fuzzy_edge_f1": fuzzy_f1,
-            "fuzzy_edge_precision": fuzzy_precision,
-            "fuzzy_edge_recall": fuzzy_recall,
+            # "edge_similarity": edge_sim,
+            # "fuzzy_edge_f1": fuzzy_f1,
+            # "fuzzy_edge_precision": fuzzy_precision,
+            # "fuzzy_edge_recall": fuzzy_recall,
+            "edge_soft_precision": soft_precision,
+            "edge_soft_recall": soft_recall,
+            "edge_soft_f1": soft_f1,
+            "edge_hard_precision": hard_precision,
+            "edge_hard_recall": hard_recall,
+            "edge_hard_f1": hard_f1,
+            "graph_soft_precision": soft_graph_precision,
+            "graph_soft_recall": soft_graph_recall,
+            "graph_soft_f1": soft_graph_f1,
+            "graph_hard_precision": hard_graph_precision,
+            "graph_hard_recall": hard_graph_recall,
+            "graph_hard_f1": hard_graph_f1,
             "hp": dataclasses.asdict(hp),
         }
 

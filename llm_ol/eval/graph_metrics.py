@@ -97,6 +97,103 @@ def embed_graph(
     return G
 
 
+def safe_f1(precision, recall):
+    if precision + recall == 0:
+        return 0
+    return 2 * precision * recall / (precision + recall)
+
+
+@torch.no_grad()
+def graph_fuzzy_match(
+    G1: nx.DiGraph,
+    G2: nx.DiGraph,
+    n_iters: int = 3,
+    embedding_model: str = "sentence-transformers/all-MiniLM-L6-v2",
+    direction: str = "forward",
+    threshold: float = 0.5,
+) -> (
+    tuple[float, float, float, float, float, float]
+    | tuple[None, None, None, None, None, None]
+):
+    if len(G1) == 0 or len(G2) == 0:
+        return 0, 0, 0, 0, 0, 0
+
+    # Skip computation if too slow. Time complexity is O(n^2 m)
+    n, m = min(len(G1), len(G2)), max(len(G1), len(G2))
+    if (n**2 * m) > 20000**3:
+        return None, None, None, None, None, None
+
+    if "embed" not in G1.nodes[next(iter(G1.nodes))]:
+        G1 = embed_graph(G1, embedding_model=embedding_model)
+    if "embed" not in G2.nodes[next(iter(G2.nodes))]:
+        G2 = embed_graph(G2, embedding_model=embedding_model)
+
+    if direction == "forward":
+        pass
+    elif direction == "reverse":
+        G1 = G1.reverse(copy=False)
+        G2 = G2.reverse(copy=False)
+    elif direction == "undirected":
+        G1 = G1.to_undirected(as_view=True).to_directed(as_view=True)
+        G2 = G2.to_undirected(as_view=True).to_directed(as_view=True)
+    else:
+        raise ValueError(f"Invalid direction {direction}")
+
+    def nx_to_vec(G: nx.Graph, n_iters) -> torch.Tensor:
+        """Compute a graph embedding of shape (n_nodes embed_dim).
+
+        Uses a GCN with identity weights to compute the embedding.
+        """
+
+        # Delete all node and edge attributes except for the embedding
+        # Otherwise PyG might complain "Not all nodes/edges contain the same attributes"
+        G = G.copy()
+        for _, _, d in G.edges(data=True):
+            d.clear()
+        for _, d in G.nodes(data=True):
+            for k in list(d.keys()):
+                if k != "embed":
+                    del d[k]
+        pyg_G = from_networkx(G, group_node_attrs=["embed"])
+
+        embed_dim = pyg_G.x.shape[1]
+        conv = SGConv(embed_dim, embed_dim, K=n_iters, bias=False).to(device)
+        conv.lin.weight.data = torch.eye(embed_dim, device=conv.lin.weight.device)
+
+        pyg_batch = Batch.from_data_list([pyg_G])
+        x, edge_index = pyg_batch.x, pyg_batch.edge_index  # type: ignore
+        x, edge_index = x.to(device), edge_index.to(device)
+        x = conv(x, edge_index)
+
+        return x
+
+    # Compute embeddings
+    x1 = nx_to_vec(G1, n_iters)
+    x2 = nx_to_vec(G2, n_iters)
+
+    # Cosine similarity matrix
+    x1 = x1 / x1.norm(dim=-1, keepdim=True)
+    x2 = x2 / x2.norm(dim=-1, keepdim=True)
+    sim = (x1 @ x2.T).cpu().numpy()
+
+    # soft precision, recall, f1
+    row_ind, col_ind = linear_sum_assignment(sim, maximize=True)
+    score = sim[row_ind, col_ind].sum()
+    precision = score / len(G1)
+    recall = score / len(G2)
+    f1 = safe_f1(precision, recall)
+
+    # hard precision, recall, f1
+    hard_sim = (sim >= threshold).astype(int)
+    row_ind, col_ind = linear_sum_assignment(hard_sim, maximize=True)
+    score = hard_sim[row_ind, col_ind].sum()
+    precision_hard = score / len(G1)
+    recall_hard = score / len(G2)
+    f1_hard = safe_f1(precision_hard, recall_hard)
+
+    return precision, recall, f1, precision_hard, recall_hard, f1_hard
+
+
 @torch.no_grad()
 def graph_similarity(
     G1: nx.DiGraph,
@@ -110,7 +207,7 @@ def graph_similarity(
 
     # Skip computation if too slow. Time complexity is O(n^2 m)
     n, m = min(len(G1), len(G2)), max(len(G1), len(G2))
-    if (n**2 * m) > 10000**3:
+    if (n**2 * m) > 20000**3:
         return None
 
     def nx_to_vec(G: nx.Graph, n_iters) -> torch.Tensor:
@@ -155,11 +252,14 @@ def graph_similarity(
         x1 = x1 / x1.norm(dim=-1, keepdim=True)
         x2 = x2 / x2.norm(dim=-1, keepdim=True)
         sim = x1 @ x2.T
-        sim = sim.cpu().numpy()
 
-        row_ind, col_ind = linear_sum_assignment(sim, maximize=True)
-        score = sim[row_ind, col_ind].sum().item() / max(sim.shape)
-        return score
+        return (sim.amax(0).mean() + sim.amax(1).mean()).item() / 2
+
+        # sim = sim.cpu().numpy()
+
+        # row_ind, col_ind = linear_sum_assignment(sim, maximize=True)
+        # score = sim[row_ind, col_ind].sum().item() / max(sim.shape)
+        # return score
 
     if direction == "forward":
         return sim(G1, G2)
@@ -181,9 +281,18 @@ def edge_similarity(
     embedding_model: str = "sentence-transformers/all-MiniLM-L6-v2",
     batch_size: int = 512,
     match_threshold: float = 0.9,
-) -> tuple[float, float, float, float] | tuple[None, None, None, None]:
+) -> (
+    tuple[float, float, float, float, float, float]
+    | tuple[None, None, None, None, None, None]
+):
     if len(G1) == 0 or len(G2) == 0:
-        return 0, 0, 0, 0
+        return 0, 0, 0, 0, 0, 0
+
+    # Skip computation if too slow. Time complexity is O(n^2 m)
+    n = min(G1.number_of_edges(), G2.number_of_edges())
+    m = max(G1.number_of_edges(), G2.number_of_edges())
+    if (n**2 * m) > 20000**3:
+        return None, None, None, None, None, None
 
     if "embed" not in G1.nodes[next(iter(G1.nodes))]:
         G1 = embed_graph(G1, embedding_model=embedding_model)
@@ -213,29 +322,24 @@ def edge_similarity(
             for edge_batch_2 in batch(G2.edges, batch_size)
         ]
         sims.append(torch.cat(sim, dim=-1))
-    sims = torch.cat(sims, dim=0)
+    sims = torch.cat(sims, dim=0).cpu().numpy()
 
-    # Aggregate similarity
-    # Skip computation if too slow. Time complexity is O(n^2 m)
-    n, m = min(sims.shape), max(sims.shape)
-    if (n**2 * m) > 10000**3:
-        return None, None, None, None
+    # Soft precision, recall, f1
+    row_ind, col_ind = linear_sum_assignment(sims, maximize=True)
+    score = sims[row_ind, col_ind].sum()
+    precision = score / len(G1.edges)
+    recall = score / len(G2.edges)
+    f1 = safe_f1(precision, recall)
 
-    row_ind, col_ind = linear_sum_assignment(sims.cpu().numpy(), maximize=True)
-    avg_sim = sims[row_ind, col_ind].sum().item() / m
+    # Hard precision, recall, f1
+    hard_sims = (sims >= match_threshold).astype(int)
+    row_ind, col_ind = linear_sum_assignment(hard_sims, maximize=True)
+    score = hard_sims[row_ind, col_ind].sum()
+    precision_hard = score / len(G1.edges)
+    recall_hard = score / len(G2.edges)
+    f1_hard = safe_f1(precision_hard, recall_hard)
 
-    matching_matrix = sims >= match_threshold
-    row_ind, col_ind = linear_sum_assignment(
-        matching_matrix.cpu().numpy(), maximize=True
-    )
-    num_matched = matching_matrix[row_ind, col_ind].sum().item()
-
-    precision = num_matched / len(G1.edges)
-    recall = num_matched / len(G2.edges)
-
-    f1 = 2 * precision * recall / (precision + recall) if precision + recall > 0 else 0
-
-    return avg_sim, precision, recall, f1
+    return precision, recall, f1, precision_hard, recall_hard, f1_hard
 
 
 def node_prec_recall_f1(G_pred: nx.Graph, G_true: nx.Graph):

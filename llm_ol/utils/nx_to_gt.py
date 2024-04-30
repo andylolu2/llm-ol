@@ -31,6 +31,7 @@ def get_gt_type(value):
             else:
                 return "object"
         case _:
+            return "object"
             raise ValueError(f"Unsupported type: {type(value)}")
 
 
@@ -49,11 +50,9 @@ def nx_to_gt(
 
     # Nodes and node properties (including the node id)
     nx_to_gt_map = {}  # mapping nx nodes -> gt vertices for later
-    G_gt.vp["id"] = G_gt.new_vp(get_gt_type(next(iter(G_nx.nodes))))
     for node, data in G_nx.nodes(data=True):
         v = G_gt.add_vertex()
         nx_to_gt_map[node] = G_gt.vertex_index[v]
-        G_gt.vp["id"][v] = str(node)
 
         for key, val in data.items():
             if key not in G_gt.vp:
