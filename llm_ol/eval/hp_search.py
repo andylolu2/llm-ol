@@ -69,30 +69,16 @@ def main(_):
 
         precision, recall, f1 = edge_prec_recall_f1(G_pruned, G_true)
         soft_precision, soft_recall, soft_f1, hard_precision, hard_recall, hard_f1 = (
-            edge_similarity(G_pruned, G_true, match_threshold=0.75**2)
+            edge_similarity(G_pruned, G_true, match_threshold=0.436)
         )
-        # edge_sim, fuzzy_precision, fuzzy_recall, fuzzy_f1 = edge_similarity(
-        #     G_pruned, G_true, match_threshold=0.75**2
-        # )
-        (
-            soft_graph_precision,
-            soft_graph_recall,
-            soft_graph_f1,
-            hard_graph_precision,
-            hard_graph_recall,
-            hard_graph_f1,
-        ) = graph_fuzzy_match(G_pruned, G_true, threshold=0.75, direction="undirected")
-        # graph_sim = graph_similarity(G_pruned, G_true)
+        soft_graph_precision, soft_graph_recall, soft_graph_f1 = graph_fuzzy_match(
+            G_pruned, G_true, direction="undirected", n_iters=2
+        )
 
         item = {
-            # "graph_similarity": graph_sim,
             "edge_f1": f1,
             "edge_precision": precision,
             "edge_recall": recall,
-            # "edge_similarity": edge_sim,
-            # "fuzzy_edge_f1": fuzzy_f1,
-            # "fuzzy_edge_precision": fuzzy_precision,
-            # "fuzzy_edge_recall": fuzzy_recall,
             "edge_soft_precision": soft_precision,
             "edge_soft_recall": soft_recall,
             "edge_soft_f1": soft_f1,
@@ -102,9 +88,6 @@ def main(_):
             "graph_soft_precision": soft_graph_precision,
             "graph_soft_recall": soft_graph_recall,
             "graph_soft_f1": soft_graph_f1,
-            "graph_hard_precision": hard_graph_precision,
-            "graph_hard_recall": hard_graph_recall,
-            "graph_hard_f1": hard_graph_f1,
             "hp": dataclasses.asdict(hp),
         }
 

@@ -432,6 +432,7 @@ finetune_experiments = [
         dataset="arxiv/v2",
         step=288,
         reweighted=True,
+        eval_output="out/experiments/finetune/arxiv/v3/288/eval/graph.json",
         test_output="out/experiments/finetune/arxiv/v3/288/test/graph.json",
         train_input="out/data/arxiv/v2/train_eval_split/train_graph.json",
         eval_ground_truth="out/data/arxiv/v2/train_eval_split/test_graph.json",

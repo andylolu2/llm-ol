@@ -24,7 +24,7 @@ flags.DEFINE_string("best_hp_metric", "edge_soft_f1", "Metric to use for best HP
 flags.DEFINE_string("dataset", "wikipedia/v2", "Dataset to evaluate.")
 
 
-def motifs_kl(G_pred: nx.Graph, G_true: nx.Graph, n: int = 3):
+def motifs_wasserstein(G_pred: nx.Graph, G_true: nx.Graph, n: int = 3):
     motifs_pred, counts_pred = gt.motifs(nx_to_gt(G_pred)[0], n)  # type: ignore
     motifs_true, counts_true = gt.motifs(nx_to_gt(G_true)[0], n)  # type: ignore
 
@@ -47,32 +47,23 @@ def motifs_kl(G_pred: nx.Graph, G_true: nx.Graph, n: int = 3):
             if gt.isomorphism(motif, existing_motif):
                 all_counts_true[j] = counts_true[i]
                 break
-
-    # Plus one smoothing
-    all_counts_pred += 1
-    all_counts_true += 1
     all_counts_pred /= all_counts_pred.sum()
     all_counts_true /= all_counts_true.sum()
 
-    kl = np.sum(all_counts_true * np.log(all_counts_true / all_counts_pred))
-    return kl
+    wass = np.sum(np.abs(all_counts_true - all_counts_pred)) / 2
+    return wass
 
 
 def evaluate(G, G_true, hp):
     G = post_process(G, hp)
     precision, recall, f1 = edge_prec_recall_f1(G, G_true)
     soft_precision, soft_recall, soft_f1, hard_precision, hard_recall, hard_f1 = (
-        edge_similarity(G, G_true, match_threshold=0.75**2)
+        edge_similarity(G, G_true, match_threshold=0.436)
+    )  # 0.436 is the median similarity between synonyms
+    soft_graph_precision, soft_graph_recall, soft_graph_f1 = graph_fuzzy_match(
+        G, G_true, direction="undirected", n_iters=2
     )
-    (
-        soft_graph_precision,
-        soft_graph_recall,
-        soft_graph_f1,
-        hard_graph_precision,
-        hard_graph_recall,
-        hard_graph_f1,
-    ) = graph_fuzzy_match(G, G_true, threshold=0.75, direction="undirected")
-    motif_kl = motifs_kl(G, G_true)
+    motif_wass = motifs_wasserstein(G, G_true, n=3)
 
     return {
         "edge_f1": f1,
@@ -87,10 +78,7 @@ def evaluate(G, G_true, hp):
         "graph_soft_precision": soft_graph_precision,
         "graph_soft_recall": soft_graph_recall,
         "graph_soft_f1": soft_graph_f1,
-        "graph_hard_precision": hard_graph_precision,
-        "graph_hard_recall": hard_graph_recall,
-        "graph_hard_f1": hard_graph_f1,
-        "motif_kl": motif_kl,
+        "motif_wass": motif_wass,
     }
 
 

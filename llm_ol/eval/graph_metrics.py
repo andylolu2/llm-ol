@@ -110,18 +110,14 @@ def graph_fuzzy_match(
     n_iters: int = 3,
     embedding_model: str = "sentence-transformers/all-MiniLM-L6-v2",
     direction: str = "forward",
-    threshold: float = 0.5,
-) -> (
-    tuple[float, float, float, float, float, float]
-    | tuple[None, None, None, None, None, None]
-):
+) -> tuple[float, float, float] | tuple[None, None, None]:
     if len(G1) == 0 or len(G2) == 0:
-        return 0, 0, 0, 0, 0, 0
+        return 0, 0, 0
 
     # Skip computation if too slow. Time complexity is O(n^2 m)
     n, m = min(len(G1), len(G2)), max(len(G1), len(G2))
     if (n**2 * m) > 20000**3:
-        return None, None, None, None, None, None
+        return None, None, None
 
     if "embed" not in G1.nodes[next(iter(G1.nodes))]:
         G1 = embed_graph(G1, embedding_model=embedding_model)
@@ -183,15 +179,7 @@ def graph_fuzzy_match(
     recall = score / len(G2)
     f1 = safe_f1(precision, recall)
 
-    # hard precision, recall, f1
-    hard_sim = (sim >= threshold).astype(int)
-    row_ind, col_ind = linear_sum_assignment(hard_sim, maximize=True)
-    score = hard_sim[row_ind, col_ind].sum()
-    precision_hard = score / len(G1)
-    recall_hard = score / len(G2)
-    f1_hard = safe_f1(precision_hard, recall_hard)
-
-    return precision, recall, f1, precision_hard, recall_hard, f1_hard
+    return precision, recall, f1
 
 
 @torch.no_grad()
@@ -313,18 +301,30 @@ def edge_similarity(
         v2_emb = v2_emb / v2_emb.norm(dim=-1, keepdim=True)
         sim_1 = u1_emb @ u2_emb.T
         sim_2 = v1_emb @ v2_emb.T
-        return sim_1 * sim_2
+        return sim_1, sim_2
 
-    sims = []
+    sims_1 = []
+    sims_2 = []
     for edge_batch_1 in batch(G1.edges, batch_size):
-        sim = [
-            edge_sim(G1, edge_batch_1, G2, edge_batch_2)
-            for edge_batch_2 in batch(G2.edges, batch_size)
-        ]
-        sims.append(torch.cat(sim, dim=-1))
-    sims = torch.cat(sims, dim=0).cpu().numpy()
+        sims_1_row = []
+        sims_2_row = []
+        for edge_batch_2 in batch(G2.edges, batch_size):
+            sim_1, sim_2 = edge_sim(G1, edge_batch_1, G2, edge_batch_2)
+            sims_1_row.append(sim_1)
+            sims_2_row.append(sim_2)
+        sims_1.append(torch.cat(sims_1_row, dim=-1))
+        sims_2.append(torch.cat(sims_2_row, dim=-1))
+        # sim = [
+        #     edge_sim(G1, edge_batch_1, G2, edge_batch_2)
+        #     for edge_batch_2 in batch(G2.edges, batch_size)
+        # ]
+        # sims.append(torch.cat(sim, dim=-1))
+    # sims = torch.cat(sims, dim=0).cpu().numpy()
+    sims_1 = torch.cat(sims_1, dim=0).cpu().numpy()
+    sims_2 = torch.cat(sims_2, dim=0).cpu().numpy()
 
     # Soft precision, recall, f1
+    sims = sims_1 * sims_2
     row_ind, col_ind = linear_sum_assignment(sims, maximize=True)
     score = sims[row_ind, col_ind].sum()
     precision = score / len(G1.edges)
@@ -332,11 +332,14 @@ def edge_similarity(
     f1 = safe_f1(precision, recall)
 
     # Hard precision, recall, f1
-    hard_sims = (sims >= match_threshold).astype(int)
-    row_ind, col_ind = linear_sum_assignment(hard_sims, maximize=True)
-    score = hard_sims[row_ind, col_ind].sum()
-    precision_hard = score / len(G1.edges)
-    recall_hard = score / len(G2.edges)
+    # hard_sims = (sims >= match_threshold).astype(int)
+    hard_sims = (sims_1 >= match_threshold) & (sims_2 >= match_threshold)
+    precision_hard = hard_sims.any(axis=1).sum() / len(G1.edges)
+    recall_hard = hard_sims.any(axis=0).sum() / len(G2.edges)
+    # row_ind, col_ind = linear_sum_assignment(hard_sims, maximize=True)
+    # score = hard_sims[row_ind, col_ind].sum()
+    # precision_hard = score / len(G1.edges)
+    # recall_hard = score / len(G2.edges)
     f1_hard = safe_f1(precision_hard, recall_hard)
 
     return precision, recall, f1, precision_hard, recall_hard, f1_hard

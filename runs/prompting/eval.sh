@@ -7,13 +7,13 @@ if [ -f .env ]; then
     set +o allexport
 fi
 
-split=eval
-dataset=wikipedia/v2
-exp_dir=out/experiments/prompting/v5/$split
+# split=eval
+# dataset=wikipedia/v2
+# exp_dir=out/experiments/prompting/v5/$split
 
-# split=test
-# dataset=arxiv/v2
-# exp_dir=out/experiments/prompting/arxiv/v2/$split
+split=eval
+dataset=arxiv/v2
+exp_dir=out/experiments/prompting/arxiv/v3/$split
 
 python llm_ol/eval/hp_search.py \
     --graph $exp_dir/graph.json \
