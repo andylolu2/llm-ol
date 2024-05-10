@@ -10,14 +10,15 @@ fi
 # step=final
 # split=eval
 # dataset=wikipedia/v2
-# exp_dir=out/experiments/finetune/v10/$step/$split
+# exp_dir=out/experiments/finetune/v4/$step/$split
 
-step=288
+step=192
 split=eval
 dataset=arxiv/v2
-exp_dir=out/experiments/finetune/arxiv/v3/$step/$split
+exp_dir=out/experiments/finetune/arxiv/v2/$step/$split
 
 python llm_ol/eval/hp_search.py \
     --graph $exp_dir/graph.json \
     --graph_true out/data/$dataset/train_${split}_split/test_graph.json \
+    --num_samples 21 \
     --output_dir $exp_dir

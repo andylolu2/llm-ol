@@ -1,3 +1,5 @@
+from functools import cache
+
 import torch
 from absl import logging
 from transformers import AutoModel, AutoTokenizer
@@ -5,6 +7,7 @@ from transformers import AutoModel, AutoTokenizer
 from llm_ol.utils import device
 
 
+@cache
 def load_embedding_model(name: str = "sentence-transformers/all-MiniLM-L6-v2"):
     logging.info("Loading embedding model %s", name)
     tokenizer = AutoTokenizer.from_pretrained(name)

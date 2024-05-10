@@ -89,7 +89,8 @@ def embed_graph(
     batch_size: int = 256,
 ) -> Graph:
     embedder, tokenizer = load_embedding_model(embedding_model)
-    for nodes in batch(textqdm(G.nodes), batch_size=batch_size):
+    nodes_to_embed = [n for n in G.nodes if "embed" not in G.nodes[n]]
+    for nodes in batch(textqdm(nodes_to_embed), batch_size=batch_size):
         titles = [G.nodes[n]["title"] for n in nodes]
         embedding = embed(titles, embedder, tokenizer)
         for n, e in zip(nodes, embedding):
@@ -350,7 +351,7 @@ def node_prec_recall_f1(G_pred: nx.Graph, G_true: nx.Graph):
         return 0, 0, 0
 
     def title(G, n):
-        return G.nodes[n]["title"].lower()
+        return G.nodes[n]["title"]
 
     nodes_G = {title(G_pred, n) for n in G_pred.nodes}
     nodes_G_true = {title(G_true, n) for n in G_true.nodes}
@@ -365,7 +366,7 @@ def edge_prec_recall_f1(G_pred: nx.Graph, G_true: nx.Graph):
         return 0, 0, 0
 
     def title(G, n):
-        return G.nodes[n]["title"].lower()
+        return G.nodes[n]["title"]
 
     edges_G = {(title(G_pred, u), title(G_pred, v)) for u, v in G_pred.edges}
     edges_G_true = {(title(G_true, u), title(G_true, v)) for u, v in G_true.edges}

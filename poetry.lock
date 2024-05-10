@@ -3229,6 +3229,23 @@ files = [
 ]
 
 [[package]]
+name = "obonet"
+version = "1.0.0"
+description = "Parse OBO formatted ontologies into networkx"
+optional = false
+python-versions = ">=3.7"
+files = [
+    {file = "obonet-1.0.0-py3-none-any.whl", hash = "sha256:8b1fe4d140953cee6ce9dc5de585cc29c76b955c7b5e9f0174961fcbaef16999"},
+    {file = "obonet-1.0.0.tar.gz", hash = "sha256:e96a69e41210b01bab2d9613b287899cd8aa61b6a32e5a2792041f76d4bf2a28"},
+]
+
+[package.dependencies]
+networkx = "*"
+
+[package.extras]
+dev = ["pre-commit", "pytest"]
+
+[[package]]
 name = "openai"
 version = "1.14.3"
 description = "The official Python library for the openai API"
@@ -6734,4 +6751,4 @@ multidict = ">=4.0"
 [metadata]
 lock-version = "2.0"
 python-versions = "^3.11"
-content-hash = "9d0a50c8e29ddfd58beee1e9868bedd3a8426ae6fe64114bc82b92c6cbc00edb"
+content-hash = "98b85840d461674c8ad5804ab4f1d782f4e13078cb4bec8ae80ac92c8f18125b"

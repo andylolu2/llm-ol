@@ -6,7 +6,6 @@ import numpy as np
 from absl import logging
 
 from llm_ol.eval.graph_metrics import (
-    central_nodes,
     edge_prec_recall_f1,
     embed_graph,
     graph_similarity,
@@ -22,7 +21,6 @@ class PostProcessHP:
     remove_inverse_edges: bool = True
     prune_unconnected_nodes: bool = True
     add_root: bool = True
-    # merge_nodes_by_lemma: bool = True
 
 
 def post_process(G: nx.DiGraph, hp: PostProcessHP) -> nx.DiGraph:
@@ -87,9 +85,13 @@ def post_process(G: nx.DiGraph, hp: PostProcessHP) -> nx.DiGraph:
                 G = G.subgraph(largest_cc)
 
     if hp.add_root and "root" not in G.graph:
-        centrality = central_nodes(G)
-        root, _, _ = centrality[0]
+        root = "Main topic classifications"
+        G.add_node(root, title=root)
         G.graph["root"] = root
+        # Add edges from the root to all other nodes with no incoming edges
+        for node in G.nodes:
+            if G.in_degree(node) == 0:
+                G.add_edge(root, node, weight=1)
 
     return G
 

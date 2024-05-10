@@ -15,7 +15,6 @@ from llm_ol.eval.graph_metrics import (
     edge_similarity,
     embed_graph,
     graph_fuzzy_match,
-    graph_similarity,
 )
 from llm_ol.experiments.post_processing import PostProcessHP, post_process
 from llm_ol.utils import setup_logging
@@ -62,10 +61,11 @@ def main(_):
         hp = PostProcessHP(
             absolute_percentile,
             relative_percentile,
-            add_root=False,
+            add_root=True,
             prune_unconnected_nodes=False,
         )
         G_pruned = post_process(G, hp)
+        G_pruned = embed_graph(G_pruned)
 
         precision, recall, f1 = edge_prec_recall_f1(G_pruned, G_true)
         soft_precision, soft_recall, soft_f1, hard_precision, hard_recall, hard_f1 = (
