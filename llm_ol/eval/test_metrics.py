@@ -55,10 +55,10 @@ def motifs_wasserstein(G_pred: nx.Graph, G_true: nx.Graph, n: int = 3):
 
 
 def evaluate(G, G_true, hp):
-    G = post_process(G, hp)
+    G, _ = post_process(G, hp)
     precision, recall, f1 = edge_prec_recall_f1(G, G_true)
     soft_precision, soft_recall, soft_f1, hard_precision, hard_recall, hard_f1 = (
-        edge_similarity(G, G_true, match_threshold=0.436)
+        edge_similarity(G, G_true, match_threshold=0.436, skip_if_too_slow=False)
     )  # 0.436 is the median similarity between synonyms
     soft_graph_precision, soft_graph_recall, soft_graph_f1 = graph_fuzzy_match(
         G, G_true, direction="undirected", n_iters=2
@@ -66,6 +66,8 @@ def evaluate(G, G_true, hp):
     motif_wass = motifs_wasserstein(G, G_true, n=3)
 
     return {
+        "num_nodes": nx.number_of_nodes(G),
+        "num_edges": nx.number_of_edges(G),
         "edge_f1": f1,
         "edge_precision": precision,
         "edge_recall": recall,
@@ -88,14 +90,24 @@ def main(_):
 
     exps = [
         query(exp="memorisation", dataset=FLAGS.dataset),
+        # query(exp="link_prediction", dataset=FLAGS.dataset),
         query(exp="hearst", dataset=FLAGS.dataset),
         query(exp="rebel", dataset=FLAGS.dataset),
         query(exp="prompting", k_shot=0, dataset=FLAGS.dataset),
         query(exp="prompting", k_shot=1, dataset=FLAGS.dataset),
         query(exp="prompting", k_shot=3, dataset=FLAGS.dataset),
-        query(exp="finetune", reweighted=False, dataset=FLAGS.dataset),
-        query(exp="finetune", reweighted=True, dataset=FLAGS.dataset),
+        query(exp="finetune", reweighted=False, transfer=False, dataset=FLAGS.dataset),
+        query(exp="finetune", reweighted=True, transfer=False, dataset=FLAGS.dataset),
     ]
+    if FLAGS.dataset == "arxiv/v2":
+        exps += [
+            query(
+                exp="finetune", reweighted=False, transfer=True, dataset=FLAGS.dataset
+            ),
+            query(
+                exp="finetune", reweighted=True, transfer=True, dataset=FLAGS.dataset
+            ),
+        ]
 
     with output_file.open("w") as f:
         for exp in exps:
@@ -103,7 +115,9 @@ def main(_):
             G = load_graph(exp.test_output)
             G_true = load_graph(exp.test_ground_truth)
             hp = PostProcessHP(**exp.best_hp(FLAGS.best_hp_metric))
+            logging.info("HP: %s", hp)
             metrics = evaluate(G, G_true, hp)
+            logging.info("Metrics: %s", metrics)
 
             item = {"name": exp.name, "hp": dataclasses.asdict(hp), **metrics}
             f.write(json.dumps(item) + "\n")

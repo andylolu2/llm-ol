@@ -22,7 +22,7 @@ def main(_):
 
     pattern = re.compile(r"(?P<child>.*)\|\|\|(?P<parent>.*)\|\|\|(?P<rule>.*)")
 
-    hyponyms = defaultdict(lambda: defaultdict(list))
+    hyponyms = defaultdict(int)
     for extraction_file in textqdm(extraction_files):
         with open(extraction_file, "r") as f:
             for line in f:
@@ -31,16 +31,14 @@ def main(_):
                     continue
                 child = match.group("child").strip()
                 parent = match.group("parent").strip()
-                rule = match.group("rule").strip()
-                hyponyms[parent][child].append(rule)
+                hyponyms[(parent, child)] += 1
 
     # Export to a graph
     G = nx.DiGraph()
-    for parent, children in hyponyms.items():
-        for child, rules in children.items():
-            G.add_node(parent, title=parent)
-            G.add_node(child, title=child)
-            G.add_edge(parent, child, weight=len(set(rules)))
+    for (parent, child), weight in hyponyms.items():
+        G.add_node(parent, title=parent)
+        G.add_node(child, title=child)
+        G.add_edge(parent, child, weight=weight)
     logging.info(
         "Extracted %d nodes and %d edges", G.number_of_nodes(), G.number_of_edges()
     )

@@ -14,7 +14,7 @@ flags.DEFINE_string(
 )
 flags.DEFINE_multi_string(
     "relations",
-    ["subclass of", "instance of", "member of"],
+    ["subclass of", "instance of", "member of", "part of"],
     "List of relations to extract",
 )
 flags.DEFINE_string("output_dir", None, "Path to the output directory", required=True)

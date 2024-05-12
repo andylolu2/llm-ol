@@ -5,7 +5,7 @@ import networkx as nx
 import torch
 from scipy.optimize import linear_sum_assignment
 from torch_geometric.data import Batch
-from torch_geometric.nn import SGConv
+from torch_geometric.nn import SGConv, SSGConv
 from torch_geometric.utils import from_networkx
 
 from llm_ol.llm.embed import embed, load_embedding_model
@@ -120,10 +120,8 @@ def graph_fuzzy_match(
     if (n**2 * m) > 20000**3:
         return None, None, None
 
-    if "embed" not in G1.nodes[next(iter(G1.nodes))]:
-        G1 = embed_graph(G1, embedding_model=embedding_model)
-    if "embed" not in G2.nodes[next(iter(G2.nodes))]:
-        G2 = embed_graph(G2, embedding_model=embedding_model)
+    G1 = embed_graph(G1, embedding_model=embedding_model)
+    G2 = embed_graph(G2, embedding_model=embedding_model)
 
     if direction == "forward":
         pass
@@ -270,17 +268,19 @@ def edge_similarity(
     embedding_model: str = "sentence-transformers/all-MiniLM-L6-v2",
     batch_size: int = 512,
     match_threshold: float = 0.9,
+    skip_if_too_slow: bool = True,
 ) -> (
     tuple[float, float, float, float, float, float]
     | tuple[None, None, None, None, None, None]
 ):
-    if len(G1) == 0 or len(G2) == 0:
-        return 0, 0, 0, 0, 0, 0
-
     # Skip computation if too slow. Time complexity is O(n^2 m)
-    n = min(G1.number_of_edges(), G2.number_of_edges())
-    m = max(G1.number_of_edges(), G2.number_of_edges())
-    if (n**2 * m) > 20000**3:
+    s1 = G1.number_of_edges()
+    s2 = G2.number_of_edges()
+    n = min(s1, s2)
+    m = max(s1, s2)
+    if n == 0 or m == 0:
+        return 0, 0, 0, 0, 0, 0
+    if (n**2 * m) > 20000**3 and skip_if_too_slow:
         return None, None, None, None, None, None
 
     if "embed" not in G1.nodes[next(iter(G1.nodes))]:
@@ -321,22 +321,24 @@ def edge_similarity(
         # ]
         # sims.append(torch.cat(sim, dim=-1))
     # sims = torch.cat(sims, dim=0).cpu().numpy()
-    sims_1 = torch.cat(sims_1, dim=0).cpu().numpy()
-    sims_2 = torch.cat(sims_2, dim=0).cpu().numpy()
+    sims_1 = torch.cat(sims_1, dim=0)
+    sims_2 = torch.cat(sims_2, dim=0)
 
     # Soft precision, recall, f1
-    sims = sims_1 * sims_2
+    sims = (sims_1 * sims_2).cpu().numpy()
     row_ind, col_ind = linear_sum_assignment(sims, maximize=True)
     score = sims[row_ind, col_ind].sum()
-    precision = score / len(G1.edges)
-    recall = score / len(G2.edges)
+    precision = score / s1
+    recall = score / s2
     f1 = safe_f1(precision, recall)
 
     # Hard precision, recall, f1
     # hard_sims = (sims >= match_threshold).astype(int)
-    hard_sims = (sims_1 >= match_threshold) & (sims_2 >= match_threshold)
-    precision_hard = hard_sims.any(axis=1).sum() / len(G1.edges)
-    recall_hard = hard_sims.any(axis=0).sum() / len(G2.edges)
+    hard_sims = (
+        ((sims_1 >= match_threshold) & (sims_2 >= match_threshold)).cpu().numpy()
+    )
+    precision_hard = hard_sims.any(axis=1).sum() / s1
+    recall_hard = hard_sims.any(axis=0).sum() / s2
     # row_ind, col_ind = linear_sum_assignment(hard_sims, maximize=True)
     # score = hard_sims[row_ind, col_ind].sum()
     # precision_hard = score / len(G1.edges)

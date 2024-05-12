@@ -36,6 +36,7 @@ class PromptingExperiment(Experiment):
 class FinetuneExperiment(Experiment):
     step: Any
     reweighted: bool
+    transfer: bool = False
 
 
 def query(**kwargs) -> Experiment:
@@ -48,7 +49,7 @@ def query(**kwargs) -> Experiment:
 
 @overload
 def query_multiple(
-    exp: Literal["memorisation", "hearst", "rebel", "all"], **kwargs
+    exp: Literal["memorisation", "link_prediction", "hearst", "rebel", "all"], **kwargs
 ) -> list[Experiment]: ...
 
 
@@ -69,6 +70,8 @@ def query_multiple(exp: str = "all", **kwargs):
         experiments = rebel_experiments
     elif exp == "memorisation":
         experiments = memorisation_experiments
+    elif exp == "link_prediction":
+        experiments = link_prediction_experiments
     elif exp == "prompting":
         experiments = prompting_experiments
     elif exp == "finetune":
@@ -109,53 +112,106 @@ memorisation_experiments = [
     ),
 ]
 
-hearst_experiments = [
+link_prediction_experiments = [
     Experiment(
-        name="Hearst",
+        name="Link prediction",
         dataset="wikipedia/v2",
-        eval_output="out/experiments/hearst/v2/graph.json",
-        test_output="out/experiments/hearst/v2/test/graph.json",
+        eval_output="out/experiments/link_prediction/v1/eval/graph_filtered.json",
+        test_output="out/experiments/link_prediction/v1/test/graph_filtered.json",
         train_input="out/data/wikipedia/v2/train_eval_split/train_graph.json",
         eval_ground_truth="out/data/wikipedia/v2/train_eval_split/test_graph.json",
         test_ground_truth="out/data/wikipedia/v2/train_test_split/test_graph.json",
-        eval_hp_result="out/experiments/hearst/v2/eval/hp_search.jsonl",
-        test_hp_result="out/experiments/hearst/v2/test/hp_search.jsonl",
+        eval_hp_result="out/experiments/link_prediction/v1/eval/hp_search.jsonl",
+    ),
+]
+
+hearst_experiments = [
+    # Experiment(
+    #     name="Hearst",
+    #     dataset="wikipedia/v2",
+    #     eval_output="out/experiments/hearst/v2/graph.json",
+    #     test_output="out/experiments/hearst/v2/test/graph.json",
+    #     train_input="out/data/wikipedia/v2/train_eval_split/train_graph.json",
+    #     eval_ground_truth="out/data/wikipedia/v2/train_eval_split/test_graph.json",
+    #     test_ground_truth="out/data/wikipedia/v2/train_test_split/test_graph.json",
+    #     eval_hp_result="out/experiments/hearst/v2/eval/hp_search.jsonl",
+    #     test_hp_result="out/experiments/hearst/v2/test/hp_search.jsonl",
+    # ),
+    # Experiment(
+    #     name="Hearst",
+    #     dataset="arxiv/v2",
+    #     eval_output="out/experiments/hearst/v3/eval/graph.json",
+    #     test_output="out/experiments/hearst/v3/test/graph.json",
+    #     train_input="out/data/arxiv/v2/train_eval_split/train_graph.json",
+    #     eval_ground_truth="out/data/arxiv/v2/train_eval_split/test_graph.json",
+    #     test_ground_truth="out/data/arxiv/v2/train_test_split/test_graph.json",
+    #     eval_hp_result="out/experiments/hearst/v3/eval/hp_search.jsonl",
+    #     test_hp_result="out/experiments/hearst/v3/test/hp_search.jsonl",
+    # ),
+    Experiment(
+        name="Hearst better",
+        dataset="wikipedia/v2",
+        eval_output="out/experiments/hearst/svd/wiki/eval/k_150/graph.json",
+        test_output="out/experiments/hearst/svd/wiki/test/k_150/graph.json",
+        train_input="out/data/wikipedia/v2/train_eval_split/train_graph.json",
+        eval_ground_truth="out/data/wikipedia/v2/train_eval_split/test_graph.json",
+        test_ground_truth="out/data/wikipedia/v2/train_test_split/test_graph.json",
+        eval_hp_result="out/experiments/hearst/svd/wiki/eval/k_150/hp_search.jsonl",
     ),
     Experiment(
-        name="Hearst",
+        name="Hearst better",
         dataset="arxiv/v2",
-        eval_output="out/experiments/hearst/v3/eval/graph.json",
-        test_output="out/experiments/hearst/v3/test/graph.json",
-        train_input="out/data/arxiv/v2/train_eval_split/train_graph.json",
+        eval_output="out/experiments/hearst/svd/arxiv/eval/k_50/graph.json",
+        test_output="out/experiments/hearst/svd/arxiv/test/k_50/graph.json",
+        train_input="out/data/axiv/v2/train_eval_split/train_graph.json",
         eval_ground_truth="out/data/arxiv/v2/train_eval_split/test_graph.json",
         test_ground_truth="out/data/arxiv/v2/train_test_split/test_graph.json",
-        eval_hp_result="out/experiments/hearst/v3/eval/hp_search.jsonl",
-        test_hp_result="out/experiments/hearst/v3/test/hp_search.jsonl",
+        eval_hp_result="out/experiments/hearst/svd/arxiv/eval/k_50/hp_search.jsonl",
     ),
 ]
 
 rebel_experiments = [
+    # Experiment(
+    #     name="Rebel",
+    #     dataset="wikipedia/v2",
+    #     eval_output="out/experiments/rebel/v1/eval/graph.json",
+    #     test_output="out/experiments/rebel/v1/test/graph.json",
+    #     train_input="out/data/wikipedia/v2/train_eval_split/train_graph.json",
+    #     eval_ground_truth="out/data/wikipedia/v2/train_eval_split/test_graph.json",
+    #     test_ground_truth="out/data/wikipedia/v2/train_test_split/test_graph.json",
+    #     eval_hp_result="out/experiments/rebel/v1/eval/hp_search.jsonl",
+    #     test_hp_result="out/experiments/rebel/v1/test/hp_search.jsonl",
+    # ),
+    # Experiment(
+    #     name="Rebel",
+    #     dataset="arxiv/v2",
+    #     eval_output="out/experiments/rebel/v2/eval/graph.json",
+    #     test_output="out/experiments/rebel/v2/test/graph.json",
+    #     train_input="out/data/arxiv/v2/train_eval_split/train_graph.json",
+    #     eval_ground_truth="out/data/arxiv/v2/train_eval_split/test_graph.json",
+    #     test_ground_truth="out/data/arxiv/v2/train_test_split/test_graph.json",
+    #     eval_hp_result="out/experiments/rebel/v2/eval/hp_search.jsonl",
+    #     test_hp_result="out/experiments/rebel/v2/test/hp_search.jsonl",
+    # ),
     Experiment(
-        name="Rebel",
+        name="Rebel better",
         dataset="wikipedia/v2",
-        eval_output="out/experiments/rebel/v1/eval/graph.json",
-        test_output="out/experiments/rebel/v1/test/graph.json",
+        eval_output="out/experiments/rebel/svd/wiki/eval/k_50/graph.json",
+        test_output="out/experiments/rebel/svd/wiki/test/k_50/graph.json",
         train_input="out/data/wikipedia/v2/train_eval_split/train_graph.json",
         eval_ground_truth="out/data/wikipedia/v2/train_eval_split/test_graph.json",
         test_ground_truth="out/data/wikipedia/v2/train_test_split/test_graph.json",
-        eval_hp_result="out/experiments/rebel/v1/eval/hp_search.jsonl",
-        test_hp_result="out/experiments/rebel/v1/test/hp_search.jsonl",
+        eval_hp_result="out/experiments/rebel/svd/wiki/eval/k_50/hp_search.jsonl",
     ),
     Experiment(
-        name="Rebel",
+        name="Rebel better",
         dataset="arxiv/v2",
-        eval_output="out/experiments/rebel/v2/eval/graph.json",
-        test_output="out/experiments/rebel/v2/test/graph.json",
+        eval_output="out/experiments/rebel/svd/arxiv/eval/k_200/graph.json",
+        test_output="out/experiments/rebel/svd/arxiv/test/k_200/graph.json",
         train_input="out/data/arxiv/v2/train_eval_split/train_graph.json",
         eval_ground_truth="out/data/arxiv/v2/train_eval_split/test_graph.json",
         test_ground_truth="out/data/arxiv/v2/train_test_split/test_graph.json",
-        eval_hp_result="out/experiments/rebel/v2/eval/hp_search.jsonl",
-        test_hp_result="out/experiments/rebel/v2/test/hp_search.jsonl",
+        eval_hp_result="out/experiments/rebel/svd/arxiv/eval/k_200/hp_search.jsonl",
     ),
 ]
 
@@ -235,37 +291,6 @@ prompting_experiments = [
 ]
 
 finetune_experiments = [
-    # FinetuneExperiment(
-    #     name="Finetune step 5000",
-    #     dataset="wikipedia/v2",
-    #     step=5000,
-    #     reweighted=False,
-    #     eval_output="out/experiments/finetune/v4/5000/eval/graph.json",
-    #     train_input="out/data/wikipedia/v2/train_eval_split/train_graph.json",
-    #     eval_ground_truth="out/data/wikipedia/v2/train_eval_split/test_graph.json",
-    #     test_ground_truth="out/data/wikipedia/v2/train_test_split/test_graph.json",
-    # ),
-    # FinetuneExperiment(
-    #     name="Finetune step 10000",
-    #     dataset="wikipedia/v2",
-    #     step=10000,
-    #     reweighted=False,
-    #     eval_output="out/experiments/finetune/v4/10000/eval/graph.json",
-    #     train_input="out/data/wikipedia/v2/train_eval_split/train_graph.json",
-    #     eval_ground_truth="out/data/wikipedia/v2/train_eval_split/test_graph.json",
-    #     test_ground_truth="out/data/wikipedia/v2/train_test_split/test_graph.json",
-    # ),
-    # FinetuneExperiment(
-    #     name="Finetune step 16500",
-    #     dataset="wikipedia/v2",
-    #     step=16500,
-    #     reweighted=False,
-    #     eval_output="out/experiments/finetune/v4/16500/eval/graph.json",
-    #     train_input="out/data/wikipedia/v2/train_eval_split/train_graph.json",
-    #     eval_ground_truth="out/data/wikipedia/v2/train_eval_split/test_graph.json",
-    #     test_ground_truth="out/data/wikipedia/v2/train_test_split/test_graph.json",
-    #     eval_hp_result="out/experiments/finetune/v4/16500/eval/hp_search.jsonl",
-    # ),
     FinetuneExperiment(
         name="Finetune",
         dataset="wikipedia/v2",
@@ -279,117 +304,6 @@ finetune_experiments = [
         eval_hp_result="out/experiments/finetune/v4/final/eval/hp_search.jsonl",
         test_hp_result="out/experiments/finetune/v4/final/test/hp_search.jsonl",
     ),
-    # FinetuneExperiment(
-    #     name="Finetune weighted step 5000",
-    #     dataset="wikipedia/v2",
-    #     step=5000,
-    #     reweighted=True,
-    #     eval_output="out/experiments/finetune/v6/5000/graph.json",
-    #     train_input="out/data/wikipedia/v2/train_eval_split/train_graph.json",
-    #     eval_ground_truth="out/data/wikipedia/v2/train_eval_split/test_graph.json",
-    #     test_ground_truth="out/data/wikipedia/v2/train_test_split/test_graph.json",
-    # ),
-    # FinetuneExperiment(
-    #     name="Finetune weighted step 10000",
-    #     dataset="wikipedia/v2",
-    #     step=10000,
-    #     reweighted=True,
-    #     eval_output="out/experiments/finetune/v6/10000/graph.json",
-    #     train_input="out/data/wikipedia/v2/train_eval_split/train_graph.json",
-    #     eval_ground_truth="out/data/wikipedia/v2/train_eval_split/test_graph.json",
-    #     test_ground_truth="out/data/wikipedia/v2/train_test_split/test_graph.json",
-    # ),
-    # FinetuneExperiment(
-    #     name="Finetune weighted step 16500",
-    #     dataset="wikipedia/v2",
-    #     step=16500,
-    #     reweighted=True,
-    #     eval_output="out/experiments/finetune/v6/16500/graph.json",
-    #     train_input="out/data/wikipedia/v2/train_eval_split/train_graph.json",
-    #     eval_ground_truth="out/data/wikipedia/v2/train_eval_split/test_graph.json",
-    #     test_ground_truth="out/data/wikipedia/v2/train_test_split/test_graph.json",
-    # ),
-    # FinetuneExperiment(
-    #     name="Finetune weighted step 10000",
-    #     dataset="wikipedia/v2",
-    #     step=10000,
-    #     reweighted=True,
-    #     eval_output="out/experiments/finetune/v8/10000/graph.json",
-    #     train_input="out/data/wikipedia/v2/train_eval_split/train_graph.json",
-    #     eval_ground_truth="out/data/wikipedia/v2/train_eval_split/test_graph.json",
-    #     test_ground_truth="out/data/wikipedia/v2/train_test_split/test_graph.json",
-    #     version=2,
-    # ),
-    # FinetuneExperiment(
-    #     name="Finetune weighted step 20000",
-    #     dataset="wikipedia/v2",
-    #     step=20000,
-    #     reweighted=True,
-    #     eval_output="out/experiments/finetune/v8/20000/graph.json",
-    #     train_input="out/data/wikipedia/v2/train_eval_split/train_graph.json",
-    #     eval_ground_truth="out/data/wikipedia/v2/train_eval_split/test_graph.json",
-    #     test_ground_truth="out/data/wikipedia/v2/train_test_split/test_graph.json",
-    #     version=2,
-    # ),
-    # FinetuneExperiment(
-    #     name="Finetune weighted step 30000",
-    #     dataset="wikipedia/v2",
-    #     step=30000,
-    #     reweighted=True,
-    #     eval_output="out/experiments/finetune/v8/30000/graph.json",
-    #     train_input="out/data/wikipedia/v2/train_eval_split/train_graph.json",
-    #     eval_ground_truth="out/data/wikipedia/v2/train_eval_split/test_graph.json",
-    #     test_ground_truth="out/data/wikipedia/v2/train_test_split/test_graph.json",
-    #     version=2,
-    # ),
-    # FinetuneExperiment(
-    #     name="Finetune weighted step 5000",
-    #     dataset="wikipedia/v2",
-    #     step=5000,
-    #     reweighted=True,
-    #     eval_output="out/experiments/finetune/v9/5000/eval/graph.json",
-    #     train_input="out/data/wikipedia/v2/train_eval_split/train_graph.json",
-    #     eval_ground_truth="out/data/wikipedia/v2/train_eval_split/test_graph.json",
-    #     test_ground_truth="out/data/wikipedia/v2/train_test_split/test_graph.json",
-    #     eval_hp_result="out/experiments/finetune/v9/5000/eval/hp_search.jsonl",
-    #     version=3,
-    # ),
-    # FinetuneExperiment(
-    #     name="Finetune weighted step 10000",
-    #     dataset="wikipedia/v2",
-    #     step=10000,
-    #     reweighted=True,
-    #     eval_output="out/experiments/finetune/v9/10000/eval/graph.json",
-    #     train_input="out/data/wikipedia/v2/train_eval_split/train_graph.json",
-    #     eval_ground_truth="out/data/wikipedia/v2/train_eval_split/test_graph.json",
-    #     test_ground_truth="out/data/wikipedia/v2/train_test_split/test_graph.json",
-    #     eval_hp_result="out/experiments/finetune/v9/10000/eval/hp_search.jsonl",
-    #     version=3,
-    # ),
-    # FinetuneExperiment(
-    #     name="Finetune weighted step 15000",
-    #     dataset="wikipedia/v2",
-    #     step=15000,
-    #     reweighted=True,
-    #     eval_output="out/experiments/finetune/v9/15000/eval/graph.json",
-    #     train_input="out/data/wikipedia/v2/train_eval_split/train_graph.json",
-    #     eval_ground_truth="out/data/wikipedia/v2/train_eval_split/test_graph.json",
-    #     test_ground_truth="out/data/wikipedia/v2/train_test_split/test_graph.json",
-    #     eval_hp_result="out/experiments/finetune/v9/15000/eval/hp_search.jsonl",
-    #     version=3,
-    # ),
-    # FinetuneExperiment(
-    #     name="Finetune reweighted",
-    #     dataset="wikipedia/v2",
-    #     step="final",
-    #     reweighted=True,
-    #     test_output="out/experiments/finetune/v9/final/test/graph.json",
-    #     train_input="out/data/wikipedia/v2/train_eval_split/train_graph.json",
-    #     eval_ground_truth="out/data/wikipedia/v2/train_eval_split/test_graph.json",
-    #     test_ground_truth="out/data/wikipedia/v2/train_test_split/test_graph.json",
-    #     test_hp_result="out/experiments/finetune/v9/final/test/hp_search.jsonl",
-    #     version=3,
-    # ),
     FinetuneExperiment(
         name="Finetune masked",
         dataset="wikipedia/v2",
@@ -402,49 +316,62 @@ finetune_experiments = [
         test_ground_truth="out/data/wikipedia/v2/train_test_split/test_graph.json",
         eval_hp_result="out/experiments/finetune/v10/final/eval/hp_search.jsonl",
         test_hp_result="out/experiments/finetune/v10/final/test/hp_search.jsonl",
-        version=4,
     ),
     FinetuneExperiment(
-        name="Finetune",
+        name="Finetune (transfer)",
         dataset="arxiv/v2",
         step=192,
         reweighted=False,
+        transfer=True,
         eval_output="out/experiments/finetune/arxiv/v2/192/eval/graph.json",
         test_output="out/experiments/finetune/arxiv/v2/192/test/graph.json",
         train_input="out/data/arxiv/v2/train_eval_split/train_graph.json",
         eval_ground_truth="out/data/arxiv/v2/train_eval_split/test_graph.json",
         test_ground_truth="out/data/arxiv/v2/train_test_split/test_graph.json",
         eval_hp_result="out/experiments/finetune/arxiv/v2/192/eval/hp_search.jsonl",
-        test_hp_result="out/experiments/finetune/arxiv/v2/192/test/hp_search.jsonl",
     ),
-    # FinetuneExperiment(
-    #     name="Finetune arxiv reweighted",
-    #     dataset="arxiv/v2",
-    #     step=320,
-    #     reweighted=True,
-    #     test_output="out/experiments/finetune/arxiv/v1/320/test/graph.json",
-    #     train_input="out/data/arxiv/v2/train_eval_split/train_graph.json",
-    #     eval_ground_truth="out/data/arxiv/v2/train_eval_split/test_graph.json",
-    #     test_ground_truth="out/data/arxiv/v2/train_test_split/test_graph.json",
-    # ),
     FinetuneExperiment(
-        name="Finetune masked",
+        name="Finetune masked (transfer)",
         dataset="arxiv/v2",
-        step=288,
+        step="final",
         reweighted=True,
+        transfer=True,
         eval_output="out/experiments/finetune/arxiv/v3/288/eval/graph.json",
         test_output="out/experiments/finetune/arxiv/v3/288/test/graph.json",
         train_input="out/data/arxiv/v2/train_eval_split/train_graph.json",
         eval_ground_truth="out/data/arxiv/v2/train_eval_split/test_graph.json",
         test_ground_truth="out/data/arxiv/v2/train_test_split/test_graph.json",
         eval_hp_result="out/experiments/finetune/arxiv/v3/288/eval/hp_search.jsonl",
-        test_hp_result="out/experiments/finetune/arxiv/v3/288/test/hp_search.jsonl",
-        version=2,
+    ),
+    FinetuneExperiment(
+        name="Finetune",
+        dataset="arxiv/v2",
+        step="final",
+        reweighted=False,
+        eval_output="out/experiments/finetune/arxiv/v4/final/eval/graph.json",
+        test_output="out/experiments/finetune/arxiv/v4/final/test/graph.json",
+        train_input="out/data/arxiv/v2/train_eval_split/train_graph.json",
+        eval_ground_truth="out/data/arxiv/v2/train_eval_split/test_graph.json",
+        test_ground_truth="out/data/arxiv/v2/train_test_split/test_graph.json",
+        eval_hp_result="out/experiments/finetune/arxiv/v4/final/eval/hp_search.jsonl",
+    ),
+    FinetuneExperiment(
+        name="Finetune masked",
+        dataset="arxiv/v2",
+        step="final",
+        reweighted=True,
+        eval_output="out/experiments/finetune/arxiv/v5/final/eval/graph.json",
+        test_output="out/experiments/finetune/arxiv/v5/final/test/graph.json",
+        train_input="out/data/arxiv/v2/train_eval_split/train_graph.json",
+        eval_ground_truth="out/data/arxiv/v2/train_eval_split/test_graph.json",
+        test_ground_truth="out/data/arxiv/v2/train_test_split/test_graph.json",
+        eval_hp_result="out/experiments/finetune/arxiv/v5/final/eval/hp_search.jsonl",
     ),
 ]
 
 all_experiments = (
     memorisation_experiments
+    + link_prediction_experiments
     + hearst_experiments
     + rebel_experiments
     + prompting_experiments

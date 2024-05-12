@@ -41,7 +41,9 @@ def main(_):
         G.graph.pop("root", None)
 
     G = embed_graph(G)
+    n_edges_pred = G.number_of_edges()
     G_true = embed_graph(G_true)
+    n_edges_true = G_true.number_of_edges()
 
     absolute_percentiles = 1 - np.geomspace(
         1 / G.number_of_edges(), 1, FLAGS.num_samples
@@ -64,30 +66,43 @@ def main(_):
             add_root=True,
             prune_unconnected_nodes=False,
         )
-        G_pruned = post_process(G, hp)
+        G_pruned, n_removed = post_process(G, hp)
         G_pruned = embed_graph(G_pruned)
 
-        precision, recall, f1 = edge_prec_recall_f1(G_pruned, G_true)
-        soft_precision, soft_recall, soft_f1, hard_precision, hard_recall, hard_f1 = (
-            edge_similarity(G_pruned, G_true, match_threshold=0.436)
-        )
-        soft_graph_precision, soft_graph_recall, soft_graph_f1 = graph_fuzzy_match(
-            G_pruned, G_true, direction="undirected", n_iters=2
-        )
+        n = min(n_edges_pred - n_removed, n_edges_true)
+        m = max(n_edges_pred - n_removed, n_edges_true)
+        if (n**2 * m) > 20000**3:
+            (
+                soft_precision,
+                soft_recall,
+                soft_f1,
+                hard_precision,
+                hard_recall,
+                hard_f1,
+            ) = (None, None, None, None, None, None)
+        else:
+            (
+                soft_precision,
+                soft_recall,
+                soft_f1,
+                hard_precision,
+                hard_recall,
+                hard_f1,
+            ) = edge_similarity(G_pruned, G_true, match_threshold=0.436)
 
         item = {
-            "edge_f1": f1,
-            "edge_precision": precision,
-            "edge_recall": recall,
+            # "edge_f1": f1,
+            # "edge_precision": precision,
+            # "edge_recall": recall,
             "edge_soft_precision": soft_precision,
             "edge_soft_recall": soft_recall,
             "edge_soft_f1": soft_f1,
             "edge_hard_precision": hard_precision,
             "edge_hard_recall": hard_recall,
             "edge_hard_f1": hard_f1,
-            "graph_soft_precision": soft_graph_precision,
-            "graph_soft_recall": soft_graph_recall,
-            "graph_soft_f1": soft_graph_f1,
+            # "graph_soft_precision": soft_graph_precision,
+            # "graph_soft_recall": soft_graph_recall,
+            # "graph_soft_f1": soft_graph_f1,
             "hp": dataclasses.asdict(hp),
         }
 

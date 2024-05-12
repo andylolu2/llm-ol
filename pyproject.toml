@@ -46,6 +46,7 @@ accelerate = "^0.28.0"
 matplotlib-venn = "^0.11.10"
 spacy-lookups-data = "^1.0.5"
 obonet = "^1.0.0"
+evaluate = "^0.4.2"
 
 
 [build-system]

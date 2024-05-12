@@ -12,10 +12,10 @@ fi
 # dataset=wikipedia/v2
 # exp_dir=out/experiments/finetune/v4/$step/$split
 
-step=192
+step=final
 split=eval
 dataset=arxiv/v2
-exp_dir=out/experiments/finetune/arxiv/v2/$step/$split
+exp_dir=out/experiments/finetune/arxiv/v5/$step/$split
 
 python llm_ol/eval/hp_search.py \
     --graph $exp_dir/graph.json \
