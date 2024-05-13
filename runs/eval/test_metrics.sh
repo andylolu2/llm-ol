@@ -7,8 +7,8 @@ if [ -f .env ]; then
     set +o allexport
 fi
 
-# dataset=wikipedia/v2
-dataset=arxiv/v2
+dataset=wikipedia/v2
+# dataset=arxiv/v2
 
 # replace / with _
 dataset_name=$(echo $dataset | sed 's/\//_/g')

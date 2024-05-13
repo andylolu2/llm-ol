@@ -7,14 +7,20 @@ if [ -f .env ]; then
     set +o allexport
 fi
 
+split=eval
 # step=final
-# split=eval
 # dataset=wikipedia/v2
 # exp_dir=out/experiments/finetune/v4/$step/$split
+# exp_dir=out/experiments/finetune/v10/$step/$split
 
-step=final
-split=eval
 dataset=arxiv/v2
+# step=192
+# exp_dir=out/experiments/finetune/arxiv/v2/$step/$split
+# step=288
+# exp_dir=out/experiments/finetune/arxiv/v3/$step/$split
+# step=final
+# exp_dir=out/experiments/finetune/arxiv/v4/$step/$split
+step=final
 exp_dir=out/experiments/finetune/arxiv/v5/$step/$split
 
 python llm_ol/eval/hp_search.py \

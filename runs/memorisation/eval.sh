@@ -11,7 +11,6 @@ split=eval
 dataset=wikipedia/v2
 exp_dir=out/experiments/memorisation/wiki
 
-# split=eval
 # dataset=arxiv/v2
 # exp_dir=out/experiments/memorisation/arxiv
 

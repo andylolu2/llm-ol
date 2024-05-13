@@ -59,9 +59,9 @@ def evaluate(G, G_true, hp):
     precision, recall, f1 = edge_prec_recall_f1(G, G_true)
     soft_precision, soft_recall, soft_f1, hard_precision, hard_recall, hard_f1 = (
         edge_similarity(G, G_true, match_threshold=0.436, skip_if_too_slow=False)
-    )  # 0.436 is the median similarity between synonyms
+    )
     soft_graph_precision, soft_graph_recall, soft_graph_f1 = graph_fuzzy_match(
-        G, G_true, direction="undirected", n_iters=2
+        G, G_true, direction="forward", n_iters=2
     )
     motif_wass = motifs_wasserstein(G, G_true, n=3)
 

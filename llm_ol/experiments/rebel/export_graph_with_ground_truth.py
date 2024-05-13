@@ -5,28 +5,27 @@ from pathlib import Path
 import networkx as nx
 import numpy as np
 import scipy.sparse as sp
-import spacy
 from absl import app, flags, logging
 
 from llm_ol.dataset import data_model
 from llm_ol.experiments.hearst.svd_ppmi import SvdPpmiModel
-from llm_ol.utils import setup_logging, textqdm
+from llm_ol.utils import setup_logging
 
 FLAGS = flags.FLAGS
 flags.DEFINE_string(
     "input_file", None, "Path to the inference ouptut file", required=True
-)
-flags.DEFINE_multi_string(
-    "relations",
-    ["subclass of", "instance of", "member of", "part of"],
-    "List of relations to extract",
 )
 flags.DEFINE_string("graph_true", None, "The ground truth graph", required=True)
 flags.DEFINE_string("output_dir", None, "Path to the output directory", required=True)
 flags.DEFINE_multi_integer(
     "k", None, "The number of dimensions for the SVD", required=True
 )
-flags.DEFINE_float("threshold", 1e-5, "Threshold for edge pruning")
+flags.DEFINE_multi_string(
+    "relations",
+    ["subclass of", "instance of", "member of", "part of"],
+    "List of relations to extract",
+)
+flags.DEFINE_float("factor", 10, "Ratio of number of edges to keep vs nodes")
 
 
 def parse_triplets(triplets: list[dict[str, str]]) -> set[tuple[str, str]]:
@@ -45,17 +44,10 @@ def main(_):
     out_dir = Path(FLAGS.output_dir)
     setup_logging(out_dir, "export_graph", flags=FLAGS)
 
-    nlp = spacy.load(
-        "en_core_web_sm", enable=["tagger", "attribute_ruler", "lemmatizer"]
-    )
-
     # Use the ground truth graph to get the true concepts
     G_true = data_model.load_graph(FLAGS.graph_true)
     true_concepts = set(G_true.nodes[n]["title"] for n in G_true.nodes)
-    true_lemma_to_concepts = {}
-    for doc in nlp.pipe(textqdm(true_concepts), n_process=8):
-        lemma = " ".join([token.lemma_ for token in doc])
-        true_lemma_to_concepts[lemma] = doc.text
+    root_concept = G_true.nodes[G_true.graph["root"]]["title"]
 
     matches = []
     with open(FLAGS.input_file, "r") as f:
@@ -68,39 +60,39 @@ def main(_):
         concepts.add(parent)
         concepts.add(child)
 
-    # Map all concepts -> lemma -> canonical concept
-    concept_to_lemma = {}
-    for concept, doc in zip(textqdm(concepts), nlp.pipe(concepts, n_process=8)):
-        lemma = " ".join([token.lemma_ for token in doc])
-        concept_to_lemma[concept] = lemma
-
-    vocab = {lemma: i + 1 for i, lemma in enumerate(set(concept_to_lemma.values()))}
+    vocab = {concept: i + 1 for i, concept in enumerate(concepts)}
     vocab["<OOV>"] = 0
+    logging.info("Voabulary size: %d", len(vocab))
     csr_m = sp.dok_matrix((len(vocab), len(vocab)), dtype=np.float64)
 
     for parent, child in matches:
-        child_lemma = concept_to_lemma[child]
-        parent_lemma = concept_to_lemma[parent]
-        csr_m[vocab[parent_lemma], vocab[child_lemma]] += 1
+        csr_m[vocab[parent], vocab[child]] += 1
+
+    csr_m = sp.csr_matrix(csr_m)
 
     for k in FLAGS.k:
         model = SvdPpmiModel(csr_m, vocab, k)
-        nodes = list(true_lemma_to_concepts.keys())
+        nodes = list(true_concepts)
+        heads, tails = zip(*product(nodes, nodes))
+        weights = model.predict_many(heads, tails)
+
+        n_edges_to_keep = min(int(len(nodes) * FLAGS.factor), len(weights))
+        top_indices = np.argpartition(weights, -n_edges_to_keep)[-n_edges_to_keep:]
 
         # Export to a graph
         G = nx.DiGraph()
-        for lemma, concept in true_lemma_to_concepts.items():
-            G.add_node(lemma, title=concept)
-
-        for u, v in textqdm(product(nodes, nodes), total=len(nodes) ** 2):
-            weight = float(model.predict(u, v))
-            if weight > FLAGS.threshold:
-                G.add_edge(u, v, weight=weight)
+        for concept in true_concepts:
+            G.add_node(concept, title=concept)
+        for idx in top_indices:
+            head = heads[idx]
+            tail = tails[idx]
+            weight = weights[idx]
+            G.add_edge(head, tail, weight=weight)
+        G.graph["root"] = root_concept
 
         logging.info(
             "Extracted %d nodes and %d edges", G.number_of_nodes(), G.number_of_edges()
         )
-        G.graph["root"] = None
 
         data_model.save_graph(G, Path(FLAGS.output_dir) / f"k_{k}" / "graph.json")
 

@@ -8,12 +8,12 @@ if [ -f .env ]; then
 fi
 
 split=eval
-dataset=wikipedia/v2
-exp_dir=out/experiments/prompting/v7/$split
 
-# split=eval
+dataset=wikipedia/v2
+exp_dir=out/experiments/prompting/v5/$split
+
 # dataset=arxiv/v2
-# exp_dir=out/experiments/prompting/arxiv/v3/$split
+# exp_dir=out/experiments/prompting/arxiv/v1/$split
 
 python llm_ol/eval/hp_search.py \
     --graph $exp_dir/graph.json \

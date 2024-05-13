@@ -10,12 +10,7 @@ import numpy as np
 from absl import app, flags, logging
 
 from llm_ol.dataset import data_model
-from llm_ol.eval.graph_metrics import (
-    edge_prec_recall_f1,
-    edge_similarity,
-    embed_graph,
-    graph_fuzzy_match,
-)
+from llm_ol.eval.graph_metrics import edge_similarity, embed_graph
 from llm_ol.experiments.post_processing import PostProcessHP, post_process
 from llm_ol.utils import setup_logging
 
@@ -52,7 +47,6 @@ def main(_):
 
     # reverse to start with the most memory-intensive HPs
     absolute_percentiles = absolute_percentiles[::-1]
-    relative_percentiles = relative_percentiles[::-1]
 
     if out_file.exists():
         out_file.unlink()
@@ -91,18 +85,12 @@ def main(_):
             ) = edge_similarity(G_pruned, G_true, match_threshold=0.436)
 
         item = {
-            # "edge_f1": f1,
-            # "edge_precision": precision,
-            # "edge_recall": recall,
             "edge_soft_precision": soft_precision,
             "edge_soft_recall": soft_recall,
             "edge_soft_f1": soft_f1,
             "edge_hard_precision": hard_precision,
             "edge_hard_recall": hard_recall,
             "edge_hard_f1": hard_f1,
-            # "graph_soft_precision": soft_graph_precision,
-            # "graph_soft_recall": soft_graph_recall,
-            # "graph_soft_f1": soft_graph_f1,
             "hp": dataclasses.asdict(hp),
         }
 

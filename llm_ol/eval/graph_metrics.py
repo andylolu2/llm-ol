@@ -5,11 +5,11 @@ import networkx as nx
 import torch
 from scipy.optimize import linear_sum_assignment
 from torch_geometric.data import Batch
-from torch_geometric.nn import SGConv, SSGConv
+from torch_geometric.nn import SGConv
 from torch_geometric.utils import from_networkx
 
 from llm_ol.llm.embed import embed, load_embedding_model
-from llm_ol.utils import Graph, batch, device, textqdm
+from llm_ol.utils import Graph, batch, cosine_sim, device, textqdm
 from llm_ol.utils.nx_to_gt import nx_to_gt
 
 
@@ -167,9 +167,7 @@ def graph_fuzzy_match(
     x2 = nx_to_vec(G2, n_iters)
 
     # Cosine similarity matrix
-    x1 = x1 / x1.norm(dim=-1, keepdim=True)
-    x2 = x2 / x2.norm(dim=-1, keepdim=True)
-    sim = (x1 @ x2.T).cpu().numpy()
+    sim = cosine_sim(x1, x2, dim=-1).cpu().numpy()
 
     # soft precision, recall, f1
     row_ind, col_ind = linear_sum_assignment(sim, maximize=True)
@@ -236,17 +234,9 @@ def graph_similarity(
         x2 = nx_to_vec(G2, n_iters)
 
         # Cosine similarity matrix
-        x1 = x1 / x1.norm(dim=-1, keepdim=True)
-        x2 = x2 / x2.norm(dim=-1, keepdim=True)
-        sim = x1 @ x2.T
+        sim = cosine_sim(x1, x2, dim=-1).cpu().numpy()
 
         return (sim.amax(0).mean() + sim.amax(1).mean()).item() / 2
-
-        # sim = sim.cpu().numpy()
-
-        # row_ind, col_ind = linear_sum_assignment(sim, maximize=True)
-        # score = sim[row_ind, col_ind].sum().item() / max(sim.shape)
-        # return score
 
     if direction == "forward":
         return sim(G1, G2)
@@ -296,36 +286,26 @@ def edge_similarity(
     def edge_sim(G1, edges1, G2, edges2):
         u1_emb, v1_emb = embed_edges(G1, edges1)
         u2_emb, v2_emb = embed_edges(G2, edges2)
-        u1_emb = u1_emb / u1_emb.norm(dim=-1, keepdim=True)
-        v1_emb = v1_emb / v1_emb.norm(dim=-1, keepdim=True)
-        u2_emb = u2_emb / u2_emb.norm(dim=-1, keepdim=True)
-        v2_emb = v2_emb / v2_emb.norm(dim=-1, keepdim=True)
-        sim_1 = u1_emb @ u2_emb.T
-        sim_2 = v1_emb @ v2_emb.T
-        return sim_1, sim_2
+        sim_u = cosine_sim(u1_emb, u2_emb, dim=-1)
+        sim_v = cosine_sim(v1_emb, v2_emb, dim=-1)
+        return sim_u, sim_v
 
-    sims_1 = []
-    sims_2 = []
+    sims_u = []
+    sims_v = []
     for edge_batch_1 in batch(G1.edges, batch_size):
-        sims_1_row = []
-        sims_2_row = []
+        sims_u_row = []
+        sims_v_row = []
         for edge_batch_2 in batch(G2.edges, batch_size):
-            sim_1, sim_2 = edge_sim(G1, edge_batch_1, G2, edge_batch_2)
-            sims_1_row.append(sim_1)
-            sims_2_row.append(sim_2)
-        sims_1.append(torch.cat(sims_1_row, dim=-1))
-        sims_2.append(torch.cat(sims_2_row, dim=-1))
-        # sim = [
-        #     edge_sim(G1, edge_batch_1, G2, edge_batch_2)
-        #     for edge_batch_2 in batch(G2.edges, batch_size)
-        # ]
-        # sims.append(torch.cat(sim, dim=-1))
-    # sims = torch.cat(sims, dim=0).cpu().numpy()
-    sims_1 = torch.cat(sims_1, dim=0)
-    sims_2 = torch.cat(sims_2, dim=0)
+            sim_u, sim_v = edge_sim(G1, edge_batch_1, G2, edge_batch_2)
+            sims_u_row.append(sim_u)
+            sims_v_row.append(sim_v)
+        sims_u.append(torch.cat(sims_u_row, dim=-1))
+        sims_v.append(torch.cat(sims_v_row, dim=-1))
+    sims_u = torch.cat(sims_u, dim=0)
+    sims_v = torch.cat(sims_v, dim=0)
 
     # Soft precision, recall, f1
-    sims = (sims_1 * sims_2).cpu().numpy()
+    sims = torch.minimum(sims_u, sims_v).cpu().numpy()
     row_ind, col_ind = linear_sum_assignment(sims, maximize=True)
     score = sims[row_ind, col_ind].sum()
     precision = score / s1
@@ -333,16 +313,11 @@ def edge_similarity(
     f1 = safe_f1(precision, recall)
 
     # Hard precision, recall, f1
-    # hard_sims = (sims >= match_threshold).astype(int)
     hard_sims = (
-        ((sims_1 >= match_threshold) & (sims_2 >= match_threshold)).cpu().numpy()
+        ((sims_u >= match_threshold) & (sims_v >= match_threshold)).cpu().numpy()
     )
     precision_hard = hard_sims.any(axis=1).sum() / s1
     recall_hard = hard_sims.any(axis=0).sum() / s2
-    # row_ind, col_ind = linear_sum_assignment(hard_sims, maximize=True)
-    # score = hard_sims[row_ind, col_ind].sum()
-    # precision_hard = score / len(G1.edges)
-    # recall_hard = score / len(G2.edges)
     f1_hard = safe_f1(precision_hard, recall_hard)
 
     return precision, recall, f1, precision_hard, recall_hard, f1_hard
