@@ -1,0 +1,484 @@
+\documentclass{article}
+
+
+% if you need to pass options to natbib, use, e.g.:
+\PassOptionsToPackage{numbers,compress}{natbib}
+% before loading neurips_2024
+
+
+% ready for submission
+\usepackage{neurips_2024}
+
+
+% to compile a preprint version, e.g., for submission to arXiv, add add the
+% [preprint] option:
+%     \usepackage[preprint]{neurips_2024}
+
+
+% to compile a camera-ready version, add the [final] option, e.g.:
+%     \usepackage[final]{neurips_2024}
+
+
+% to avoid loading the natbib package, add option nonatbib:
+%    \usepackage[nonatbib]{neurips_2024}
+
+
+\usepackage[utf8]{inputenc} % allow utf-8 input
+\usepackage[T1]{fontenc}    % use 8-bit T1 fonts
+\usepackage{hyperref}       % hyperlinks
+\usepackage{url}            % simple URL typesetting
+\usepackage{booktabs}       % professional-quality tables
+\usepackage{amsfonts}       % blackboard math symbols
+\usepackage{nicefrac}       % compact symbols for 1/2, etc.
+\usepackage{microtype}      % microtypography
+\usepackage{xcolor}         % colors
+\usepackage{multirow}
+\usepackage{xspace}
+\usepackage{amsmath}
+\usepackage[capitalise]{cleveref}
+\usepackage{tabularx}
+\usepackage{graphicx}
+\usepackage{subcaption}
+\usepackage{stix}
+\usepackage{adjustbox}
+\usepackage{listings}
+\usepackage{float}
+
+\lstset{
+basicstyle=\small\ttfamily,
+columns=fullflexible,
+breaklines=true,
+}
+
+\newcommand{\todo}[1]{\textcolor{red}{TODO: #1}}
+\newcommand{\note}[1]{\textcolor{blue}{Note: #1}}
+\newcommand{\fig}[1]{\textcolor{teal}{Figure: #1}}
+\newcommand{\name}{{OLLM}\xspace}
+\newcommand{\textss}[1]{{\fontfamily{lmss}\selectfont#1}}
+\DeclareMathOperator{\nodesim}{NodeSim}
+\DeclareMathOperator{\edgesim}{EdgeSim}
+
+\hypersetup{
+    colorlinks=true,
+    linkcolor=blue,
+    urlcolor=blue,
+    citecolor=blue,
+}
+
+% \title{Leveraging and Evaluating Large Language Models for Ontology Learning}
+% \title{Large Language Models for End-to-End Ontology Learning: Method and Evaluation}
+\title{End-to-End Ontology Learning with \\Large Language Models}
+% \title{Leveraging Large Language Models to Learn and Evaluate Ontologies}
+
+% KEYWORDS
+% Ontology Learning, Large Language Models, Knowledge representation
+
+% The \author macro works with any number of authors. There are two commands
+% used to separate the names and addresses of multiple authors: \And and \AND.
+%
+% Using \And between authors leaves it to LaTeX to determine where to break the
+% lines. Using \AND forces a line break at that point. So, if LaTeX puts 3 of 4
+% authors names on the first line, and the last on the second line, try using
+% \AND instead of \And before the third author name.
+
+
+\author{%
+    Andy Lo \\
+    University of Cambridge\\
+    \texttt{cyal4@cam.ac.uk} \\
+    Albert Q. Jiang \\
+    University of Cambridge\\
+    \texttt{qj213@cam.ac.uk} \\
+    Wenda Li \\
+    University of Cambridge\\
+    \texttt{wl302@cam.ac.uk} \\
+    Mateja Jamnik \\
+    University of Cambridge\\
+    \texttt{mateja.jamnik@cl.cam.ac.uk} \\
+  % examples of more authors
+  % \And
+  % Coauthor \\
+  % Affiliation \\
+  % Address \\
+  % \texttt{email} \\
+  % \AND
+  % Coauthor \\
+  % Affiliation \\
+  % Address \\
+  % \texttt{email} \\
+  % \And
+  % Coauthor \\
+  % Affiliation \\
+  % Address \\
+  % \texttt{email} \\
+  % \And
+  % Coauthor \\
+  % Affiliation \\
+  % Address \\
+  % \texttt{email} \\
+}
+
+
+\begin{document}
+
+
+\maketitle
+
+\begin{abstract}
+Ontologies are useful for automatic machine processing as they represent knowledge in a structured format. Yet, constructing ontologies requires substantial manual effort. To automate part of this process, large language models (LLMs) have been applied to solve various subtasks of ontology learning. However, this partial ontology learning does not capture the interactions between subtasks. 
+% We address this gap by introducing \name, an end-to-end and scalable method that uses LLMs for building \emph{full/entire?} ontologies from scratch.
+We address this gap by introducing \name, a general and scalable method for solving the \emph{full} task of building an ontology from scratch.
+%that leverages LMMs.
+%leveraging the language processing capabilities of LLMs to solve the 
+%few study the application of LLMs to solve the 
+%\emph{full} task of building an ontology from scratch. We present %\name, an end-to-end and scalable method for building ontologies, 
+Rather than focusing on subtasks, like individual relations between entities, we model entire subcomponents of the target ontology by finetuning an LLM with a custom regulariser that reduces overfitting on high-frequency concepts. We introduce a novel suite of metrics for evaluating the quality of the generated ontology by measuring its semantic and structural similarity to the ground truth. Our metrics stem from modern deep learning evaluation techniques, but make fewer assumptions about the ontologies than standard ontology metrics.
+% These metrics builds on top of more modern deep learning techniques and makes less assumptions about the ontologies than existing metrics.
+Our results on Wikipedia show that \name outperforms subtask composition methods, producing more semantically accurate ontologies while maintaining structural integrity. We further demonstrate that our model can be effectively adapted to a new domain, like arXiv, needing only a small number of training examples. 
+\end{abstract}
+
+% \section*{Template}
+
+% \subsection*{Open problem you are addressing}
+% Automate the construction of ontologies---how to build high-quality ontologies at scale. We aim to research methods that are domain-independent, but to begin with we focus on a general-purpose ontology (Wikipedia).
+
+% \subsection*{Why it is important (motivation)}
+% Ontologies capture knowledge in a structured and explicit manner. Compared to typical deep learning models representing knowledge implicitly in its weights, ontologies are easier to edit and more human-interpretable.
+
+% % are structured  and are explicitly capture, as opposed to typical machine learning models where knowledge is implicit (hence easy to edit) and human-interpretable.
+
+% Ontologies are widely used in practice: Arguably the most used ontology is Schema.org \cite{Schema.org_2011} which is part of the semantic web project to aid the search and retrieval of information on the internet. Another example is using the Gene Ontology for protein function prediction \cite{radivojac2013large}. 
+
+% % Other works have also shown that ontologies are complementary to existing models such as LLMs) to enhance performance. 
+
+% \subsection*{Research gap (what other have and have not done about this problem) + research questions}
+% Many prior works focus on subtasks of ontology learning (e.g., link prediction, knowledge graph completion) and it has been shown that LLMs can solve such subtasks effectively. While studying subtasks permits fine-grained analysis and evaluation, it does not directly reflect the impact on the final constructed ontology. Moreover, there is potential room for improvement by combining several subtasks into one. Unfortunately, few study end-to-end methods for building ontologies from scratch, especially at scale. We thus study the following research questions:
+% \begin{enumerate}
+%     \item How can we leverage LLMs' general knowledge to build ontologies from scratch?
+%     \item Does our method scale efficiently to practical problem sizes? (Reference: WordNet has 90K relations, Google-RE has 60K facts.)
+%     \item How well does our method generalise to new domains?
+% \end{enumerate}
+
+% \subsection*{Key innovation you invented}
+% Rather than focusing on individual relations between entities, we finetune an LLM to model entire sub-components of the target ontology.
+% % We construct an end-to-end pipeline for building an ontology by aggregating the inference outputs of the finetuned model. 
+% To construct the final ontology, we take the sum of sub-components generated by the model and apply simple post-processing steps. 
+
+% \subsection*{How you realised this innovation (e.g., a new method): methodology}
+% We collect the categorisation metadata for a subset of Wikipedia to train our models. Using the collected dataset, we attempt to adapt a pretrained language model to generate the relevant subgraph for a particular document in the source corpus. We discover that direct finetuning leads to poor generalisation due to overfitting to high-level, frequently occurring concepts. We propose a novel loss function for finetuning that significantly improves generalisation. 
+
+% Evaluation is done by measuring the similarity of the generated ontology with the ground truth. Current approaches for comparing ontologies rely on mapping classes of the two ontologies onto each other, most commonly by literal text matching. This is unreliable when the two ontologies are not already sufficiently similar. Instead, we propose a suite of evaluation metrics suitable for comparing arbitrary ontology graphs and capturing different aspects of the generated ontology such as semantics and structure.
+
+% % \begin{enumerate}
+% %     \item Constructed a dataset from Wikipedia categorisation metadata.
+% %     \item Key technical insight: LLMs are very flexible---we can use them to do a lot more than solving subtasks! Instead of modelling each edge individually (like in existing methods), we train the LLM to model entire \emph{subgraphs} for the target ontology. This by-passes many inference complications such as such as deciding on how many subtask inferences to run.
+% %     \item Summarise the method in 2-3 sentences.
+% %     \item Evaluation contributions.
+% % \end{enumerate}
+
+% \subsection*{What the results are and what they mean}
+% \begin{enumerate}
+%     \item An LLM ontologist specialised in producing Wikipedia categorisation graphs. An LLM already performs much better than traditional extraction-based methods out of the box. The performance can be further improved by finetuning with our custom loss function.
+%     \item The finetuned model can be adapted to a new domain (arXiv papers) using a small number of examples. This demonstrates that our model can be applied to new domains in a data-efficient way. 
+% \end{enumerate}
+
+% \subsection*{Summary of deliverables and their impact}
+% \begin{enumerate}
+%     \item Constructed two (to be made public) corpora with categorisation metadata which can serve as standard datasets for future work studying end-to-end OL.
+%     % training/evaluation, facilitating future work in this direction.
+%     \item Demonstrated a practical application of LLMs to build ontologies from scratch. The model produces high-quality ontologies and serves as a strong baseline for future research on end-to-end (\todo{is there a better word than `end-to-end'?}) ontology learning.
+%     \item Development of several evaluation metrics for end-to-end ontology learning. 
+% \end{enumerate}
+
+\section{Introduction}
+
+% \begin{figure}
+%     \centering
+%     \includegraphics[width=0.8\linewidth]{media/Finetune masked_test_output.pdf}
+%     \caption{\todo{Really hard to embed the whole graph while still readable... Perhaps just show a subgraph and include the full graph in the appendix.}}
+%     \label{fig:enter-label}
+% \end{figure}
+
+An ontology is a formal and structural way of representing domain-specific concepts and their relations~\cite{gruber1995toward}.
+They can be simplistic consisting of \emph{concepts} and only a small number of types of \emph{taxonomic relations} (e.g., \emph{is-a} relationships). Or they can be complex consisting of axioms and many types of relations. 
+%A simplistic ontology consists of \emph{concepts} and \emph{taxonomic relations} (\emph{is-a} relationships). 
+For example, a simple ontology for programming languages might contain two concepts ``Dynamically-typed language'' and ``Python'', and one relation ``Dynamically-typed language $\to$ Python'', representing the knowledge that Python is a dynamically-typed language. A more complex ontology might contain axioms too, for example, ``all programming languages are either dynamically or statically typed''.
+In this paper we focus on ontologies of the simpler type. Compared to typical deep learning models which represent knowledge implicitly in its weights, ontologies capture knowledge in a structured and explicit manner, making them reliable, easy to edit and human-interpretable. Such benefits of ontologies have led to their wide adoption in practice such as the  Schema.org~\cite{Schema.org_2011} ontology which is part of the Semantic Web~\cite{antoniou2004semantic} initiative.
+
+While ontologies are useful, building ontologies often requires substantial manual effort. Ontology learning (OL) is the study of automating the construction of high-quality ontologies at scale. For a simplistic ontology, this amounts to discovering the concepts and taxonomic relations, usually based on a source corpus. In this paper we aim to develop domain-independent methods for OL that are scalable and produce better ontologies.
+
+Traditionally, OL is viewed as a composition of subtasks~\cite{asim2018survey}, such as concept discovery and relation extraction. In particular, prior works have demonstrated that state-of-the-art large language models (LLMs) can solve such subtasks effectively~\cite{babaei2023llms4ol}. While studying subtasks permits fine-grained analysis and evaluation, it does not directly reflect the downstream impact on the final ontology. Moreover, there is potential room for improvement by combining several subtasks into one. In this paper, we instead develop and evaluate methods that construct ontologies in an end-to-end fashion to answer the following research questions:
+\begin{enumerate}
+    \item How can we leverage LLMs' knowledge base to build ontologies from scratch?
+    \item Does our method scale efficiently to practical problem sizes?
+    \item How well does our method generalise to new domains?
+\end{enumerate}
+
+\input{figures/overview}
+
+We introduce \name, an end-to-end method for using LLMs to construct ontologies at scale. Rather than focusing on individual relations between concepts, we finetune an LLM to model entire sub-components of the target ontology. The output ontology is generated by taking the sum of generated sub-components and applying simple post-processing. An overview of the pipeline is shown in \cref{fig:overview}. To train \name, we collect the categorisation metadata for a subset of Wikipedia articles. We attempt to adapt an LLM to model the relevant categorisation subgraph for a particular Wikipedia article, but discover that direct finetuning leads to poor generalisation due to overfitting to high-level, frequently occurring concepts. Instead, we propose a custom regulariser that reweights each concept based on its frequency of occurrence, which substantially improves generalisation. 
+
+We evaluate \name by measuring the similarity of the generated ontology with the ground truth. Current approaches for comparing ontologies rely on mapping classes of the two ontologies onto each other, most commonly by literal text matching. \todo{Add citation} This is unreliable when the two ontologies are not already sufficiently similar. Instead, we propose a suite of evaluation metrics suitable for comparing arbitrary labelled graphs. These metrics compare edges and subgraphs of the two ontologies using pretrained text embedders to test for semantic and structural similarity. The results reveal that an LLM can already outperform existing extraction-based methods out of the box, and the performance can be further improved by finetuning with our custom regulariser. We additionally demonstrate that \name can be adapted to build the arXiv ontology using only a small number of training examples, suggesting that our model can be applied to new domains in a data-efficient way. 
+
+\textbf{Contributions}
+\begin{enumerate}
+    \item We constructed two datasets based on Wikipedia and arXiv, which can serve as standard datasets for future work studying end-to-end OL.
+    \item We created \name, a method that utilises LLMs to build ontologies from scratch. \name produces high-quality ontologies and serves as a strong baseline for end-to-end OL.
+    \item We developed new evaluation metrics for end-to-end OL. 
+\end{enumerate}
+
+% \fig{Insert some generated graphs by the final model here for the ``thumbnail''?}
+
+\section{Background}
+
+% \subsection{Ontology learning}
+% Key points:
+% \begin{enumerate}
+%     \item Explain what an ontology is. State that we only focus on constructing a simplistic ontology (with just classes and taxonomic relation). 
+%     \item Give a brief overview of non-LM-based approaches. In particular Hearst patterns \cite{hearst1998automated}.
+%     \item Given an overview of LM-based methods. State their shortcomings. First efforts by \citet{petrucci2016ontology,petrucci2018expressive} viewing OL as a translation task from natural language to Description Logic formulae. It is only tested on synthetic datasets and a small number of manually curated examples due to the lack of such a natural language-description language pairing dataset. \citet{babaei2023llms4ol} benchmarked LLMs for several subtasks of OL such as link prediction. There exists proof-of-concept end-to-end methods using LLMs by recursive prompting \cite{funk2023towards} or generating entire ontology directly in one generation prompt \cite{trajanoska2023enhancing}, both of which only considered graphs up to $\approx$1000 nodes and relied on manual evaluation. \todo{Include clustering-based approaches?} \todo{Some of these should go into ``related works''.}
+% \end{enumerate}
+
+% Key points:
+% \begin{enumerate}
+%     \item Introduce any mathematical notations here, e.g., $G=(V,E)$ for a graph.
+%     \item Assume we have a ground truth ontology represented as a directed graph, where nodes represent classes and edges represent taxonomic relations. Each node has a label in natural language and is optionally associated with one or more documents, which in our case is represented by a title and some main body text. The goal is to recover the graph given the set of documents. 
+% \end{enumerate}
+
+% [What is an ontology and how is it represented?]
+An ontology is a structured way of representing concepts and relations of a shared conceptualisation, i.e. domain knowledge \cite{gruber1995toward,gruber1993translation}. In this paper, we focus on simplistic ontologies that only consist of concepts and taxonomic relations which represent \emph{is-a} or \emph{is-subclass-of} relationships between concepts. In some cases, the \emph{is-part-of} relation is also considered a taxonomic relation. We treat such an ontology as a rooted labelled directed graph where nodes represent concepts, edges represent taxonomic relations and the root node is the special concept of all concepts. A strict ontology asserts that the taxonomic relation is asymmetric and thus the graph must be acyclic, though in practice some ontologies, such as the Wikipedia ontology studied in this paper, may contain cycles. We therefore do not assume that an ontology graph is necessarily acyclic. Examples of ontologies include WordNet \cite{miller1995wordnet} with 117,659 concepts and 89,089 taxonomic relations and the Gene Ontology \cite{ashburner2000gene} with 42,255 concepts and 66,810 taxonomic relations.
+
+% [What is the precise task we study in this paper?]
+Ontology learning is the automatic extraction of ontological elements \cite{hazman2011survey}. The most studied source of input is unstructured text, though there are also works on OL on semi-structured data like HTML \cite{karoui2004ontology}. In this paper, the input is a set of documents, each consisting of some unstructured text. We additionally assume each document is associated with one or more concepts in the ground truth ontology which we utilise for training. The goal is to reconstruct the ground truth ontology given the set of documents. 
+
+% [Traditional approaches to OL.]
+Prior works view OL as a composition of subtasks and study each subtask in isolation \cite{buitelaar2005ontology,asim2018survey}. A typical pipeline for building a simple ontology is to first perform concept discovery (identify the nodes) and then relation extraction (identify the edges) \cite{cimiano2005text2onto,kaushik2018automatic}. A notable approach for relation extraction is Hearst patterns \cite{hearst1998automated}. Hearst patterns are hand-crafted lexico-syntactic patterns that exploit natural language structure to discover taxonomic relations. For example, the pattern ``NP such as NP'' matches phrases like ``dogs such as chihuahuas'' and thus can be processed by regular expressions to identify the relation ``dog $\to$ chihuahua''. Hearst patterns suffer from low recall as the relations must occur in exact configurations to be matched by rules. More recent works have suggested smoothing techniques to alleviate this issue \cite{roller2018hearst}.
+% Another approach for relation extraction utilises word co-occurrence statistics to predict taxonomic relations \cite{cimiano2005learning}.
+
+% [LLM approaches to OL]
+Recent research has transitioned to using language models for OL. REBEL \cite{cabot2021rebel} treats relation discovery as a translation task and finetunes encoder-decoder LLMs to extract both taxonomic and non-taxonomic relations. \citet{babaei2023llms4ol} benchmarked a wide family of LLMs for concept and relation discovery and showed promising results. There are also proof-of-concept works for building ontologies end-to-end with LLMs. \citet{funk2023towards} proposes to build an ontology by recursive prompting an LLMs while \citet{trajanoska2023enhancing} generates the entire ontology in one completion. However, both studies are limited in the scale of the task and evaluation. The authors only considered ontologies of up to 1000 concepts and relied on manual qualitative evaluation. We bridge this gap by proposing a method that can scale to practical problem sizes and new metrics for systematic qualitative evaluation.
+
+% [Prior approaches to evaluating OL.]
+The evaluation of ontologies is also an open research area. The main approaches are gold-standard evaluation, which matches elements of the generated ontology with a predefined target ontology; task-based evaluation, which measures the usefulness of the ontology on a specific application; and human evaluation \cite{raad2015survey,brank2005survey}. In this paper, we evaluate by the gold standard as it is the most straightforward approach when such ground-truth ontology exists. Prior works have considered matching concepts \cite{maedche2002measuring} and direct and indirect relations \cite{Kashyap2005TaxaMinerAE, Treeratpituk2013GraphbasedAT} by literal text comparison. Other works have also considered edit-distance \cite{Ehrig2005SimilarityFO} or bag-of-words distributional similarity for text comparison \cite{Zavitsanos2011GoldSE}.  These techniques may be considered unreliable and have been superseded by current methods \cite{conneau2017supervised}. We instead rely on more modern techniques like pretrained text embedders \cite{devlin2018bert} and graph convolutions \cite{kipf2016semi} to match substructures between the two ontologies. 
+
+% \subsection{Knowledge graph construction with LLMs \todo{Move to ``related works''?}}
+% Key points:
+% \begin{enumerate}
+%     \item There is a lot of overlap between knowledge graph construction and OL but state the differences: KG focuses on the structured representation of facts from the source corpus, hence typically involves more types of relations and less concerned about graph structure.
+%     \item Overview of methods for KG construction. Most common task is KG completion: Given a head node and a relation, predict the tail node. \citet{petroni2019language} first to use LLMs for this task by prompting. Recent work by \citet{yao2023exploring} finetunes LLMs for link prediction and relation prediction. \citet{wang2020language} inspects the attention patterns of LLMs to extract the relation token(s) between two entities in the source text.
+% \end{enumerate}
+
+\section{\name}
+
+This section introduces \name, a simple and scalable method for end-to-end OL with LLMs. On a high level, \name uses an LLM to model linearised subgraphs of the target ontology. In contrast to learning individual edges, modelling subgraphs allows the model to learn higher-order structures, such as the interactions between three or more nodes. To create the training dataset, \name relies on the assignment of documents to concepts which induces a relevant subgraph for each document. Such subgraphs are much smaller than the complete graph so they can be learned by the model more easily. The generated subgraphs for each document are summed into a weighted graph and simple post-processing is applied to obtain the final predicted ontology.
+
+% Highlight the core components and insights for \name.
+% \begin{enumerate}
+%     \item The idea to model subgraphs instead of edges. Motivation: More efficient inference, captures the global structure of an ontology (the hierarchical structure is "baked in").
+%     \item Components: 1. Document $\to$ subgraph. 2. Aggregrate subgraphs induced by each document into a weighted global graph. 3. Apply post-processing and pruning.
+%     \item Argue that this setup is appealing for scaling: Inference can be parallelised across the source documents, so inference duration is inversely proportional to the amount of hardware available. 
+% \end{enumerate}
+
+\subsection{Subgraph modeling}  \label{sec:method:subgraph}
+
+\input{figures/prompt_template}
+
+Here, we describe the method for creating document-subgraph pairings. Given a document and its associated set of concepts $C$, we define the \emph{relevant paths} as the set paths of at most length $N$ from the root to any of the concepts in $C$. The \emph{relevant subgraph} is the set of nodes and edges that occur at least once in the relevant paths. An example is shown in the left subfigure of \cref{fig:prompt-template}. The choice of $N$ is task-specific and we describe our method for choosing $N$ in \cref{sec:implementation}. 
+
+To employ LLMs to model the subgraphs, we must linearise the graph into a string for sequence modelling. Existing methods for autoregressive graph generation employ BFS \cite{you2018graphrnn} or DFS \cite{goyal2020graphgen} ordering starting at an arbitrary node. We instead choose to linearise the subgraph as a list of relevant paths that produced the subgraph in the first place. We do so for three reasons: Firstly, the subgraph is defined from such a collection of paths which makes them the most natural representation; Secondly, we hypothesise the hierarchy of concepts on each path is a desirable inductive bias for the hierarchical nature of an ontology; Thirdly, the path-based representation is much easier to describe in natural language instructions so that our LLM prompting-based baselines may produce reasonable results without finetuning. The linearisation template can be found in \cref{appendix:prompt-template}.
+
+% Key points:
+% \begin{enumerate}
+%     \item Explain how to construct document-subgraph pairing from the training dataset. E.g., the path length cutoff is selected as the smallest number that still covers almost all of the edges.
+%     \item Linearisation of subgraph to a sequence. Why choose the method of ``subgraph as a set of paths''? Ans: More natural language-like, easier for zero/few-shot to comprehend so we have stronger baselines.
+%     \item \fig{Example output format.}
+% \end{enumerate}
+
+\subsection{Post-processing}  \label{sec:method:post-processing}
+
+The final output graph is obtained by summing all generated subgraphs for each document and pruning low-weighted components. Given the generated subgraphs $G_1 = (V_1, E_1), \dots, G_n = (V_n, E_n)$, the raw output graph is defined as $G_\text{raw} = (V_\text{raw}, E_\text{raw})$ where $V_\text{raw} = \cup_{i=1}^n V_n$ and $E_\text{raw} = \cup_{i=1}^n E_n$. Each edge $(u, v) \in E_\text{raw}$ is additionally weighted by the number of times they occur in the collection of subgraphs: $w_{u, v} = \sum_{i=1}^n \mathbb{1}[(u,v) \in E_n]$. A few simple post-processing steps are then applied to $G_\text{raw}$:
+\begin{enumerate}
+    \item Self-loop pruning: All edge $(u, u) \in E_\text{raw}$ are removed.
+    \item Inverse-edge pruning: All edges $(u, v) \in E_\text{raw}$ where $(v, u) \in E_\text{raw}$ and $w_{v, u} > w_{u, v}$ are removed.
+    \item Absolute thresholding: Edges in $E_\text{raw}$ with weight below the $\alpha$-th quantile are removed, where $0 \leq \alpha \leq 1$ is a hyperparamter. 
+    \item Relative thresholding: For each vertex $u \in V_\text{raw}$, let $e_1, \dots, e_k$ be the outgoing edges from $u$ sorted by weight in ascending order. Define the cumulative weight as $C(e_i) = \sum_{j=1}^i w_{e_j} / \sum_{j=1}^k w_{e_j}$. The edges $\{e_i\ |\ C(e_i) \leq \beta\}$ are pruned, where $0 \leq \beta \leq 1$ is a hyperparameter.
+    \item Clean up: After pruning all edges, nodes with no incoming or outgoing edges are removed.
+\end{enumerate}
+In our implementation, we choose the hyperparameters $\alpha$ and $\beta$ by tuning on the validation set.
+
+% Key points:
+% \begin{enumerate}
+%     \item Aggregate inference outputs into a weighted directed graph.
+%     \item Following \cite{roller2018hearst}, we prune self loops and edge $u \to v$ if $v \to u$ is also in the graph with a higher weight.
+%     \item Apply two thresholding values to prune the graph further. The first threshold $\alpha$ where the lowest-weighted $100 \alpha\%$ of edges are pruned. The second threshold $\beta$ is a relative threshold where \emph{for each node}, the lowest-weighted outgoing edges that are in the bottom $100\beta\%$ cumulative probability mass are removed. \todo{Perhaps easier to describe in equations.}
+%     \item The hyperparameters $\alpha$ and $\beta$ are tuned on the evaluation set.
+% \end{enumerate}
+
+\section{Evaluating end-to-end OL}
+
+Since our problem setup is uncommon in existing literature, we also develop new evaluation methods. Ontology evaluation is a hard problem as there are no quantitative definitions of what constitutes a ``good ontology'' and metrics generally only capture one aspect of an ontology. We approach evaluation by treating the ground truth as a proxy for a good ontology and comparing the generated ontologies against the ground truth. This section describes how the ground truth is obtained and what metrics are used for measuring ontology similarity.
+
+% Key points:
+% \begin{enumerate}
+%     \item Explain the goals of evaluation---what do we care about? Ans: Semantics and structure.
+%     \item Suggest why end-to-end evaluation is hard: Large graph. Generally, a ``good ontology'' is ill-defined. Difficult to find one metric that describes all. Always trade-offs. No standard evaluation metric. 
+%     \item How do we overcome this? 1. Use a ground truth ontology as a proxy for ``good ontology'' and measure how similar the generated ontology is to the ground truth. 2. Propose a series of evaluation metrics to capture various aspects of the generated output.
+% \end{enumerate}
+
+\subsection{Dataset}
+
+We collect the datasets for the two ontologies considered in this paper: Wikipedia categories and the arXiv taxonomy. We use Wikipedia for learning and in-domain evaluation and arXiv for out-of-domain evaluation. To build the Wikipedia dataset, we perform a BFS traversal from its root category ``Main topic classifications'' up to depth 3. For every category encountered, we retrieve the title and summary (the text before the first section) of up to 5000 pages that belong in that category. The source data is obtained from the Wikipedia API.\footnote{\url{https://en.wikipedia.org/w/api.php}} The arXiv taxonomy is available from its home page and the source corpus is constructed from the title and abstract of all the papers uploaded to arXiv in the years 2020--2022 with more than or equal to 10 citations.\footnote{Citation counts obtained from \url{https://api.semanticscholar.org/}.} In total, the Wikipedia dataset has 13,886 concepts, 28,375 taxonomic relations and 362,067 documents, while the arXiv dataset has 161 concepts, 166 taxonomic relations and 126,001 documents.
+
+\input{figures/dataset}
+
+Generating the train and test splits from the datasets is also a non-trivial problem. As described in \cref{sec:method:subgraph}, each training example consists of a document and its induced subgraph. The naive approach of randomly selecting a subset of documents for the training set likely leads to data leakage as there might be a significant overlap between subgraphs in the training set and the test set. Instead, we propose to first split the full ontology in train and test graphs and then generate the training document-subgraph pairs. Our method is as follows:
+\begin{enumerate}
+    \item Let $V^\text{top}$ be the set of top-level nodes, i.e. children of the root node. Randomly partition $V^\text{top}$ into train $V^\text{top}_{\text{train}}$, validation $V^\text{top}_{\text{val}}$, and test $V^\text{top}_{\text{test}}$ splits in 7:3:10 ratio.
+    \item Let $d$ be the depth on the full graph, i.e. the distance of the furthest node from the root. The nodes of the train graph are taken as the union of all the nodes that are within distance $d - 1$ from any node in $V^\text{top}_\text{train}$, plus $V_\text{train}^\text{top}$ and the root. The edges are all the edges in the full graph that have both endpoints in the train graph. Similar applies for $V^\text{top}_\text{val}$ and $V^\text{top}_\text{test}$.
+\end{enumerate}
+Our methods ensure that there are sufficiently many unseen concepts (and thus relations) in the test split, as shown in \cref{fig:dataset-overlap}. 
+
+% Key points:
+% \begin{enumerate}
+%     \item Describe the data collection procedure.
+%     \item Report the dataset statistics, e.g., number of nodes/edges/documents. Wikipedia: 13886 / 28375 / 362067. arXiv: 161 / 166 / 126001.
+%     \item Highlight the thought process behind the creation of the train-eval-test split (Balance between the diversity of the training set and having unseen nodes/edges in the eval/test split).
+%     \item \fig{Venn diagram to show the overlap between the train/eval/test splits. \cref{fig:dataset-overlap}}
+% \end{enumerate}
+
+\subsection{Metrics}
+
+Existing methods for measuring similarity between ontologies rely on outdated techniques such as edit distance or document co-occurrence statistics for text comparison. To obtain more reliable evaluation results, we propose a suite of similarity metrics that uses more modern methods like text embeddings. Multiple metrics are used as they trade off interpretability with comprehensiveness, and we aim to make them complementary by capturing different aspects of an ontology. In this section, we denote the ground truth ontology graph as $G = (V, E)$ and the generated graph as $G' = (V', E')$. 
+
+\paragraph{Literal F1 \cite{Kashyap2005TaxaMinerAE}}
+While literal text matching is unreliable, it is also the simplest and the most interpretable. The Literal F1 metric is given by the harmonic mean of the precision and recall of the edges:
+\[
+\text{Literal precision} = \frac{|E \cap E'|}{|E'|} \qquad
+\text{Literal recall} = \frac{|E \cap E'|}{|E|}
+\]
+
+\paragraph{Fuzzy F1}
+The literal F1 metric puts a strong emphasis on using the correct wording, while in practice, we are interested in evaluating the semantics of an ontology. For example, using a synonymous phrase for a concept should not be penalised. We utilise embeddings from a pretrained sentence transformer and use the cosine similarity of the embeddings to measure semantic similarity. Specifically, let $\nodesim(u, u') \in V \times V' \to [-1, 1]$ be the cosine similarity between the sentence embeddings for $u$ and $u'$. The Fuzzy F1 score is obtained from the fuzzy precision and recall, defined as:
+\begin{equation*}
+\begin{aligned}
+\text{Fuzzy precision} &= \frac{|
+\{(u', v') \in E' \mid \exists (u, v) \in E. 
+\nodesim(u, u') > t \land \nodesim(v, v') > t
+\}
+|}{|E'|} \\
+\text{Fuzzy recall} &= \frac{|
+\{(u, v) \in E \mid \exists (u', v') \in E'. 
+\nodesim(u, u') > t \land \nodesim(v, v') > t
+\}
+|}{|E|} \\
+\end{aligned}
+\end{equation*}
+where $t$ is the matching threshold. We use all-MiniLM-L6-v2 \cite{wang2020minilm,reimers-2019-sentence-bert} as the embedding model and choose $t$ as the median cosine similarity between the synonyms in WordNet \cite{miller1995wordnet}, computed to be 0.436.
+
+\paragraph{Continuous F1}
+With fuzzy comparisons, the matches between the edges of the generated and the ground truth graph are no longer one-to-one. This is problematic: Consider two graphs $A \rightarrow B$ and $B \leftarrow A \rightarrow B'$, where $B$ and $B'$ match fuzzily. Such graphs will achieve a perfect fuzzy F1 score yet they significantly differ. Additionally, we found that the previous metrics fail to provide a useful signal for hyperparameter tuning, particularly for our baselines where the generated graphs are poor. The continuous F1 metric solves these issues by computing the highest-scoring edge matching between the two graphs, where the similarity score between $(u, v)$ and $(u', v')$ is given by $\min(\nodesim(u, u'), \nodesim(v, v'))$. Obtaining such matching is equivalent to solving the linear assignment problem \cite{martello1987linear}, which can be computed by the Hungarian algorithm \cite{kuhn1955hungarian}. The Continuous F1 is obtained from the continuous precision and recall, given by:
+\[
+\text{Continuous precision} = \frac{s_\text{cont}}{|E'|} \qquad
+\text{Continuous recall} = \frac{s_\text{cont}}{|E|}
+\]
+where $s_\text{cont}$ is the score achieved by the best edge matching.
+
+\paragraph{Graph F1}
+Instead of individual edges, this metric aims to capture the wider structure of the two graphs. Intuitively, we want to know how concepts are related to their local neighbourhood. We do so by using simple graph convolutions \cite{wu2019simplifying} with $K=2$ to compute graph-aware node embeddings after embedding each node with the pretrained embedder. Such embeddings in $G$ are compared against those in $G'$ by cosine similarity, and the highest-scoring node matching, similar to the continuous F1 metric, gives the graph similarity score. The Graph F1 is computed from the graph precision and recall, defined to be:
+\[
+\text{Graph precision} = \frac{s_\text{graph}}{|V'|} \qquad
+\text{Graph recall} = \frac{s_\text{graph}}{|V|}
+\]
+where $s_\text{graph}$ is the score achieved by the best node matching.
+
+\paragraph{Motif distance}
+Taking inspiration from classical network analysis, we use \emph{network motifs} \cite{milo2002network,shen2002network} to evaluate the structural integrity of the generated graphs. Network motifs are reoccurring subgraphs in a larger graph, most commonly 3-vertex subgraphs. They are typically indicative of the structural characteristics of the full graph. We define the motif distance as the 1-Wasserstein distance between the distribution of all 3-vertex subgraphs in $G$ and $G'$.
+
+% \begin{enumerate}
+%     \item Explain the rationale behind each evaluation metric.
+%     \item Literal edge comparison: Simplest and most interpretable but not strongly indicative of the model's performance. For example, the solution of memorising the training split does very well.
+%     \item Fuzzy edge comparison: Use embedding cosine similarity to determine a match between edges. We take the median similarity of English synonyms as the matching threshold for each endpoint. An edge matches another edge if both endpoints match.
+%     \item Continuous edge matching: Solves the problem where graphs with repeated components like $B \leftarrow A \rightarrow B$ and $A \rightarrow B$ achieve a perfect score on the two metrics above. Instead, we need to compute the highest-scoring matching between the edges of the two graphs. This can be further improved by using the cosine similarity scores directly so that we can compare two graphs even when they contain no literally/fuzzily common edges.
+%     \item Graph similarity matching: Previous metrics are only aware of individual edges. We want something that captures the wider structure of the graph as well. We use a simple graph convolution \cite{wu2019simplifying} to compute structure-aware node embeddings and compute the highest-scoring matching similar to continuous edge matching.
+%     \item Motif distance: Taking inspiration from classical network analysis, we use \emph{network motifs} \cite{milo2002network,shen2002network} to evaluate the structural integrity of the generated graphs. Give a brief explainer of network motifs. We compute the 1-Wasserstein distance between the distribution of 3-vertex motifs identified in the generated and ground truth graph.
+% \end{enumerate}
+
+\section{Experiments}
+
+We design our experiments to answer the following research questions:
+\begin{enumerate}
+    \item Does \name produce better ontologies than traditional methods by subtask composition?
+    \item Can \name be easily adapted to a new domain?
+\end{enumerate}
+ We approach the questions by training \name on the Wikipedia dataset and further transfer the model to arXiv with a small number of arXiv samples. As baselines, we use two relation extraction methods, Hearst patterns \cite{hearst1998automated,roller2018hearst} and REBEL \cite{cabot2021rebel}. Relation extraction depends on successful concept discovery to produce high-quality ontologies. To estimate a ceiling to such baselines, \emph{we give the baselines a substantial advantage} by providing them with the ground truth concepts in the test graph. The results show that even with such an advantage, \name outperforms the baselines on many metrics, demonstrating the potential of \name for end-to-end OL.
+
+\subsection{Implementation details}  \label{sec:implementation}
+
+
+% \subsection{Masked loss regularisation}  \label{sec:method:masked-loss}
+
+\input{figures/vanilla_vs_masked}
+
+We discover that directly finetuning an LLM on the sequences defined in \cref{sec:method:subgraph} produces poor results due to overfitting. Analysing the per-token loss of a naively finetuned model on the test split shows that the model tends to memorise high-level relations from the training set, leading to poor generalisation as shown in \cref{fig:vanilla-vs-mask} (top). This occurs because high-level relations are present in many relevant subgraphs and thus repeated many times in the training set. This problem is not solvable by early stopping since terminating training early will result in a model that massively underfits lower-level relations. 
+
+This issue is akin to multi-task learning \cite{caruana1997multitask} where the standard solution is to apply some loss weighting factor to rebalance training objectives \cite{sermanet2013overfeat,kendall2018multi}. We draw inspiration from this connection and propose a new training objective that randomly masks the loss contribution from frequently occurring relations. Suppose a relation $u \to v$ is present $n$ times in the training set. During training, when $u \to v$ appears in one of the relevant paths, we mask the tokens for $v$ with probability $\max(1 - M/n, 0)$, where $M$ is a constant for the average number of times a relation is present in the training set. Note that while $v$ is masked from the target, its tokens are still present in the input sequence as context for later tokens. A concrete example is shown in \cref{fig:prompt-template} (right). 
+
+We finetune Mistral 7B v0.2 \cite{jiang2023mistral} with Low-Rank Adaptation \cite{hu2021lora} on the masked loss objective. The model is trained on the Wikipedia dataset for two epochs with Adam. During inference, the outputs are generated with temperature 0.1 and nucleus sampling \cite{holtzman2019curious} top-$p$ of 0.9. The weight of each edge is given by the number of generated subgraphs in which it appears. We include a finetuning baseline without the masked loss objective, denoted as \textbf{Finetune}. To adapt \name for arXiv, we further finetune the model on 2048 document-subgraph pairs from arXiv. We initialise new low-rank adaptors and train until the loss stops improving on the validation set. We name these models \textbf{\name (transfer)} and \textbf{Finetune (transfer)} for training without and without the masked loss objective respectively. Full details for the Wikipedia and arXiv experiments can be found in \cref{appendix:training-details}.
+
+The hyperparameters for the post-processing steps are tuned by grid search on the validation set. We sweep over $\alpha \in 1 - \text{geomspace}(1 / |E_\text{raw}|, 1, 21)$ and $\beta \in \text{geomspace}(0.1, 1, 21) - 0.1$ and use the values that maximises the continuous F1 metric. For Wikipedia, we choose the subgraph modelling path length $N=4$ as it is the smallest $N$ such that almost all edges ($>99\%$) occur in at least one induced subgraph. Such criterion is used as smaller $N$ results in smaller subgraphs which we expect to be easier to model accurately. We choose $N=3$ for arXiv for the same reason. 
+
+\subsection{Baselines}
+
+We give a brief overview of the baseline methods here. The full implementation details can be found in \cref{appendix:exp-details}. All baselines produce weighted directed graphs which we apply the same post-processing steps as \name (\cref{sec:method:post-processing}) to obtain the final predicted graph.
+
+\paragraph{Memorisation}
+Simply memorising the train graph is a surprisingly strong baseline due to the overlap between train and test graphs, especially for Wikipedia. The weight of each edge is given by the number of relevant subgraphs in which it appears.
+
+\paragraph{Hearst}
+We follow the improved implementation of Hearst patterns by \citet{roller2018hearst}. The authors propose spmi, a method which uses low-rank approximations to smooth the relation matrix so that two concepts can be compared even if there are no direct matches between them. We use the smoothed relation matrix to weigh the relations between the ground truth concepts. The additional hyperparameter for the rank of the smoothed matrix is tuned by grid search over the validation set.
+
+\paragraph{REBEL}
+The REBEL-large model \cite{cabot2021rebel} is an encoder-decoder LLM trained to extract many types of relations from Wikipedia articles. We only take the ``subclass of'', ``instance of'', ``member of'' and ``part of'' relations that were extracted. Similar to \textbf{Hearst}, we find that it fails to find many direct relations between ground truth concepts. The same low-rank smoothing technique is applied to give a higher recall. 
+
+\paragraph{Prompting}
+We test the \textbf{zero/one/three-shot} performance of instruction-tuned LLMs on the subgraph modelling task described in \cref{sec:method:subgraph}. We use Mistral 7B Instruct v0.2 \cite{jiang2023mistral} as the instruct model. We perform manual prompt engineering to describe the task and steer the model to return outputs of the same format as that described in \cref{sec:method:subgraph}. The prompt can be found in \cref{appendix:prompt-template}.
+
+\subsection{Results}
+
+\input{figures/metrics}
+
+Our evaluation results reveal that \name produces both semantically and structurally more accurate ontologies than our baselines. Inspecting the metrics for the Wikipedia task in \cref{table:metrics}, we see that although \name is outperformed by the \textbf{Memorisation} and \textbf{Finetune} on Literal F1, it is much better at the Fuzzy, Continuous and Graph F1 metrics. This suggests that while \name produces ontologies that are \emph{syntactically} less aligned to the ground truth, it better captures the overall semantics. In fact, our prompting baselines following the same task format as \name also outperform \textbf{Hearst} and \textbf{REBEL} in the semantics-aware metrics, though they suffer in structural integrity as reflected by the high Motif Distance. The results also hint at the potential pitfalls of syntax-based evaluation metrics as we see syntactic similarity does not generally entail semantic similarity.
+
+The arXiv task differs from the Wikipedia task as it has much fewer relations and there is even less overlap between the train and test split. This imposes a great challenge on \textbf{Finetune} and \name as they need to generalise with a limited diversity of training samples. Despite such constraints, \name is substantially better than other methods in modelling the semantics of the test graph. Inspecting the generated outputs, we observe prompting baselines tend to produce repetitive concepts such as ``Machine Learning and Artificial Intelligence'' and ''Artificial Intelligence and Machine Learning'' while \textbf{Hearst} and \textbf{REBEL} put ``Machine Learning'' as the parent concept of almost all ground truth concepts. Plots for the generated graphs can be found in \cref{appendix:visualisation}. 
+
+% \section{Related work/qualitative evaluation}
+
+% Compare the results qualitatively with other works in the same area.
+
+% \subsection{End-to-end ontology learning}
+
+% \subsection{Graph generation}
+
+\section{Discussion}
+
+In this paper, we introduce a general method for building ontologies in an end-to-end fashion. We propose a set of metrics for end-to-end OL that measures the semantic and structural similarity between arbitrary labelled graphs. Our model, \name, outperforms traditional subtask composition methods in reconstructing the Wikipedia categories and can be transferred to build ontologies for arXiv after finetuning on a small number of examples. Using LLMs as the backbone for subgraph modelling opens up exciting avenues for future research. For example, one may generate ontologies from corpora with images using vision language models \cite{donahue2015long}.
+
+We only study and evaluate the construction of simple ontologies with only concepts and taxonomic relations. A potential approach to extend \name to produce non-taxonomic relations is to add tags indicating the relation type to each edge when linearising the subgraphs for sequence modelling. New evaluation metrics might also be required to handle multiple types of relations. Another limitation is that we are unable to fully control for data contamination as the pretraining dataset of Mistral 7B is not publically known. We do, however, observe that the generated ontologies are sufficiently different from the ground truth, indicating that \name is not simply remembering samples from its pretraining stage.
+
+%TC:ignore
+\bibliographystyle{plainnat}
+\bibliography{references}
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+
+\appendix
+\include{appendix}
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+
+\newpage
+\input{checklist}
+%TC:endignore
+
+
+\end{document}
