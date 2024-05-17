@@ -99,7 +99,10 @@
 
 \chapter*{Abstract}
 
-Prior to recent progress, Ontology Learning (OL) has mostly been tackled with rule-based methods which scale poorly. Recent work demonstrated potential for applying Large Language Models (LLMs) to several sub-tasks of OL. This project aims to extend this idea to build a complete system for OL by leveraging the flexibility of LLMs, bypassing the needs for specialist models and large training datasets. If successful, this approach, by the virtue of the generality of LLMs, will be applicable to corpuses other than Wikipedia with minimal re-training and modifications.
+Ontologies are useful for automatic machine processing as they represent knowledge in a structured format. Yet, constructing ontologies requires substantial manual effort. To automate part of this process, large language models (LLMs) have been applied to solve various subtasks of ontology learning. However, this partial ontology learning does not capture the interactions between subtasks.
+We address this gap by introducing \name, a general and scalable method for solving the \emph{full} task of building an ontology from scratch.
+Rather than focusing on subtasks, like individual relations between entities, we model entire subcomponents of the target ontology by finetuning an LLM with a custom regulariser that reduces overfitting on high-frequency concepts. We introduce a novel suite of metrics for evaluating the quality of the generated ontology by measuring its semantic and structural similarity to the ground truth. Our metrics stem from modern deep learning evaluation techniques, but make fewer assumptions about the ontologies than standard ontology metrics.
+Our results on Wikipedia show that \name outperforms subtask composition methods, producing more semantically accurate ontologies while maintaining structural integrity. We further demonstrate that our model can be effectively adapted to a new domain, like arXiv, needing only a small number of training examples.
 
 \ifsubmission\else
     % not included in submission for blind marking:

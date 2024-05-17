@@ -16,11 +16,27 @@
 \usepackage{refcount}
 \usepackage{upquote}
 \usepackage{xcolor}
-\usepackage{cleveref}
+\usepackage{subcaption}
+\usepackage{amsmath}
+\usepackage{amssymb}
 \usepackage[sort,numbers]{natbib}
+\usepackage[capitalise]{cleveref}
+\usepackage{adjustbox}
+\usepackage{listings}
+\usepackage{float}
+\usepackage{tabularx}
+\usepackage{booktabs}
+\usepackage{multirow}
+\usepackage{xspace}
+\usepackage{tikz}
+\usetikzlibrary{arrows,calc,arrows.meta,positioning}
 
+\lstset{
+basicstyle=\small\ttfamily,
+columns=fullflexible,
+breaklines=true,
+}
 
-\bibliographystyle{plainnat}
 \hypersetup{
     colorlinks,
     linkcolor={blue!50!black},
@@ -31,13 +47,15 @@
 \newif\ifsubmission % Boolean flag for distinguishing submitted/final version
 
 % Change the following lines to your own project title, name, college, course
-\title{Building Ontologies with Large Language Models}
+\title{End-to-End Ontology Learning with Large Language Models}
 \author{Chun Yuen Andy Lo}
 \date{May 2024}
 \newcommand{\candidatenumber}{1234N}
 \newcommand{\college}{Christ's College}
 \newcommand{\course}{Computer Science Tripos, Part III}
 \newcommand{\todo}[1]{\textcolor{red}{TODO: #1}}
+\newcommand{\name}{{OLLM}\xspace}
+\DeclareMathOperator{\nodesim}{NodeSim}
 
 % Select which version this is:
 % For the (anonymous) submission (without your name or acknowledgements)
@@ -68,7 +86,8 @@
 \label{lastcontentpage} % end page count here
 
 %TC:ignore 
-\bibliography{refs}
+\bibliographystyle{plainnat}
+\bibliography{references}
 
 \input{sections/appendix.tex}
 %TC:endignore 

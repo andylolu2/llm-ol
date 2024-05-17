@@ -1,35 +1,36 @@
 \chapter{Background}
 
-A more extensive coverage of what's required to understand your work.
-In general you should assume the reader has a good undergraduate
-degree in computer science, but is not necessarily an expert in the
-particular area you've been working on. Hence this chapter may need to
-summarize some ``text book'' material.
+This project's research topic is in the intersection of ontology learning, ontology evaluation, and large language models for structured knowledge representation. This chapter provides an overview of the standard techniques and core principles in these areas, and discusses potential research gaps that this project aims to address.
 
-This is not something you'd normally require in an academic paper, and
-it may not be appropriate for your particular circumstances. Indeed,
-in some cases it's possible to cover all of the ``background''
-material either in the introduction or at appropriate places in the
-rest of the dissertation.
+\section{What is an Ontology?}
 
-% \chapter{Related work}
+% [What is an ontology and how is it represented?]
+An ontology is a structured way of representing concepts and relations of a shared conceptualisation, i.e. domain knowledge \cite{gruber1995toward,gruber1993translation}. The primary goal of an ontology is to represent the entities in a domain in a machine-readable format and linking the relationships among them \cite{national2022ontologies}. This project focuses on ontologies that only consist of concepts and taxonomic relations which represent \emph{is-a} or \emph{is-subclass-of} relationships between concepts. In some cases, the \emph{is-part-of} relation is also considered a taxonomic relation.
 
-This chapter covers relevant (and typically, recent) research
-which you build upon (or improve upon). There are two complementary
-goals for this chapter:
+% [Representations of ontologies]
+We treat such an ontology as a rooted labelled directed graph where nodes represent concepts, edges represent taxonomic relations and the root node is the special concept of all concepts. A strict ontology asserts that the taxonomic relation is asymmetric and thus the graph must be acyclic, though in practice some ontologies, such as the Wikipedia ontology studied in this paper, may contain cycles. We therefore do not assume that an ontology graph is necessarily acyclic. Examples of ontologies include WordNet \cite{miller1995wordnet} with 117,659 concepts and 89,089 taxonomic relations and the Gene Ontology \cite{ashburner2000gene} with 42,255 concepts and 66,810 taxonomic relations.
+
+\section{Ontology Learning}
+
+% [What is the precise task we study in this paper?]
+Ontology learning is the automatic extraction of ontological elements \cite{hazman2011survey}. The most studied source of input is unstructured text, though there are also works on OL on semi-structured data like HTML \cite{karoui2004ontology}. In this paper, the input is a set of documents, each consisting of some unstructured text. We additionally assume each document is associated with one or more concepts in the ground truth ontology which we utilise for training. The goal is to reconstruct the ground truth ontology given the set of documents.
+
+% [Traditional approaches to OL.]
+Prior works view OL as a composition of subtasks and study each subtask in isolation \cite{buitelaar2005ontology,asim2018survey}. A typical pipeline for building a simple ontology is to first perform concept discovery (identify the nodes) and then relation extraction (identify the edges) \cite{cimiano2005text2onto,kaushik2018automatic}. A notable approach for relation extraction is Hearst patterns \cite{hearst1998automated}. Hearst patterns are hand-crafted lexico-syntactic patterns that exploit natural language structure to discover taxonomic relations. For example, the pattern ``NP such as NP'' matches phrases like ``dogs such as chihuahuas'' and thus can be processed by regular expressions to identify the relation ``dog $\to$ chihuahua''. Hearst patterns suffer from low recall as the relations must occur in exact configurations to be matched by rules. More recent works have suggested smoothing techniques to alleviate this issue \cite{roller2018hearst}.
+% Another approach for relation extraction utilises word co-occurrence statistics to predict taxonomic relations \cite{cimiano2005learning}.
+
+% [LLM approaches to OL]
+Recent research has transitioned to using language models for OL. REBEL \cite{cabot2021rebel} treats relation discovery as a translation task and finetunes encoder-decoder LLMs to extract both taxonomic and non-taxonomic relations. \citet{babaei2023llms4ol} benchmarked a wide family of LLMs for concept and relation discovery and showed promising results. There are also proof-of-concept works for building ontologies end-to-end with LLMs. \citet{funk2023towards} proposes to build an ontology by recursive prompting an LLMs while \citet{trajanoska2023enhancing} generates the entire ontology in one completion. However, both studies are limited in the scale of the task and evaluation. The authors only considered ontologies of up to 1000 concepts and relied on manual qualitative evaluation. We bridge this gap by proposing a method that can scale to practical problem sizes and new metrics for systematic qualitative evaluation.
+
+\section{Evaluating Ontologies}
+
+% [Prior approaches to evaluating OL.]
+The evaluation of ontologies is also an open research area. The main approaches are gold-standard evaluation, which matches elements of the generated ontology with a predefined target ontology; task-based evaluation, which measures the usefulness of the ontology on a specific application; and human evaluation \cite{raad2015survey,brank2005survey}. In this paper, we evaluate by the gold standard as it is the most straightforward approach when such ground-truth ontology exists. Prior works have considered matching concepts \cite{maedche2002measuring} and direct and indirect relations \cite{Kashyap2005TaxaMinerAE, Treeratpituk2013GraphbasedAT} by literal text comparison. Other works have also considered edit-distance \cite{Ehrig2005SimilarityFO} or bag-of-words distributional similarity for text comparison \cite{Zavitsanos2011GoldSE}.  These techniques may be considered unreliable and have been superseded by current methods \cite{conneau2017supervised}. We instead rely on more modern techniques like pretrained text embedders \cite{devlin2018bert} and graph convolutions \cite{kipf2016semi} to match substructures between the two ontologies.
+
+\section{LLMs for Knowledge Representation}
+
+Key points:
 \begin{enumerate}
-    \item to show that you know and understand the state of the art; and
-    \item to put your work in context
+    \item There is a lot of overlap between knowledge graph construction and OL but state the differences: KG focuses on the structured representation of facts from the source corpus, hence typically involves more types of relations and less concerned about graph structure.
+    \item Overview of methods for KG construction. Most common task is KG completion: Given a head node and a relation, predict the tail node. \citet{petroni2019language} first to use LLMs for this task by prompting. Recent work by \citet{yao2023exploring} finetunes LLMs for link prediction and relation prediction. \citet{wang2020language} inspects the attention patterns of LLMs to extract the relation token(s) between two entities in the source text.
 \end{enumerate}
-
-Ideally you can tackle both together by providing a critique of
-related work, and describing what is insufficient (and how you do
-better!)
-
-The related work chapter should usually come either near the front or
-near the back of the dissertation. The advantage of the former is that
-you get to build the argument for why your work is important before
-presenting your solution(s) in later chapters; the advantage of the
-latter is that don't have to forward reference to your solution too
-much. The correct choice will depend on what you're writing up, and
-your own personal preference.

@@ -1,35 +1,148 @@
 \appendix
 
-\chapter{Technical details, proofs, etc.}
+\chapter{Experiment details}  \label{appendix:exp-details}
 
-Appendices are for optional materials that is not essential to
-understanding the work, and that the examiners are not expected to
-read, but that will be of value to readers interested in additional,
-in-depth technical detail.
+\section{\name training}  \label{appendix:training-details}
 
-\section{Lorem ipsum}
+For the Wikipedia experiment, we use Mistral 7B v0.2 (not instruction-tuned) \cite{jiang2023mistral} as the base model. We attach LoRA \cite{hu2021lora} adaptors to all attention and feed-forward layers with parameters $r=32$ and $\alpha=16$. The model is trained for 2 epochs ($\approx$ 17K steps) with batch size 16, context length 2048, and is optimised with Adam using a constant learning rate of 1e-5 with warm-up from zero for the first 100 steps. \textbf{Finetune} uses the same configuration. Training on two A100 GPUs takes $\approx 6$ hours.
 
-% Some traditional fake Latin prose for calibrating words/page
-Lorem ipsum dolor sit amet, consetetur sadipscing elitr, sed diam
-nonumy eirmod tempor invidunt ut labore et dolore magna aliquyam erat,
-sed diam voluptua. At vero eos et accusam et justo duo dolores et ea
-rebum. Stet clita kasd gubergren, no sea takimata sanctus est Lorem
-ipsum dolor sit amet. Lorem ipsum dolor sit amet, consetetur
-sadipscing elitr, sed diam nonumy eirmod tempor invidunt ut labore et
-dolore magna aliquyam erat, sed diam voluptua. At vero eos et accusam
-et justo duo dolores et ea rebum. Stet clita kasd gubergren, no sea
-takimata sanctus est Lorem ipsum dolor sit amet. Lorem ipsum dolor sit
-amet, consetetur sadipscing elitr, sed diam nonumy eirmod tempor
-invidunt ut labore et dolore magna aliquyam erat, sed diam voluptua.
-At vero eos et accusam et justo duo dolores et ea rebum. Stet clita
-kasd gubergren, no sea takimata sanctus est Lorem ipsum dolor sit
-amet.
+For the arXiv experiment, we further finetune the model trained on Wikipedia with masked loss objective on 2048 document-subgraph pairs from the arXiv training set. We merge the LoRA adaptors from the Wikipedia experiment and initialise new ones with $r=8$ and $\alpha=8$. The model is trained with batch size 16 and Adam with constant learning rate 3e-6 and warp-up from zero for the first 10 steps. Early stopping is used to terminate training when the loss stops improving on the evaluation set, which happened at step 288. \textbf{Finetune (transfer)} uses the same configuration. Eearly stopping happened at step 192.
 
-\section{Homo sapiens non urinat in ventum}
-Duis autem vel eum iriure dolor in hendrerit in vulputate velit esse
-molestie consequat, vel illum dolore eu feugiat nulla facilisis at
-vero eros et accumsan et iusto odio dignissim qui blandit praesent
-luptatum zzril delenit augue duis dolore te feugait nulla facilisi.
-Lorem ipsum dolor sit amet, consectetuer adipiscing elit, sed diam
-nonummy nibh euismod tincidunt ut laoreet dolore magna aliquam erat
-volutpat.
+\section{Hearst}
+
+The \textbf{Hearst} baseline follows the implementation by \citet{roller2018hearst}. We give a description of the implementation here. \todo{CoreNLP, blah blah blah...}
+
+\section{REBEL}
+
+\section{Prompting}
+We sample the one/three-shot examples from the training set for each query. The output is parsed using regex and results that do not match the regex are discarded.
+
+\section{Prompt templates}  \label{appendix:prompt-template}
+
+\subsection*{\name finetuning template}
+
+\begin{lstlisting}[frame=single]
+<s>[INST]\
+Title: {{ title }}
+{{ abstract }}[/INST]\
+{% for path in paths %}
+{{ path | join(" -> ") }}
+{% endfor %}\
+</s>
+\end{lstlisting}
+
+\subsection*{Zero, one, and three-shot prompt template}
+
+\begin{lstlisting}[frame=single]
+The following is an article's title and abstract. Your task is to assign this article to suitable category hierarchy. A category is typically represented by a word or a short phrase, representing broader topics/concepts that the article is about. A category hierarchy represented by a collection of paths from the generic root category "Main topic classifications" to a specific category suitable for the article. The topics titles should become more and more specific as you move from the root to the leaf. 
+
+{% if examples|length > 0 %}
+{% for example in examples %}
+### EXAMPLE {{ loop.index }} ###
+### ARTICLE ###
+Title: {{ example['title'] }}
+{{ example['abstract'] }}
+### END ARTICLE ###
+{% for path in example['paths'] %}
+{{ path | join(" -> ") }}
+{% endfor %}
+### END EXAMPLE {{ loop.index }} ###
+{% endfor %}
+{% else %}
+You must answer in the format of:
+Main topic classifications -> Broad topic 1 -> Subtopic 1 -> ... -> Most specific topic 1
+Main topic classifications -> Borad topic 2 -> Subtopic 2 -> ... -> Most specific topic 2
+...
+{% endif %}
+
+### ARTICLE ###
+Title: {{ title }}
+{{ abstract }}
+### END ARTICLE ###
+
+Provide a category hierarchy for the above article. \
+{% if examples|length > 0 %}
+Use the same format as the examples above.
+{% else %}
+Use the format described above.
+{% endif %}
+\end{lstlisting}
+
+\newpage
+
+\chapter{Visualisations} \label{appendix:visualisation}
+
+% \subsubsection{Ground truth}
+
+\begin{figure}[h]
+    \centering
+    \includegraphics[width=0.9\linewidth]{media/arxiv_v2_test_gt_graph.pdf}
+    \caption{Ground truth test split ontology for arXiv}
+\end{figure}
+
+% \subsubsection{\name}
+
+\begin{figure}[h]
+    \centering
+    \includegraphics[width=0.9\linewidth]{media/arxiv_v2_Finetune masked (transfer)_graph.pdf}
+    \caption{Ontology for arXiv generated by \name}
+\end{figure}
+
+% \subsubsection{Finetune}
+
+\begin{figure}[h]
+    \centering
+    \includegraphics[width=\linewidth]{media/arxiv_v2_Finetune (transfer)_graph.pdf}
+    \caption{Ontology for arXiv generated by Finetune}
+\end{figure}
+
+% \subsubsection{Memorisation}
+
+\begin{figure}[h]
+    \centering
+    \includegraphics[width=0.9\linewidth]{media/arxiv_v2_Memorisation_graph.pdf}
+    \caption{Ontology for arXiv generated by Memorisation}
+\end{figure}
+
+% \subsubsection{Hearst}
+
+\begin{figure}[h]
+    \centering
+    \includegraphics[width=0.9\linewidth]{media/arxiv_v2_Hearst better_graph.pdf}
+    \caption{Ontology for arXiv generated by Hearst}
+\end{figure}
+
+% \subsubsection{REBEL}
+
+\begin{figure}[h]
+    \centering
+    \includegraphics[width=0.8\linewidth]{media/arxiv_v2_Rebel better_graph.pdf}
+    \caption{Ontology for arXiv generated by REBEL}
+\end{figure}
+
+% \subsubsection{Prompting}
+
+\begin{figure}[h]
+    \centering
+    \includegraphics[width=0.8\linewidth]{media/arxiv_v2_0 shot_graph.pdf}
+    \caption{Ontology for arXiv generated by zero-shot}
+\end{figure}
+
+\begin{figure}[h]
+    \centering
+    \includegraphics[width=0.9\linewidth]{media/arxiv_v2_1 shot_graph.pdf}
+    \caption{Ontology for arXiv generated by one-shot}
+\end{figure}
+
+\begin{figure}[h]
+    \centering
+    \includegraphics[width=0.9\linewidth]{media/arxiv_v2_3 shot_graph.pdf}
+    \caption{Ontology for arXiv generated by three-shot}
+\end{figure}
+
+% \begin{figure}
+%     \centering
+%     \includegraphics[width=\linewidth]{media/arxiv_ground_truth.pdf}
+%     \caption{Ground truth ontology for arXiv}
+%     \label{fig:arxiv-ground-truth}
+% \end{figure}

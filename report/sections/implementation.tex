@@ -1,5 +1,152 @@
 \chapter{Design and implementation}
 
-This chapter may be called something else\ldots but in general the
-idea is that you have one (or a few) ``meat'' chapters which describe
-the work you did in technical detail.
+One of the goals of this project is to explore the paradigm shift from traditional subtask composition OL to end-to-end OL. The novelty of the task in of itself means that many components of the project has to be built from ground up. This chapter documents the implementation and design decisions made for each of these building blocks, including curating the datasets (\cref{sec:implementation:data-collection}), building reliable baselines (\cref{sec:implementation:baselines}), introducing our own method \name (\cref{sec:implementation:core}), and developing robust evaluation metrics (\cref{sec:implementation:evaluation}).
+
+% \section{Starting point}
+
+% This project is not based on any existing codebase. The Wikipedia and arXiv datasets to be used in this project are also not readily available. In addition, few prior works in OL have open-source implementation, even including unofficial ones. Knowing the novelty of the end-to-end OL task studied in this project, I decided to build the project from scratch as it would give me to the most flexibility in designing the system.
+
+\section{Data collection}  \label{sec:implementation:data-collection}
+
+We collect the datasets for the two ontologies considered in this paper: Wikipedia categories and the arXiv taxonomy. We use Wikipedia for learning and in-domain evaluation and arXiv for out-of-domain evaluation. To build the Wikipedia dataset, we perform a BFS traversal from its root category ``Main topic classifications'' up to depth 3. For every category encountered, we retrieve the title and summary (the text before the first section) of up to 5000 pages that belong in that category. The source data is obtained from the Wikipedia API.\footnote{\url{https://en.wikipedia.org/w/api.php}} The arXiv taxonomy is available from its home page and the source corpus is constructed from the title and abstract of all the papers uploaded to arXiv in the years 2020--2022 with more than or equal to 10 citations.\footnote{Citation counts obtained from \url{https://api.semanticscholar.org/}.} In total, the Wikipedia dataset has 13,886 concepts, 28,375 taxonomic relations and 362,067 documents, while the arXiv dataset has 161 concepts, 166 taxonomic relations and 126,001 documents.
+
+\section{Baselines}  \label{sec:implementation:baselines}
+
+We give a brief overview of the baseline methods here. The full implementation details can be found in \cref{appendix:exp-details}. All baselines produce weighted directed graphs which we apply the same post-processing steps as \name (\cref{sec:method:post-processing}) to obtain the final predicted graph.
+
+\paragraph{Memorisation}
+Simply memorising the train graph is a surprisingly strong baseline due to the overlap between train and test graphs, especially for Wikipedia. The weight of each edge is given by the number of relevant subgraphs in which it appears.
+
+\paragraph{Hearst}
+We follow the improved implementation of Hearst patterns by \citet{roller2018hearst}. The authors propose spmi, a method which uses low-rank approximations to smooth the relation matrix so that two concepts can be compared even if there are no direct matches between them. We use the smoothed relation matrix to weigh the relations between the ground truth concepts. The additional hyperparameter for the rank of the smoothed matrix is tuned by grid search over the validation set.
+
+\paragraph{REBEL}
+The REBEL-large model \cite{cabot2021rebel} is an encoder-decoder LLM trained to extract many types of relations from Wikipedia articles. We only take the ``subclass of'', ``instance of'', ``member of'' and ``part of'' relations that were extracted. Similar to \textbf{Hearst}, we find that it fails to find many direct relations between ground truth concepts. The same low-rank smoothing technique is applied to give a higher recall.
+
+\paragraph{Prompting}
+We test the \textbf{zero/one/three-shot} performance of instruction-tuned LLMs on the subgraph modelling task described in \cref{sec:method:subgraph}. We use Mistral 7B Instruct v0.2 \cite{jiang2023mistral} as the instruct model. We perform manual prompt engineering to describe the task and steer the model to return outputs of the same format as that described in \cref{sec:method:subgraph}. The prompt can be found in \cref{appendix:prompt-template}.
+
+
+\section{\name}  \label{sec:implementation:core}
+
+This section introduces \name, a simple and scalable method for end-to-end OL with LLMs. On a high level, \name uses an LLM to model linearised subgraphs of the target ontology. In contrast to learning individual edges, modelling subgraphs allows the model to learn higher-order structures, such as the interactions between three or more nodes. To create the training dataset, \name relies on the assignment of documents to concepts which induces a relevant subgraph for each document. Such subgraphs are much smaller than the complete graph so they can be learned by the model more easily. The generated subgraphs for each document are summed into a weighted graph and simple post-processing is applied to obtain the final predicted ontology.
+
+% Highlight the core components and insights for \name.
+% \begin{enumerate}
+%     \item The idea to model subgraphs instead of edges. Motivation: More efficient inference, captures the global structure of an ontology (the hierarchical structure is "baked in").
+%     \item Components: 1. Document $\to$ subgraph. 2. Aggregrate subgraphs induced by each document into a weighted global graph. 3. Apply post-processing and pruning.
+%     \item Argue that this setup is appealing for scaling: Inference can be parallelised across the source documents, so inference duration is inversely proportional to the amount of hardware available. 
+% \end{enumerate}
+
+\subsection{Subgraph modeling}  \label{sec:method:subgraph}
+
+\input{figures/prompt_template}
+
+Here, we describe the method for creating document-subgraph pairings. Given a document and its associated set of concepts $C$, we define the \emph{relevant paths} as the set paths of at most length $N$ from the root to any of the concepts in $C$. The \emph{relevant subgraph} is the set of nodes and edges that occur at least once in the relevant paths. An example is shown in the left subfigure of \cref{fig:prompt-template}. The choice of $N$ is task-specific and we describe our method for choosing $N$ in \cref{sec:implementation}.
+
+To employ LLMs to model the subgraphs, we must linearise the graph into a string for sequence modelling. Existing methods for autoregressive graph generation employ BFS \cite{you2018graphrnn} or DFS \cite{goyal2020graphgen} ordering starting at an arbitrary node. We instead choose to linearise the subgraph as a list of relevant paths that produced the subgraph in the first place. We do so for three reasons: Firstly, the subgraph is defined from such a collection of paths which makes them the most natural representation; Secondly, we hypothesise the hierarchy of concepts on each path is a desirable inductive bias for the hierarchical nature of an ontology; Thirdly, the path-based representation is much easier to describe in natural language instructions so that our LLM prompting-based baselines may produce reasonable results without finetuning. The linearisation template can be found in \cref{appendix:prompt-template}.
+
+% Key points:
+% \begin{enumerate}
+%     \item Explain how to construct document-subgraph pairing from the training dataset. E.g., the path length cutoff is selected as the smallest number that still covers almost all of the edges.
+%     \item Linearisation of subgraph to a sequence. Why choose the method of ``subgraph as a set of paths''? Ans: More natural language-like, easier for zero/few-shot to comprehend so we have stronger baselines.
+%     \item \fig{Example output format.}
+% \end{enumerate}
+
+\subsection{Post-processing}  \label{sec:method:post-processing}
+
+The final output graph is obtained by summing all generated subgraphs for each document and pruning low-weighted components. Given the generated subgraphs $G_1 = (V_1, E_1), \dots, G_n = (V_n, E_n)$, the raw output graph is defined as $G_{\text{raw}} = (V_{\text{raw}}, E_{\text{raw}})$ where $V_\text{raw} = \cup_{i=1}^n V_n$ and $E_\text{raw} = \cup_{i=1}^n E_n$. Each edge $(u, v) \in E_\text{raw}$ is additionally weighted by the number of times they occur in the collection of subgraphs: $w_{u, v} = \sum_{i=1}^n \mathbb{1}[(u,v) \in E_n]$. A few simple post-processing steps are then applied to $G_\text{raw}$:
+\begin{enumerate}
+    \item Self-loop pruning: All edge $(u, u) \in E_\text{raw}$ are removed.
+    \item Inverse-edge pruning: All edges $(u, v) \in E_\text{raw}$ where $(v, u) \in E_\text{raw}$ and $w_{v, u} > w_{u, v}$ are removed.
+    \item Absolute thresholding: Edges in $E_\text{raw}$ with weight below the $\alpha$-th quantile are removed, where $0 \leq \alpha \leq 1$ is a hyperparamter.
+    \item Relative thresholding: For each vertex $u \in V_\text{raw}$, let $e_1, \dots, e_k$ be the outgoing edges from $u$ sorted by weight in ascending order. Define the cumulative weight as $C(e_i) = \sum_{j=1}^i w_{e_j} / \sum_{j=1}^k w_{e_j}$. The edges $\{e_i\ |\ C(e_i) \leq \beta\}$ are pruned, where $0 \leq \beta \leq 1$ is a hyperparameter.
+    \item Clean up: After pruning all edges, nodes with no incoming or outgoing edges are removed.
+\end{enumerate}
+In our implementation, we choose the hyperparameters $\alpha$ and $\beta$ by tuning on the validation set.
+
+% Key points:
+% \begin{enumerate}
+%     \item Aggregate inference outputs into a weighted directed graph.
+%     \item Following \cite{roller2018hearst}, we prune self loops and edge $u \to v$ if $v \to u$ is also in the graph with a higher weight.
+%     \item Apply two thresholding values to prune the graph further. The first threshold $\alpha$ where the lowest-weighted $100 \alpha\%$ of edges are pruned. The second threshold $\beta$ is a relative threshold where \emph{for each node}, the lowest-weighted outgoing edges that are in the bottom $100\beta\%$ cumulative probability mass are removed. \todo{Perhaps easier to describe in equations.}
+%     \item The hyperparameters $\alpha$ and $\beta$ are tuned on the evaluation set.
+% \end{enumerate}
+
+\section{Evaluating end-to-end OL}  \label{sec:implementation:evaluation}
+
+Since our problem setup is uncommon in existing literature, we also develop new evaluation methods. Ontology evaluation is a hard problem as there are no quantitative definitions of what constitutes a ``good ontology'' and metrics generally only capture one aspect of an ontology. We approach evaluation by treating the ground truth as a proxy for a good ontology and comparing the generated ontologies against the ground truth. This section describes how the ground truth is obtained and what metrics are used for measuring ontology similarity.
+
+% Key points:
+% \begin{enumerate}
+%     \item Explain the goals of evaluation---what do we care about? Ans: Semantics and structure.
+%     \item Suggest why end-to-end evaluation is hard: Large graph. Generally, a ``good ontology'' is ill-defined. Difficult to find one metric that describes all. Always trade-offs. No standard evaluation metric. 
+%     \item How do we overcome this? 1. Use a ground truth ontology as a proxy for ``good ontology'' and measure how similar the generated ontology is to the ground truth. 2. Propose a series of evaluation metrics to capture various aspects of the generated output.
+% \end{enumerate}
+
+\subsection{Dataset}
+
+\input{figures/dataset}
+
+Generating the train and test splits from the datasets is also a non-trivial problem. As described in \cref{sec:method:subgraph}, each training example consists of a document and its induced subgraph. The naive approach of randomly selecting a subset of documents for the training set likely leads to data leakage as there might be a significant overlap between subgraphs in the training set and the test set. Instead, we propose to first split the full ontology in train and test graphs and then generate the training document-subgraph pairs. Our method is as follows:
+\begin{enumerate}
+    \item Let $V^\text{top}$ be the set of top-level nodes, i.e. children of the root node. Randomly partition $V^\text{top}$ into train $V^\text{top}_{\text{train}}$, validation $V^\text{top}_{\text{val}}$, and test $V^\text{top}_{\text{test}}$ splits in 7:3:10 ratio.
+    \item Let $d$ be the depth on the full graph, i.e. the distance of the furthest node from the root. The nodes of the train graph are taken as the union of all the nodes that are within distance $d - 1$ from any node in $V^\text{top}_\text{train}$, plus $V_\text{train}^\text{top}$ and the root. The edges are all the edges in the full graph that have both endpoints in the train graph. Similar applies for $V^\text{top}_\text{val}$ and $V^\text{top}_\text{test}$.
+\end{enumerate}
+Our methods ensure that there are sufficiently many unseen concepts (and thus relations) in the test split, as shown in \cref{fig:dataset-overlap}.
+
+% Key points:
+% \begin{enumerate}
+%     \item Describe the data collection procedure.
+%     \item Report the dataset statistics, e.g., number of nodes/edges/documents. Wikipedia: 13886 / 28375 / 362067. arXiv: 161 / 166 / 126001.
+%     \item Highlight the thought process behind the creation of the train-eval-test split (Balance between the diversity of the training set and having unseen nodes/edges in the eval/test split).
+%     \item \fig{Venn diagram to show the overlap between the train/eval/test splits. \cref{fig:dataset-overlap}}
+% \end{enumerate}
+
+\subsection{Metrics}
+
+Existing methods for measuring similarity between ontologies rely on outdated techniques such as edit distance or document co-occurrence statistics for text comparison. To obtain more reliable evaluation results, we propose a suite of similarity metrics that uses more modern methods like text embeddings. Multiple metrics are used as they trade off interpretability with comprehensiveness, and we aim to make them complementary by capturing different aspects of an ontology. In this section, we denote the ground truth ontology graph as $G = (V, E)$ and the generated graph as $G' = (V', E')$.
+
+\paragraph{Literal F1 \cite{Kashyap2005TaxaMinerAE}}
+While literal text matching is unreliable, it is also the simplest and the most interpretable. The Literal F1 metric is given by the harmonic mean of the precision and recall of the edges:
+\[
+    \text{Literal precision} = \frac{|E \cap E'|}{|E'|} \qquad
+    \text{Literal recall} = \frac{|E \cap E'|}{|E|}
+\]
+
+\paragraph{Fuzzy F1}
+The literal F1 metric puts a strong emphasis on using the correct wording, while in practice, we are interested in evaluating the semantics of an ontology. For example, using a synonymous phrase for a concept should not be penalised. We utilise embeddings from a pretrained sentence transformer and use the cosine similarity of the embeddings to measure semantic similarity. Specifically, let $\nodesim(u, u') \in V \times V' \to [-1, 1]$ be the cosine similarity between the sentence embeddings for $u$ and $u'$. The Fuzzy F1 score is obtained from the fuzzy precision and recall, defined as:
+\begin{equation*}
+    \begin{aligned}
+        \text{Fuzzy precision} & = \frac{|
+            \{(u', v') \in E' \mid \exists (u, v) \in E.
+            \nodesim(u, u') > t \land \nodesim(v, v') > t
+            \}
+        |}{|E'|}                           \\
+        \text{Fuzzy recall}    & = \frac{|
+            \{(u, v) \in E \mid \exists (u', v') \in E'.
+            \nodesim(u, u') > t \land \nodesim(v, v') > t
+            \}
+        |}{|E|}                            \\
+    \end{aligned}
+\end{equation*}
+where $t$ is the matching threshold. We use all-MiniLM-L6-v2 \cite{wang2020minilm,reimers-2019-sentence-bert} as the embedding model and choose $t$ as the median cosine similarity between the synonyms in WordNet \cite{miller1995wordnet}, computed to be 0.436.
+
+\paragraph{Continuous F1}
+With fuzzy comparisons, the matches between the edges of the generated and the ground truth graph are no longer one-to-one. This is problematic: Consider two graphs $A \rightarrow B$ and $B \leftarrow A \rightarrow B'$, where $B$ and $B'$ match fuzzily. Such graphs will achieve a perfect fuzzy F1 score yet they significantly differ. Additionally, we found that the previous metrics fail to provide a useful signal for hyperparameter tuning, particularly for our baselines where the generated graphs are poor. The continuous F1 metric solves these issues by computing the highest-scoring edge matching between the two graphs, where the similarity score between $(u, v)$ and $(u', v')$ is given by $\min(\nodesim(u, u'), \nodesim(v, v'))$. Obtaining such matching is equivalent to solving the linear assignment problem \cite{martello1987linear}, which can be computed by the Hungarian algorithm \cite{kuhn1955hungarian}. The Continuous F1 is obtained from the continuous precision and recall, given by:
+\[
+    \text{Continuous precision} = \frac{s_\text{cont}}{|E'|} \qquad
+    \text{Continuous recall} = \frac{s_\text{cont}}{|E|}
+\]
+where $s_\text{cont}$ is the score achieved by the best edge matching.
+
+\paragraph{Graph F1}
+Instead of individual edges, this metric aims to capture the wider structure of the two graphs. Intuitively, we want to know how concepts are related to their local neighbourhood. We do so by using simple graph convolutions \cite{wu2019simplifying} with $K=2$ to compute graph-aware node embeddings after embedding each node with the pretrained embedder. Such embeddings in $G$ are compared against those in $G'$ by cosine similarity, and the highest-scoring node matching, similar to the continuous F1 metric, gives the graph similarity score. The Graph F1 is computed from the graph precision and recall, defined to be:
+\[
+    \text{Graph precision} = \frac{s_\text{graph}}{|V'|} \qquad
+    \text{Graph recall} = \frac{s_\text{graph}}{|V|}
+\]
+where $s_\text{graph}$ is the score achieved by the best node matching.
+
+\paragraph{Motif distance}
+Taking inspiration from classical network analysis, we use \emph{network motifs} \cite{milo2002network,shen2002network} to evaluate the structural integrity of the generated graphs. Network motifs are reoccurring subgraphs in a larger graph, most commonly 3-vertex subgraphs. They are typically indicative of the structural characteristics of the full graph. We define the motif distance as the 1-Wasserstein distance between the distribution of all 3-vertex subgraphs in $G$ and $G'$.

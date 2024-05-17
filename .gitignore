@@ -17,13 +17,12 @@ out
 
 # Core latex build outputs
 report/build
+report/paper/media
+*.zip
+*.log
 
 # wandb
 wandb/
 
 # corenlp
 corenlp/
-
-*.pdf
-*.png
-*.zip
