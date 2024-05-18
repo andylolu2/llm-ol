@@ -46,7 +46,6 @@
         \definecolor{c1}{RGB}{255,93,82}
         \definecolor{c2}{RGB}{94,118,255}
         \definecolor{c3}{RGB}{255,122,246}
-        \definecolor{c4}{RGB}{255,100,100}
 
         % PART A: Ontology
         \node[concept] (root) {};
@@ -63,27 +62,18 @@
         \draw[->] (l2) -- (l21);
         \draw[->] (l2) -- (l22);
 
-        \newcommand{\docSpace}{0.2}
         \node[align=center] (caption) at ($(root) + (0, 0.8)$) {Ontology};
-        \node[doc,fill=c1] (doc1) at ($(l11) + (0, -1.6)$) {};
-        \node[doc,fill=c2] (doc2) at ($(doc1.east) + (\docSpace, 0)$) {};
-        % \node[doc,fill=c3] (doc3) at ($(doc2.east) + (\docSpace, 0)$) {};
-        \node[doc,fill=c3] (doc3) at ($(doc2.east) + (\docSpace, 0)$) {};
-        \node[doc] (dots3) at ($(doc3.east) + (\docSpace, 0)$) {...};
-        \draw[rounded corners=1pt] ($(doc1.north west) + (-0.1, 0.1)$) rectangle ($(dots3.south east) + (0.1, -0.1)$);
 
-        % \newcommand{\docSpace}{0.75}
-        % \node[doc,fill=c1] (doc1) at ($(l11) + (-0.2, -\docSpace)$) {};
-        % \node[doc,fill=c2] (doc2) at ($(l12) + (0, -\docSpace)$) {};
-        \node[doc,fill=c4] (doc4) at ($(l21) + (0, -0.75)$) {};
-        % \draw[densely dashed] ($(l11)!0.5!(l12)$) -- ($(doc1)!0.5!(doc2)$);
-        % \node at ($(doc1)!0.5!(doc2)$) {...};
-        % \draw[densely dashed] (l11) -- (doc1);
-        % \draw[densely dashed] (l12) -- (doc2);
-        % \draw[densely dashed] (l21) -- (doc3);
+        \newcommand{\docSpace}{0.75}
+        \node[doc,fill=c1] (doc1) at ($(l11) + (0, -\docSpace)$) {};
+        \node[doc,fill=c2] (doc2) at ($(l12) + (0, -\docSpace)$) {};
+        \node[doc,fill=c3] (doc3) at ($(l21) + (0, -\docSpace)$) {};
+        \draw[densely dashed] (l11) -- (doc1);
+        \draw[densely dashed] (l12) -- (doc2);
+        \draw[densely dashed] (l21) -- (doc3);
 
         % line to separate the ontology into train and test
-        \draw[dashed] ($(root) + (0, 0.4)$) -- ($(root) + (0, -1.3)$);
+        \draw[dashed] ($(root) + (0, 0.4)$) -- ($(root) + (0, -2.3)$);
         \node at ($(root) + (1.1, -0.1)$) {Train};
         \node at ($(root) + (-1.1, -0.1)$) {Test};
 
