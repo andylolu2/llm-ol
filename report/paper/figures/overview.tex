@@ -42,10 +42,11 @@
         ]
         \newcommand{\nodeDist}{0.7}
         \newcommand{\angleA}{30}
-        \newcommand{\angleB}{60}
+        \newcommand{\angleB}{66}
         \definecolor{c1}{RGB}{255,93,82}
         \definecolor{c2}{RGB}{94,118,255}
         \definecolor{c3}{RGB}{255,122,246}
+        \definecolor{c4}{RGB}{255,222,130}
 
         % PART A: Ontology
         \node[concept] (root) {};
@@ -68,12 +69,16 @@
         \node[doc,fill=c1] (doc1) at ($(l11) + (0, -\docSpace)$) {};
         \node[doc,fill=c2] (doc2) at ($(l12) + (0, -\docSpace)$) {};
         \node[doc,fill=c3] (doc3) at ($(l21) + (0, -\docSpace)$) {};
+        \node[doc,fill=c4] (doc4) at ($(doc1.south) + (0, -0.3)$) {};
+        \node[doc] (doc5) at ($(doc2.south) + (0, -0.3)$) {...};
+        \node[doc] (doc6) at ($(l22) + (0, -\docSpace)$) {...};
         \draw[densely dashed] (l11) -- (doc1);
         \draw[densely dashed] (l12) -- (doc2);
         \draw[densely dashed] (l21) -- (doc3);
+        \draw[densely dashed,bend right=40] (l11) to (doc4);
 
         % line to separate the ontology into train and test
-        \draw[dashed] ($(root) + (0, 0.4)$) -- ($(root) + (0, -2.3)$);
+        \draw[dashed] ($(root) + (0, 0.4)$) -- ($(root) + (0, -2.8)$);
         \node at ($(root) + (1.1, -0.1)$) {Train};
         \node at ($(root) + (-1.1, -0.1)$) {Test};
 
@@ -148,8 +153,8 @@
         \draw[->] ($(input1)!0.5!(input2) + (5.1, 0)$) -- node [midway,above,align=center] {\scriptsize Sum and prune} ($(input1)!0.5!(input2) + (8.0, 0)$);
 
         % PART D: Evaluation
-        \coordinate (start) at ($(doc1)!0.5!(doc2) + (0, -0.5)$);
-        \coordinate (inter) at ($(start) + (6.8, -1.1)$);
+        \coordinate (start) at ($(doc4)!0.5!(doc5) + (0, -0.4)$);
+        \coordinate (inter) at ($(start) + (6.8, -0.5)$);
         \coordinate (end) at ($(testOutRoot) + (0, -1.5)$);
         \draw[<->,rounded corners] (start) |- (inter) -| (end);
         \node[below] at (inter) {Gold standard evaluation};
