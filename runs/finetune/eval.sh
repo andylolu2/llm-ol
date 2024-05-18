@@ -8,8 +8,9 @@ if [ -f .env ]; then
 fi
 
 split=eval
-# step=final
+
 # dataset=wikipedia/v2
+# step=final
 # exp_dir=out/experiments/finetune/v4/$step/$split
 # exp_dir=out/experiments/finetune/v10/$step/$split
 

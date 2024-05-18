@@ -92,7 +92,7 @@ def main(_):
     tokenizer = AutoTokenizer.from_pretrained(model_id, padding_side="left")
     model = BartForConditionalGeneration.from_pretrained(
         model_id,
-        torch_dtype=torch.bfloat16,
+        torch_dtype=torch.float16,
         attn_implementation="flash_attention_2",
         device_map="auto",
     )
@@ -113,7 +113,7 @@ def main(_):
             max_length=256,
             min_length=12,
             no_repeat_ngram_size=0,
-            num_beams=2,  # Recommend 4 but 2 is faster
+            num_beams=4,  # Recommend 4 but 2 is faster
         )
         outputs = tokenizer.batch_decode(generated_tokens, skip_special_tokens=False)
 
