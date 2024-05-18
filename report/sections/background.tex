@@ -29,8 +29,9 @@ The evaluation of ontologies is also an open research area. The main approaches 
 
 \section{LLMs for Knowledge Representation}
 
-Key points:
-\begin{enumerate}
-    \item There is a lot of overlap between knowledge graph construction and OL but state the differences: KG focuses on the structured representation of facts from the source corpus, hence typically involves more types of relations and less concerned about graph structure.
-    \item Overview of methods for KG construction. Most common task is KG completion: Given a head node and a relation, predict the tail node. \citet{petroni2019language} first to use LLMs for this task by prompting. Recent work by \citet{yao2023exploring} finetunes LLMs for link prediction and relation prediction. \citet{wang2020language} inspects the attention patterns of LLMs to extract the relation token(s) between two entities in the source text.
-\end{enumerate}
+Outside of OL, there is a growing body of research on using LLMs to construct structured knowledge representations, most commonly as \emph{knowledge graphs} (KGs) \cite{singhal2012introducing}. While ontologies focuses on capturing the relationship between concepts, KGs aims to represent \emph{instances} of such concepts and their properties \cite{guarino1995ontologies}. For example, an ontology may capture the common sense relation that ``a person is born at a place'', while a knowledge graph might contain explicit instantiations like ``Barack Obama is born in Honolulu''. As a result, the construction of KGs focuses more on extracting facts from the source corpus and less on the structure of the graph itself.
+
+Similar to OL, knowledge graph construction is rarely studied in an end-to-end framework. Instead, most works focus on subtasks such as entity prediction: discover which entities should be in the KG; link prediction: classify whether two entities are related by a specified relation; and KG completion: given a head node and a relation, predict the tail node. \todo{Add citations} The first work to use LLMs for KG completion is \citet{petroni2019language}, who demonstrated that many facts can be elicited by simply prompting a LLM with a relation and a head entity. Recent works have further explored the use of LLMs for KG construction, such as \citet{yao2023exploring} who finetuned LLMs for link prediction and relation prediction, and \citet{wang2020language} who inspected the attention patterns of LLMs to extract the relation token(s) between two entities in the source text. While these works have shown promising results, they do not address the research questions of this project, in particular whether are any benefits to studying knowledge representations tasks in an end-to-end manner. While the primary focus of this project is OL, the results have extended implications for KG construction as well.
+
+\section{Graph analysis}
+

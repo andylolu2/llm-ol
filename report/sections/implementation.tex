@@ -1,12 +1,18 @@
 \chapter{Design and implementation}
 
-One of the goals of this project is to explore the paradigm shift from traditional subtask composition OL to end-to-end OL. The novelty of the task in of itself means that many components of the project has to be built from ground up. This chapter documents the implementation and design decisions made for each of these building blocks, including curating the datasets (\cref{sec:implementation:data-collection}), building reliable baselines (\cref{sec:implementation:baselines}), introducing our own method \name (\cref{sec:implementation:core}), and developing robust evaluation metrics (\cref{sec:implementation:evaluation}).
+One of the goals of this project is to explore the paradigm shift from traditional subtask composition OL to end-to-end OL. The novelty of the task in of itself means that many components of the project has to be built from ground up. This chapter documents the implementation and design decisions made for each of these building blocks, including curating the datasets (\cref{sec:implementation:data-collection}), building reliable baselines (\cref{sec:implementation:baselines}), introducing our own method \name (\cref{sec:implementation:core}), and developing robust methods of evaluation (\cref{sec:implementation:evaluation}).
 
 % \section{Starting point}
 
 % This project is not based on any existing codebase. The Wikipedia and arXiv datasets to be used in this project are also not readily available. In addition, few prior works in OL have open-source implementation, even including unofficial ones. Knowing the novelty of the end-to-end OL task studied in this project, I decided to build the project from scratch as it would give me to the most flexibility in designing the system.
 
 \section{Data collection}  \label{sec:implementation:data-collection}
+
+Two datasets are used in this project: Wikipedia categories and the arXiv taxonomy. Wikipedia is chosen as its categorisation metadata is entirely human-annotated by Wikipedia maintainers and authors while simultaneously being large and diverse. This makes it a good candidate base dataset for training and evaluation. The arXiv taxonomy on the other hand is much smaller and simpler than Wikipedia. Ontologies of this size is much easier to manually inspect and understand, making it a good candidate for evaluation. In addition, the papers on arXiv are written in a different style than Wikipedia articles, and so we can evaluate the out-of-domain generalisation ability of our model by testing it on arXiv. While both data sources are in the public domain, there are no readily available datasets that contain both the main text and the categorisation metadata. I therefore have to build the datasets from scratch.
+
+\subsection{Wikipedia}
+
+\subsection{arXiv}
 
 We collect the datasets for the two ontologies considered in this paper: Wikipedia categories and the arXiv taxonomy. We use Wikipedia for learning and in-domain evaluation and arXiv for out-of-domain evaluation. To build the Wikipedia dataset, we perform a BFS traversal from its root category ``Main topic classifications'' up to depth 3. For every category encountered, we retrieve the title and summary (the text before the first section) of up to 5000 pages that belong in that category. The source data is obtained from the Wikipedia API.\footnote{\url{https://en.wikipedia.org/w/api.php}} The arXiv taxonomy is available from its home page and the source corpus is constructed from the title and abstract of all the papers uploaded to arXiv in the years 2020--2022 with more than or equal to 10 citations.\footnote{Citation counts obtained from \url{https://api.semanticscholar.org/}.} In total, the Wikipedia dataset has 13,886 concepts, 28,375 taxonomic relations and 362,067 documents, while the arXiv dataset has 161 concepts, 166 taxonomic relations and 126,001 documents.
 
@@ -73,7 +79,7 @@ In our implementation, we choose the hyperparameters $\alpha$ and $\beta$ by tun
 %     \item The hyperparameters $\alpha$ and $\beta$ are tuned on the evaluation set.
 % \end{enumerate}
 
-\section{Evaluating end-to-end OL}  \label{sec:implementation:evaluation}
+\section{How to evaluate end-to-end OL?}  \label{sec:implementation:evaluation}
 
 Since our problem setup is uncommon in existing literature, we also develop new evaluation methods. Ontology evaluation is a hard problem as there are no quantitative definitions of what constitutes a ``good ontology'' and metrics generally only capture one aspect of an ontology. We approach evaluation by treating the ground truth as a proxy for a good ontology and comparing the generated ontologies against the ground truth. This section describes how the ground truth is obtained and what metrics are used for measuring ontology similarity.
 
@@ -84,7 +90,7 @@ Since our problem setup is uncommon in existing literature, we also develop new 
 %     \item How do we overcome this? 1. Use a ground truth ontology as a proxy for ``good ontology'' and measure how similar the generated ontology is to the ground truth. 2. Propose a series of evaluation metrics to capture various aspects of the generated output.
 % \end{enumerate}
 
-\subsection{Dataset}
+\subsection{Create train and test splits}
 
 \input{figures/dataset}
 
