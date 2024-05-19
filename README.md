@@ -1,6 +1,6 @@
 # End-to-End Ontology Learning with Large Language Models
 
-This is source code of 'End-to-End Ontology Learning with Large Language Models' paper.
+This is the source code of 'End-to-End Ontology Learning with Large Language Models' paper.
 
 ## Repository structure
 
