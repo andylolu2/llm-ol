@@ -284,30 +284,6 @@ finetune_experiments = [
         test_ground_truth="out/data/arxiv/v2/train_test_split/test_graph.json",
         eval_hp_result="out/experiments/finetune/arxiv/v3/288/eval/hp_search.jsonl",
     ),
-    FinetuneExperiment(
-        name="Finetune",
-        dataset="arxiv/v2",
-        step="final",
-        reweighted=False,
-        eval_output="out/experiments/finetune/arxiv/v4/final/eval/graph.json",
-        test_output="out/experiments/finetune/arxiv/v4/final/test/graph.json",
-        train_input="out/data/arxiv/v2/train_eval_split/train_graph.json",
-        eval_ground_truth="out/data/arxiv/v2/train_eval_split/test_graph.json",
-        test_ground_truth="out/data/arxiv/v2/train_test_split/test_graph.json",
-        eval_hp_result="out/experiments/finetune/arxiv/v4/final/eval/hp_search.jsonl",
-    ),
-    FinetuneExperiment(
-        name="Finetune masked",
-        dataset="arxiv/v2",
-        step="final",
-        reweighted=True,
-        eval_output="out/experiments/finetune/arxiv/v5/final/eval/graph.json",
-        test_output="out/experiments/finetune/arxiv/v5/final/test/graph.json",
-        train_input="out/data/arxiv/v2/train_eval_split/train_graph.json",
-        eval_ground_truth="out/data/arxiv/v2/train_eval_split/test_graph.json",
-        test_ground_truth="out/data/arxiv/v2/train_test_split/test_graph.json",
-        eval_hp_result="out/experiments/finetune/arxiv/v5/final/eval/hp_search.jsonl",
-    ),
 ]
 
 all_experiments = (

@@ -63,18 +63,19 @@ def main(_):
         query(exp="prompting", k_shot=0, dataset=FLAGS.dataset),
         query(exp="prompting", k_shot=1, dataset=FLAGS.dataset),
         query(exp="prompting", k_shot=3, dataset=FLAGS.dataset),
-        query(exp="finetune", reweighted=False, transfer=False, dataset=FLAGS.dataset),
-        query(exp="finetune", reweighted=True, transfer=False, dataset=FLAGS.dataset),
+        query(
+            exp="finetune",
+            reweighted=False,
+            transfer=FLAGS.dataset == "arxiv/v2",
+            dataset=FLAGS.dataset,
+        ),
+        query(
+            exp="finetune",
+            reweighted=True,
+            transfer=FLAGS.dataset == "arxiv/v2",
+            dataset=FLAGS.dataset,
+        ),
     ]
-    if FLAGS.dataset == "arxiv/v2":
-        exps += [
-            query(
-                exp="finetune", reweighted=False, transfer=True, dataset=FLAGS.dataset
-            ),
-            query(
-                exp="finetune", reweighted=True, transfer=True, dataset=FLAGS.dataset
-            ),
-        ]
 
     with output_file.open("w") as f:
         for exp in exps:
