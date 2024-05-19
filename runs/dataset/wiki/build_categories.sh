@@ -8,5 +8,5 @@ if [ -f .env ]; then
 fi
 
 python llm_ol/dataset/wikipedia/build_categories.py \
-    --max_depth 4 \
+    --max_depth 3 \
     --output_dir out/data/wikipedia/v1/categories

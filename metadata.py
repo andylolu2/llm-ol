@@ -49,7 +49,7 @@ def query(**kwargs) -> Experiment:
 
 @overload
 def query_multiple(
-    exp: Literal["memorisation", "link_prediction", "hearst", "rebel", "all"], **kwargs
+    exp: Literal["memorisation", "hearst", "rebel", "all"], **kwargs
 ) -> list[Experiment]: ...
 
 
@@ -70,8 +70,6 @@ def query_multiple(exp: str = "all", **kwargs):
         experiments = rebel_experiments
     elif exp == "memorisation":
         experiments = memorisation_experiments
-    elif exp == "link_prediction":
-        experiments = link_prediction_experiments
     elif exp == "prompting":
         experiments = prompting_experiments
     elif exp == "finetune":
@@ -112,44 +110,9 @@ memorisation_experiments = [
     ),
 ]
 
-link_prediction_experiments = [
-    Experiment(
-        name="Link prediction",
-        dataset="wikipedia/v2",
-        eval_output="out/experiments/link_prediction/v1/eval/graph_filtered.json",
-        test_output="out/experiments/link_prediction/v1/test/graph_filtered.json",
-        train_input="out/data/wikipedia/v2/train_eval_split/train_graph.json",
-        eval_ground_truth="out/data/wikipedia/v2/train_eval_split/test_graph.json",
-        test_ground_truth="out/data/wikipedia/v2/train_test_split/test_graph.json",
-        eval_hp_result="out/experiments/link_prediction/v1/eval/hp_search.jsonl",
-    ),
-]
-
 hearst_experiments = [
-    # Experiment(
-    #     name="Hearst",
-    #     dataset="wikipedia/v2",
-    #     eval_output="out/experiments/hearst/v2/graph.json",
-    #     test_output="out/experiments/hearst/v2/test/graph.json",
-    #     train_input="out/data/wikipedia/v2/train_eval_split/train_graph.json",
-    #     eval_ground_truth="out/data/wikipedia/v2/train_eval_split/test_graph.json",
-    #     test_ground_truth="out/data/wikipedia/v2/train_test_split/test_graph.json",
-    #     eval_hp_result="out/experiments/hearst/v2/eval/hp_search.jsonl",
-    #     test_hp_result="out/experiments/hearst/v2/test/hp_search.jsonl",
-    # ),
-    # Experiment(
-    #     name="Hearst",
-    #     dataset="arxiv/v2",
-    #     eval_output="out/experiments/hearst/v3/eval/graph.json",
-    #     test_output="out/experiments/hearst/v3/test/graph.json",
-    #     train_input="out/data/arxiv/v2/train_eval_split/train_graph.json",
-    #     eval_ground_truth="out/data/arxiv/v2/train_eval_split/test_graph.json",
-    #     test_ground_truth="out/data/arxiv/v2/train_test_split/test_graph.json",
-    #     eval_hp_result="out/experiments/hearst/v3/eval/hp_search.jsonl",
-    #     test_hp_result="out/experiments/hearst/v3/test/hp_search.jsonl",
-    # ),
     Experiment(
-        name="Hearst better",
+        name="Hearst",
         dataset="wikipedia/v2",
         eval_output="out/experiments/hearst/svd/wiki/eval/k_5/graph.json",
         test_output="out/experiments/hearst/svd/wiki/test/k_5/graph.json",
@@ -159,7 +122,7 @@ hearst_experiments = [
         eval_hp_result="out/experiments/hearst/svd/wiki/eval/k_5/hp_search.jsonl",
     ),
     Experiment(
-        name="Hearst better",
+        name="Hearst",
         dataset="arxiv/v2",
         eval_output="out/experiments/hearst/svd/arxiv/eval/k_150/graph.json",
         test_output="out/experiments/hearst/svd/arxiv/test/k_150/graph.json",
@@ -171,30 +134,8 @@ hearst_experiments = [
 ]
 
 rebel_experiments = [
-    # Experiment(
-    #     name="Rebel",
-    #     dataset="wikipedia/v2",
-    #     eval_output="out/experiments/rebel/v1/eval/graph.json",
-    #     test_output="out/experiments/rebel/v1/test/graph.json",
-    #     train_input="out/data/wikipedia/v2/train_eval_split/train_graph.json",
-    #     eval_ground_truth="out/data/wikipedia/v2/train_eval_split/test_graph.json",
-    #     test_ground_truth="out/data/wikipedia/v2/train_test_split/test_graph.json",
-    #     eval_hp_result="out/experiments/rebel/v1/eval/hp_search.jsonl",
-    #     test_hp_result="out/experiments/rebel/v1/test/hp_search.jsonl",
-    # ),
-    # Experiment(
-    #     name="Rebel",
-    #     dataset="arxiv/v2",
-    #     eval_output="out/experiments/rebel/v2/eval/graph.json",
-    #     test_output="out/experiments/rebel/v2/test/graph.json",
-    #     train_input="out/data/arxiv/v2/train_eval_split/train_graph.json",
-    #     eval_ground_truth="out/data/arxiv/v2/train_eval_split/test_graph.json",
-    #     test_ground_truth="out/data/arxiv/v2/train_test_split/test_graph.json",
-    #     eval_hp_result="out/experiments/rebel/v2/eval/hp_search.jsonl",
-    #     test_hp_result="out/experiments/rebel/v2/test/hp_search.jsonl",
-    # ),
     Experiment(
-        name="Rebel better",
+        name="Rebel",
         dataset="wikipedia/v2",
         eval_output="out/experiments/rebel/svd/wiki/eval/k_20/graph.json",
         test_output="out/experiments/rebel/svd/wiki/test/k_20/graph.json",
@@ -204,7 +145,7 @@ rebel_experiments = [
         eval_hp_result="out/experiments/rebel/svd/wiki/eval/k_20/hp_search.jsonl",
     ),
     Experiment(
-        name="Rebel better",
+        name="Rebel",
         dataset="arxiv/v2",
         eval_output="out/experiments/rebel/svd/arxiv/eval/k_100/graph.json",
         test_output="out/experiments/rebel/svd/arxiv/test/k_100/graph.json",
@@ -371,7 +312,6 @@ finetune_experiments = [
 
 all_experiments = (
     memorisation_experiments
-    + link_prediction_experiments
     + hearst_experiments
     + rebel_experiments
     + prompting_experiments
