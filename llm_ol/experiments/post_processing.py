@@ -1,17 +1,8 @@
 from dataclasses import dataclass
 from functools import cache
-from itertools import product
 
 import networkx as nx
 import numpy as np
-from absl import logging
-
-from llm_ol.eval.graph_metrics import (
-    edge_prec_recall_f1,
-    embed_graph,
-    graph_similarity,
-    node_prec_recall_f1,
-)
 
 
 @dataclass
@@ -92,18 +83,6 @@ def post_process(G: nx.DiGraph, hp: PostProcessHP) -> tuple[nx.DiGraph, int]:
             If the graph does not have a root, the largest weakly connected component is kept.
         add_root: Add a root node to the graph if it does not have one.
     """
-    # G_original = G
-    # G = G.copy()  # type: ignore
-
-    # if hp.prune_unconnected_nodes:
-    #     if "root" in G.graph:
-    #         root = G.graph["root"]
-    #         connected = nx.descendants(G, root) | {root}
-    #         G = G.subgraph(connected)
-    #     else:
-    #         largest_cc = max(nx.weakly_connected_components(G), key=len)
-    #         G = G.subgraph(largest_cc)
-
     edges_to_remove = set()
     edges_to_remove.update(absolute_percentile_edges(G, hp.absolute_percentile))
     edges_to_remove.update(relative_percentile_edges(G, hp.relative_percentile))
@@ -112,19 +91,6 @@ def post_process(G: nx.DiGraph, hp: PostProcessHP) -> tuple[nx.DiGraph, int]:
     if hp.remove_self_loops:
         edges_to_remove.update(self_loops(G))
     G = nx.edge_subgraph(G, G.edges - edges_to_remove)
-
-    # if hp.prune_unconnected_nodes:
-    #     if "root" in G.graph:
-    #         root = G.graph["root"]
-    #         if root not in G:
-    #             G.add_node(root, **G.nodes[root])
-    #         connected = nx.descendants(G, root) | {root}
-    #         G = G.subgraph(connected)
-    #     else:
-    #         components = list(nx.weakly_connected_components(G))
-    #         if len(components) > 1:
-    #             largest_cc = max(components, key=len)
-    #             G = G.subgraph(largest_cc)
 
     if hp.add_root and ("root" not in G.graph or G.graph["root"] not in G):
         root = "Main topic classifications"
@@ -137,34 +103,3 @@ def post_process(G: nx.DiGraph, hp: PostProcessHP) -> tuple[nx.DiGraph, int]:
                 G.add_edge(root, node, weight=1)
 
     return G, len(edges_to_remove)
-
-
-def hp_search(G: nx.DiGraph, G_true: nx.DiGraph, metric: str = "edge_f1", **kwargs):
-    hps = []
-    keys = list(kwargs.keys())
-    for values in product(*kwargs.values()):
-        hps.append(PostProcessHP(**dict(zip(keys, values))))
-    assert len(hps) > 0, "No hyperparameters to search over"
-
-    if metric == "edge_f1":
-        score_fn = lambda G_pred, G_true: edge_prec_recall_f1(G_pred, G_true)[2]
-    elif metric == "node_f1":
-        score_fn = lambda G_pred, G_true: node_prec_recall_f1(G_pred, G_true)[2]
-    elif metric.startswith("graph_similarity"):
-        n_iters = int(metric.split("_")[-1])
-        G = embed_graph(G)  # type: ignore
-        G_true = embed_graph(G_true)  # type: ignore
-        score_fn = lambda G_pred, G_true: graph_similarity(
-            G_pred, G_true, direction="undirected", n_iters=n_iters
-        )
-    else:
-        raise ValueError(f"Unknown metric: {metric}")
-
-    best = (None, None, -float("inf"))  # best hp, best G, best score
-    for hp in hps:
-        G_pred = post_process(G, hp)
-        score = score_fn(G_pred, G_true)
-        logging.info("Score: %.5f, HP: %s", score, hp)
-        if score > best[2]:
-            best = (hp, G_pred, score)
-    return best

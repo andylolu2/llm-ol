@@ -1,7 +1,6 @@
-import random
-
 import graph_tool.all as gt
 import networkx as nx
+import numpy as np
 import torch
 from scipy.optimize import linear_sum_assignment
 from torch_geometric.data import Batch
@@ -11,76 +10,6 @@ from torch_geometric.utils import from_networkx
 from llm_ol.llm.embed import embed, load_embedding_model
 from llm_ol.utils import Graph, batch, cosine_sim, device, textqdm
 from llm_ol.utils.nx_to_gt import nx_to_gt
-
-
-def directed_diameter(G: nx.DiGraph):
-    """Diameter of the largest weakly connected component of a directed graph."""
-    comp = nx.weakly_connected_components(G)
-    largest_comp = max(comp, key=len)
-    return nx.algorithms.approximation.diameter(
-        G.subgraph(largest_comp).to_undirected()
-    )
-
-
-def central_nodes(G: nx.DiGraph):
-    G_gt, nx_to_gt_map, gt_to_nx_map = nx_to_gt(G.to_undirected())
-    vertex_betweeness, edge_betweeness = gt.betweenness(G_gt)
-    items = []
-    for v in G_gt.vertices():
-        items.append((v, vertex_betweeness[v]))
-
-    items = sorted(items, key=lambda x: x[1], reverse=True)
-    result = []
-    for v, centrality in items:
-        n = gt_to_nx_map[v]
-        title = G.nodes[n].get("title", n)
-        result.append((n, title, centrality))
-    return result
-
-
-def weakly_connected_component_distribution(G: nx.DiGraph):
-    return [len(c) for c in nx.weakly_connected_components(G)]
-
-
-def strongly_connected_component_distribution(G: nx.DiGraph):
-    return [len(c) for c in nx.strongly_connected_components(G)]
-
-
-def in_degree_distribution(G: nx.DiGraph):
-    return [d for n, d in G.in_degree()]
-
-
-def out_degree_distribution(G: nx.DiGraph):
-    return [d for n, d in G.out_degree()]
-
-
-def distance_distribution(G: nx.Graph):
-    return list(nx.single_source_shortest_path_length(G, G.graph["root"]).values())
-
-
-def random_subgraph(
-    G: Graph,
-    radius: int = 1,
-    min_size: int = 5,
-    max_size: int = 30,
-    undirected: bool = True,
-    max_tries: int = 1000,
-) -> Graph:
-    for _ in range(max_tries):
-        root = random.choice(list(G.nodes))
-        G_sub = nx.ego_graph(G, root, radius, undirected=undirected)
-
-        if min_size <= len(G_sub) <= max_size:
-            return G_sub
-
-    raise ValueError(
-        f"Failed to find a subgraph with {min_size} <= size <= {max_size} after {max_tries} tries"
-    )
-
-
-def eigenspectrum(G: nx.Graph):
-    lambda_ = nx.linalg.normalized_laplacian_spectrum(G.to_undirected())
-    return lambda_.tolist()
 
 
 def embed_graph(
@@ -180,78 +109,6 @@ def graph_fuzzy_match(
 
 
 @torch.no_grad()
-def graph_similarity(
-    G1: nx.DiGraph,
-    G2: nx.DiGraph,
-    n_iters: int = 3,
-    embedding_model: str = "sentence-transformers/all-MiniLM-L6-v2",
-    direction: str = "forward",
-) -> float | None:
-    if len(G1) == 0 or len(G2) == 0:
-        return 0
-
-    # Skip computation if too slow. Time complexity is O(n^2 m)
-    n, m = min(len(G1), len(G2)), max(len(G1), len(G2))
-    if (n**2 * m) > 20000**3:
-        return None
-
-    def nx_to_vec(G: nx.Graph, n_iters) -> torch.Tensor:
-        """Compute a graph embedding of shape (n_nodes embed_dim).
-
-        Uses a GCN with identity weights to compute the embedding.
-        """
-
-        # Delete all node and edge attributes except for the embedding
-        # Otherwise PyG might complain "Not all nodes/edges contain the same attributes"
-        G = G.copy()
-        for _, _, d in G.edges(data=True):
-            d.clear()
-        for _, d in G.nodes(data=True):
-            for k in list(d.keys()):
-                if k != "embed":
-                    del d[k]
-        pyg_G = from_networkx(G, group_node_attrs=["embed"])
-
-        embed_dim = pyg_G.x.shape[1]
-        conv = SGConv(embed_dim, embed_dim, K=n_iters, bias=False).to(device)
-        conv.lin.weight.data = torch.eye(embed_dim, device=conv.lin.weight.device)
-
-        pyg_batch = Batch.from_data_list([pyg_G])
-        x, edge_index = pyg_batch.x, pyg_batch.edge_index  # type: ignore
-        x, edge_index = x.to(device), edge_index.to(device)
-        x = conv(x, edge_index)
-
-        return x
-
-    if "embed" not in G1.nodes[next(iter(G1.nodes))]:
-        G1 = embed_graph(G1, embedding_model=embedding_model)
-    if "embed" not in G2.nodes[next(iter(G2.nodes))]:
-        G2 = embed_graph(G2, embedding_model=embedding_model)
-
-    def sim(G1, G2) -> float:
-        # Compute embeddings
-        x1 = nx_to_vec(G1, n_iters)
-        x2 = nx_to_vec(G2, n_iters)
-
-        # Cosine similarity matrix
-        sim = cosine_sim(x1, x2, dim=-1).cpu().numpy()
-
-        return (sim.amax(0).mean() + sim.amax(1).mean()).item() / 2
-
-    if direction == "forward":
-        return sim(G1, G2)
-    elif direction == "reverse":
-        return sim(G1.reverse(copy=False), G2.reverse(copy=False))
-    elif direction == "undirected":
-        return sim(
-            G1.to_undirected(as_view=True).to_directed(as_view=True),
-            G2.to_undirected(as_view=True).to_directed(as_view=True),
-        )
-    else:
-        raise ValueError(f"Invalid direction {direction}")
-
-
-@torch.no_grad()
 def edge_similarity(
     G1: nx.DiGraph,
     G2: nx.DiGraph,
@@ -312,30 +169,15 @@ def edge_similarity(
     recall = score / s2
     f1 = safe_f1(precision, recall)
 
-    # Hard precision, recall, f1
-    hard_sims = (
+    # Fuzzy precision, recall, f1
+    fizzy_sims = (
         ((sims_u >= match_threshold) & (sims_v >= match_threshold)).cpu().numpy()
     )
-    precision_hard = hard_sims.any(axis=1).sum() / s1
-    recall_hard = hard_sims.any(axis=0).sum() / s2
-    f1_hard = safe_f1(precision_hard, recall_hard)
+    precision_fuzzy = fizzy_sims.any(axis=1).sum() / s1
+    recall_fuzzy = fizzy_sims.any(axis=0).sum() / s2
+    f1_fuzzy = safe_f1(precision_fuzzy, recall_fuzzy)
 
-    return precision, recall, f1, precision_hard, recall_hard, f1_hard
-
-
-def node_prec_recall_f1(G_pred: nx.Graph, G_true: nx.Graph):
-    if len(G_pred) == 0 or len(G_true) == 0:
-        return 0, 0, 0
-
-    def title(G, n):
-        return G.nodes[n]["title"]
-
-    nodes_G = {title(G_pred, n) for n in G_pred.nodes}
-    nodes_G_true = {title(G_true, n) for n in G_true.nodes}
-    precision = len(nodes_G & nodes_G_true) / len(nodes_G)
-    recall = len(nodes_G & nodes_G_true) / len(nodes_G_true)
-    f1 = 2 * precision * recall / (precision + recall) if precision + recall > 0 else 0
-    return precision, recall, f1
+    return precision, recall, f1, precision_fuzzy, recall_fuzzy, f1_fuzzy
 
 
 def edge_prec_recall_f1(G_pred: nx.Graph, G_true: nx.Graph):
@@ -351,3 +193,33 @@ def edge_prec_recall_f1(G_pred: nx.Graph, G_true: nx.Graph):
     recall = len(edges_G & edges_G_true) / len(edges_G_true)
     f1 = 2 * precision * recall / (precision + recall) if precision + recall > 0 else 0
     return precision, recall, f1
+
+
+def motifs_wasserstein(G_pred: nx.Graph, G_true: nx.Graph, n: int = 3) -> float:
+    motifs_pred, counts_pred = gt.motifs(nx_to_gt(G_pred)[0], n)  # type: ignore
+    motifs_true, counts_true = gt.motifs(nx_to_gt(G_true)[0], n)  # type: ignore
+
+    all_motifs = motifs_pred[::]
+    for motif in motifs_true:
+        for existing_motif in all_motifs:
+            if gt.isomorphism(motif, existing_motif):
+                break
+        else:
+            all_motifs.append(motif)
+    all_counts_pred = np.zeros(len(all_motifs))
+    all_counts_true = np.zeros(len(all_motifs))
+    for i, motif in enumerate(motifs_pred):
+        for j, existing_motif in enumerate(all_motifs):
+            if gt.isomorphism(motif, existing_motif):
+                all_counts_pred[j] = counts_pred[i]
+                break
+    for i, motif in enumerate(motifs_true):
+        for j, existing_motif in enumerate(all_motifs):
+            if gt.isomorphism(motif, existing_motif):
+                all_counts_true[j] = counts_true[i]
+                break
+    all_counts_pred /= all_counts_pred.sum()
+    all_counts_true /= all_counts_true.sum()
+
+    wass = np.sum(np.abs(all_counts_true - all_counts_pred)) / 2
+    return float(wass)

@@ -16,7 +16,7 @@ class Experiment(BaseModel):
     test_hp_result: str | None = None
     version: int = 1
 
-    def best_hp(self, metric: str = "graph_similarity"):
+    def best_hp(self, metric: str = "edge_soft_f1"):
         best_score, best_hp = float("-inf"), None
         with open(self.eval_hp_result) as f:
             for line in f:

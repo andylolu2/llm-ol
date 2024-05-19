@@ -2,9 +2,7 @@ import dataclasses
 import json
 from pathlib import Path
 
-import graph_tool.all as gt
 import networkx as nx
-import numpy as np
 from absl import app, flags, logging
 
 from llm_ol.dataset.data_model import load_graph
@@ -12,46 +10,16 @@ from llm_ol.eval.graph_metrics import (
     edge_prec_recall_f1,
     edge_similarity,
     graph_fuzzy_match,
+    motifs_wasserstein,
 )
 from llm_ol.experiments.post_processing import PostProcessHP, post_process
 from llm_ol.utils import setup_logging
-from llm_ol.utils.nx_to_gt import nx_to_gt
 from metadata import query
 
 FLAGS = flags.FLAGS
 flags.DEFINE_string("output_file", None, "Path to the output file.", required=True)
 flags.DEFINE_string("best_hp_metric", "edge_soft_f1", "Metric to use for best HP.")
 flags.DEFINE_string("dataset", "wikipedia/v2", "Dataset to evaluate.")
-
-
-def motifs_wasserstein(G_pred: nx.Graph, G_true: nx.Graph, n: int = 3):
-    motifs_pred, counts_pred = gt.motifs(nx_to_gt(G_pred)[0], n)  # type: ignore
-    motifs_true, counts_true = gt.motifs(nx_to_gt(G_true)[0], n)  # type: ignore
-
-    all_motifs = motifs_pred[::]
-    for motif in motifs_true:
-        for existing_motif in all_motifs:
-            if gt.isomorphism(motif, existing_motif):
-                break
-        else:
-            all_motifs.append(motif)
-    all_counts_pred = np.zeros(len(all_motifs))
-    all_counts_true = np.zeros(len(all_motifs))
-    for i, motif in enumerate(motifs_pred):
-        for j, existing_motif in enumerate(all_motifs):
-            if gt.isomorphism(motif, existing_motif):
-                all_counts_pred[j] = counts_pred[i]
-                break
-    for i, motif in enumerate(motifs_true):
-        for j, existing_motif in enumerate(all_motifs):
-            if gt.isomorphism(motif, existing_motif):
-                all_counts_true[j] = counts_true[i]
-                break
-    all_counts_pred /= all_counts_pred.sum()
-    all_counts_true /= all_counts_true.sum()
-
-    wass = np.sum(np.abs(all_counts_true - all_counts_pred)) / 2
-    return wass
 
 
 def evaluate(G, G_true, hp):
