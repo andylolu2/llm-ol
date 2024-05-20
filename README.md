@@ -21,6 +21,11 @@ This project depends on graph-tools, which is not pip-installable. It is recomme
 pip install -r requirements.txt
 ```
 
+## Dataset download
+
+- Wikipedia: https://archive.org/download/wiki-llm-ol
+- arXiv: https://archive.org/download/arxiv-llm-ol
+
 ## Running experiments
 
 ### Data preparation
