@@ -2,13 +2,10 @@
     \centering
     \begin{tikzpicture}
         [
-            % rotate=-90,
-            % transform shape,
             >=latex,
             doc/.style={
                     rectangle,
                     rounded corners=2pt,
-                    % fill={black!80},
                     minimum width=10pt,
                     minimum height=14pt,
                     outer sep=2pt,
@@ -73,7 +70,7 @@
         \draw[->] (l2) -- (l21);
         \draw[->] (l2) -- (l22);
 
-        \node[anchor=west,inner sep=0,align=left] (caption) at ($(root.west) + (0.4, 2.3)$) {\small Dataset};
+        \node[anchor=west,inner sep=0,align=left] (caption) at ($(root.west) + (0.4, 2.55)$) {\small Dataset};
 
         \newcommand{\docSpace}{0.66}
         \node[doc,fill=c1] (doc1) at ($(l11) + ({90-\angleB-10}:{\nodeDist})$) {};
@@ -105,7 +102,7 @@
         % \node[doc,fill=c5] (inputp) at ($(doc7) + (1.0, 0)$) {};
 
         \node[llm,anchor=west] (llm) at ($(doc3)!0.5!(doc7) + (1, 0)$) {\small LLM};
-        \node[anchor=west,align=center] (loss) at ($(llm.east) + (\trainSpace, 0)$) {\small Mask-regularised loss};
+        \node[anchor=west,align=center,rounded corners=1.5pt,draw,outer sep=3pt] (loss) at ($(llm.east) + (\trainSpace + 0.2, 0)$) {\small Mask-regularised loss};
 
         \begin{scope}[local bounding box=target1,shift={($(loss.east) + (0.7, 0.2)$)},outer sep=3pt]
             \node[concept,color=c0] (sgRoot) {};
@@ -188,7 +185,7 @@
         % \draw[->] (input2) -- (llm2);
         % \draw[->] (llm2) -- ($(llm2) + (\trainSpace-0.25, 0)$);
 
-        \node[concept,color=c0] (testOutRoot) at ($(doc1)!0.5!(doc2) + (6.9, 0.0)$) {};
+        \node[concept,color=c0] (testOutRoot) at ($(doc1)!0.5!(doc2) + (7.1, 0.0)$) {};
         \node[concept,color=c4] (testOut1) at ($(testOutRoot) + ({-90+\angleA+20}:{\nodeDist})$) {};
         \node[concept,color=c2] (testOut11) at ($(testOut1) + ({-90+\angleB}:{\nodeDist})$) {};
         \node[concept,color=c1] (testOut12) at ($(testOut1) + ({90-\angleB}:{\nodeDist})$) {};
@@ -198,7 +195,7 @@
         \draw[->] (testOut1) -- (testOut11);
         \draw[->] (testOut1) -- (testOut12);
         \draw[->] (testOutRoot) -- pic[midway,-,rotate=60] {Cross={3.5 and red}} (testOut2);
-        \draw[->] ($(doc1)!0.5!(doc2) + (4.6, 0)$) -- node [midway,above,align=center] {\scriptsize Sum and prune} ($(doc1)!0.5!(doc2) + (6.6, 0)$);
+        \draw[->] ($(doc1)!0.5!(doc2) + (4.6, 0)$) -- node [midway,above,align=center,draw,rounded corners=0.8pt,inner sep=1.4pt,outer sep=3.2pt] {\scriptsize Sum and prune} ($(doc1)!0.5!(doc2) + (6.8, 0)$);
 
         % PART D: Evaluation
         \coordinate (start) at ($(l1) + (0, -0.4)$);
@@ -208,22 +205,22 @@
         \node[below] at (inter) {\footnotesize Gold standard evaluation};
 
         % Draw a separation line between Part B and Part C
-        \draw[color={black!30},dashed] ($(root) + (-0.8, 0)$) -- ($(root) + (12.4, 0)$);
+        \draw[color={black!30},dashed] ($(root) + (-0.85, 0)$) -- ($(root) + (12.65, 0)$);
         % Caption Part B
-        \node[color={black!60},inner sep=0,rotate=90] at ($(l2) + (-0.7, 0)$) {\small Training};
+        \node[color={black!60},inner sep=0,rotate=90] at ($(l2) + (-0.8, 0)$) {\small Training};
         % Caption Part C
-        \node[color={black!60},inner sep=0,rotate=90,align=center] at ($(l1) + (-0.7,0)$) {\small Evaluation /\\Inference};
+        \node[color={black!60},inner sep=0,rotate=90,align=center] at ($(l1) + (-0.8,0)$) {\small Evaluation /\\Inference};
         % Arrow connection llm train to llm inference.
         \draw[->,color={black!30}] (llm) |- ($(llm)!0.5!(llm1)$) -| (llm1);
         % Legend
-        \node[doc,fill={black!50}] (docLegend) at ($(root) + (10.6, -1.5)$) {};
+        \node[doc,fill={black!50}] (docLegend) at ($(root) + (10.8, -1.5)$) {};
         \node[anchor=west] (docDesc) at ($(docLegend) + (0.2, 0)$) {\scriptsize Document};
         \node[concept] (conceptLegend) at ($(docLegend) + (0, -0.6)$) {};
         \node[anchor=west] (conceptDesc) at ($(conceptLegend) + (0.2, 0)$) {\scriptsize Concept};
         \node (arrow1) at ($(docLegend.west) + (-0.05, -1.08)$) {};
         \node (arrow2) at ($(arrow1) + (0.65, 0)$) {};
         \draw[->] (arrow1) -- (arrow2);
-        \node[anchor=west] (arrowDesc) at ($(conceptDesc.west) + (0, -0.47)$) {\scriptsize is-a relation};
+        \node[anchor=west] (arrowDesc) at ($(conceptDesc.west) + (0, -0.47)$) {\scriptsize Is-a relation};
     \end{tikzpicture}
 
     \caption{\name: Using annotations of documents with their relevant concepts, we train an LLM to model relevant subgraphs of the target ontology with a custom regulariser. During inference, the generated subgraphs for each document are summed and pruned to give the final output ontology. For evaluation, we measure the similarity between the generated ontology and the ground truth.}
