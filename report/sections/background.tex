@@ -2,7 +2,7 @@
 
 This project's research topic is in the intersection of ontology learning, ontology evaluation, and large language models for structured knowledge representation. This chapter provides an overview of the standard techniques and core principles in these areas, and discusses potential research gaps that this project aims to address.
 
-\section{What is an Ontology?}
+\section{What is an ontology?}
 
 % [What is an ontology and how is it represented?]
 An ontology is a structured way of representing concepts and relations of a shared conceptualisation, i.e. domain knowledge \cite{gruber1995toward,gruber1993translation}. The primary goal of an ontology is to represent the entities in a domain in a machine-readable format and linking the relationships among them \cite{national2022ontologies}. This project focuses on ontologies that only consist of concepts and taxonomic relations which represent \emph{is-a} or \emph{is-subclass-of} relationships between concepts. In some cases, the \emph{is-part-of} relation is also considered a taxonomic relation.
@@ -10,7 +10,7 @@ An ontology is a structured way of representing concepts and relations of a shar
 % [Representations of ontologies]
 We treat such an ontology as a rooted labelled directed graph where nodes represent concepts, edges represent taxonomic relations and the root node is the special concept of all concepts. A strict ontology asserts that the taxonomic relation is asymmetric and thus the graph must be acyclic, though in practice some ontologies, such as the Wikipedia ontology studied in this paper, may contain cycles. We therefore do not assume that an ontology graph is necessarily acyclic. Examples of ontologies include WordNet \cite{miller1995wordnet} with 117,659 concepts and 89,089 taxonomic relations and the Gene Ontology \cite{ashburner2000gene} with 42,255 concepts and 66,810 taxonomic relations.
 
-\section{Ontology Learning}
+\section{Ontology learning}
 
 % [What is the precise task we study in this paper?]
 Ontology learning is the automatic extraction of ontological elements \cite{hazman2011survey}. The most studied source of input is unstructured text, though there are also works on OL on semi-structured data like HTML \cite{karoui2004ontology}. In this paper, the input is a set of documents, each consisting of some unstructured text. We additionally assume each document is associated with one or more concepts in the ground truth ontology which we utilise for training. The goal is to reconstruct the ground truth ontology given the set of documents.
@@ -22,12 +22,12 @@ Prior works view OL as a composition of subtasks and study each subtask in isola
 % [LLM approaches to OL]
 Recent research has transitioned to using language models for OL. REBEL \cite{cabot2021rebel} treats relation discovery as a translation task and finetunes encoder-decoder LLMs to extract both taxonomic and non-taxonomic relations. \citet{babaei2023llms4ol} benchmarked a wide family of LLMs for concept and relation discovery and showed promising results. There are also proof-of-concept works for building ontologies end-to-end with LLMs. \citet{funk2023towards} proposes to build an ontology by recursive prompting an LLMs while \citet{trajanoska2023enhancing} generates the entire ontology in one completion. However, both studies are limited in the scale of the task and evaluation. The authors only considered ontologies of up to 1000 concepts and relied on manual qualitative evaluation. We bridge this gap by proposing a method that can scale to practical problem sizes and new metrics for systematic qualitative evaluation.
 
-\section{Evaluating Ontologies}
+\section{Evaluating ontologies}
 
 % [Prior approaches to evaluating OL.]
 The evaluation of ontologies is also an open research area. The main approaches are gold-standard evaluation, which matches elements of the generated ontology with a predefined target ontology; task-based evaluation, which measures the usefulness of the ontology on a specific application; and human evaluation \cite{raad2015survey,brank2005survey}. In this paper, we evaluate by the gold standard as it is the most straightforward approach when such ground-truth ontology exists. Prior works have considered matching concepts \cite{maedche2002measuring} and direct and indirect relations \cite{Kashyap2005TaxaMinerAE, Treeratpituk2013GraphbasedAT} by literal text comparison. Other works have also considered edit-distance \cite{Ehrig2005SimilarityFO} or bag-of-words distributional similarity for text comparison \cite{Zavitsanos2011GoldSE}.  These techniques may be considered unreliable and have been superseded by current methods \cite{conneau2017supervised}. We instead rely on more modern techniques like pretrained text embedders \cite{devlin2018bert} and graph convolutions \cite{kipf2016semi} to match substructures between the two ontologies.
 
-\section{LLMs for Knowledge Representation}
+\section{LLMs for knowledge representation}
 
 Outside of OL, there is a growing body of research on using LLMs to construct structured knowledge representations, most commonly as \emph{knowledge graphs} (KGs) \cite{singhal2012introducing}. While ontologies focuses on capturing the relationship between concepts, KGs aims to represent \emph{instances} of such concepts and their properties \cite{guarino1995ontologies}. For example, an ontology may capture the common sense relation that ``a person is born at a place'', while a knowledge graph might contain explicit instantiations like ``Barack Obama is born in Honolulu''. As a result, the construction of KGs focuses more on extracting facts from the source corpus and less on the structure of the graph itself.
 
@@ -35,3 +35,22 @@ Similar to OL, knowledge graph construction is rarely studied in an end-to-end f
 
 \section{Graph analysis}
 
+Since we treat ontologies as graphs in this project, standard graph analysis techniques are applicable too. In particular, these ideas will become relevant when we design metrics for analysing and evaluating the generated ontologies. This section explains two key concepts used in this project: \emph{network motifs} and \emph{node embeddings}.
+
+\subsection{Network motifs}
+
+Network motifs are recurring subgraphs that appear more frequently in a graph than in a random graph \cite{milo2002network}. Studying the frequency or the location of the motifs in a graph can provide insights into the graph's global structures. For example, the fully-connected three-vertex graph is a motif commonly found in social networks \cite{stone2019network}, indicating the general property that if Alice is friends with Bob and Bob is friends with Charlie, then Alice and Charlie are likely to be friends as well. More generally, motif analysis is an instantiation of \emph{graphlet counting} \cite{ribeiro2021survey} which aims to compute the frequency of all possible subgraphs of a certain size. Graphlet counting has been used to evaluate graph generation models \cite{you2018graphrnn} by comparing the $n$-node graphlet counts between two graph distributions. In this project, however, we are interested in comparing two specific graph instances (the generated ontology versus the ground truth) hence such metrics do not directly apply.
+
+\subsection{Node embeddings}
+
+Node embeddings are vector representations of the nodes in a graph that aims to summarise their graph position and the structure of their local graph neighbourhood \cite{hamilton2020graph}. Node embeddings are useful for many graph analysis tasks, such as node classification and link prediction. One of the most popular algorithms for generating node embeddings is node2vec \cite{grover2016node2vec}, which uses random walks to sample the relevant neighbourhood around each node and optimises the embeddings to be predictive of whether two nodes are neighbours. It is however only designed for graphs where nodes are unlabelled (also known as \emph{homogenous graphs}) and thus not suitable for ontologies.
+
+A method suitable for learning node embeddings for labelled graphs are \emph{graph convolutions}. Suppose for a graph $G = (V, E)$, we have $\m{A}$ its adjacency matrix and the node feature (label) matrix $\m{X} \in \R^{|V| \times d}$, where $d$ is the feature dimension. The graph convolution operator with parameters $\m{W} \in \R^{d \times d}$ is defined as
+\[
+    \m{X}' = \hat{\m{D}}^{-1/2} \hat{\m{A}} \hat{\m{D}}^{-1/2} \m{X} \m{W}
+\]
+where $\hat{\m{A}} = \m{A} + \m{I}$ and $\hat{D}_{ii} = \sum_j \hat{A}_{ij}$ the diagonal degree matrix. Intuitively, applying a graph convolution to $\m{X}$ aggregates the features of each node's 1-hop neighbourhood and applies a linear transformation to the result. A simple yet effective extension to gather information from further neighbours without introducing more parameters is known as a \emph{simple graph convolution} \cite{wu2019simplifying}:
+\begin{equation}  \label{eq:simple-graph-conv}
+    \m{X}' = \left(\hat{\m{D}}^{-1/2} \hat{\m{A}} \hat{\m{D}}^{-1/2}\right)^K \m{X} \m{W}
+\end{equation}
+where $K$ determines the number of hops. A weakness of simple graph convolutions is that they are prone to \emph{over-smoothing} \cite{zhu2020simple}, where node embeddings become increasing generic and thus uninformative as $K \to \infty$. Empirically, using small values of $K$ (e.g. $K = 2$) tends to be the most effective \cite{wu2019simplifying}.
