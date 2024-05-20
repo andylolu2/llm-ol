@@ -18,7 +18,7 @@ At the time of writing, Wikipedia has 2,351,998 categories and 6,825,439 article
 
 \subsection{arXiv}
 
-The arXiv taxonomy is much simpler and can be obtained from its taxonomy page or its source code directly. To collect the main corpus, I take a subset from the arXiv dataset on Kaggle\footnote{https://www.kaggle.com/datasets/Cornell-University/arxiv} by selecting all papers uploaded in the years 2020--2022 with more than or equal to 10 citations. The citation count is not part of the metadata available in the arXiv dataset, and instead is taken from the Semantic Scholar API\footnote{\url{https://api.semanticscholar.org/}}. The final dataset has 161 concepts, 166 taxonomic relations and 126,001 documents.
+The arXiv taxonomy is much simpler and can be obtained from its taxonomy page or its source code directly. To collect the main corpus, I take a subset from the arXiv dataset on Kaggle\footnote{https://www.kaggle.com/datasets/Cornell-University/arxiv} by selecting all papers uploaded in the years 2020--2022 with more than or equal to 10 citations. The citation count is not part of the metadata available in the arXiv dataset, and instead is taken from the Semantic Scholar API\footnote{\url{https://api.semanticscholar.org/}}. For each paper, the title, abstract and category assignment is taken. The final dataset has 161 concepts, 166 taxonomic relations and 126,001 documents.
 
 \section{Baselines}  \label{sec:implementation:baselines}
 

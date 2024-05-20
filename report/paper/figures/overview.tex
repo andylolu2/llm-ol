@@ -1,7 +1,5 @@
-\begin{figure}
+\begin{figure}[t]
     \centering
-    % \includegraphics[width=\linewidth]{media/overview.pdf}
-    % make tikz figure
     \begin{tikzpicture}
         [
             >=latex,
@@ -11,21 +9,21 @@
                     % fill={black!80},
                     minimum width=10pt,
                     minimum height=14pt,
-                    outer sep=3pt,
+                    outer sep=2pt,
                 },
             llm/.style={
                     rectangle,
                     rounded corners=2pt,
                     fill={black!20},
-                    minimum width=45pt,
-                    minimum height=25pt,
+                    minimum width=40pt,
+                    minimum height=24pt,
                     outer sep=3pt,
                 },
             concept/.style={
                     circle,
                     fill={black!30},
-                    inner sep=1.5pt,
-                    outer sep=3pt,
+                    inner sep=1.25pt,
+                    outer sep=2.5pt,
                 },
             every node/.append style={font=\sffamily},
             pics/.cd,
@@ -41,21 +39,31 @@
             Cross/.default={2.5 and gray!25!black},
         ]
         \newcommand{\nodeDist}{0.7}
+        \newcommand{\nodeDistShort}{0.55}
         \newcommand{\angleA}{30}
         \newcommand{\angleB}{66}
-        \definecolor{c1}{RGB}{255,93,82}
-        \definecolor{c2}{RGB}{94,118,255}
-        \definecolor{c3}{RGB}{255,122,246}
-        \definecolor{c4}{RGB}{255,222,130}
+        \definecolor{c0}{RGB}{150, 150, 150}
+        \definecolor{c1}{RGB}{255, 93, 82}
+        \definecolor{c2}{RGB}{94, 118, 255}
+        \definecolor{c3}{RGB}{124, 188, 220}
+        \definecolor{c4}{RGB}{215, 140, 255}
+        \definecolor{c5}{RGB}{255, 195, 84}
+        \definecolor{c6}{RGB}{64, 194, 62}
 
         % PART A: Ontology
-        \node[concept] (root) {};
-        \node[concept] (l1) at ($(root) + ({180+\angleA}:{\nodeDist})$) {};
-        \node[concept] (l2) at ($(root) + ({-\angleA}:{\nodeDist})$) {};
-        \node[concept] (l11) at ($(l1) + ({180+\angleB}:{\nodeDist})$) {};
-        \node[concept] (l12) at ($(l1) + ({-\angleB}:{\nodeDist})$) {};
-        \node[concept] (l21) at ($(l2) + ({180+\angleB}:{\nodeDist})$) {};
-        \node[concept] (l22) at ($(l2) + ({-\angleB}:{\nodeDist})$) {};
+        \node[concept,color=c0] (root) {};
+        \node[concept,color=c4] (l1) at ($(root) + ({-90+\angleA}:{\nodeDist})$) {};
+        \node[concept,color=c6] (l2) at ($(root) + ({90-\angleA}:{\nodeDist})$) {};
+        \node[concept,color=c1] (l11) at ($(l1) + ({90-\angleB}:{\nodeDist})$) {};
+        \node[concept,color=c2] (l12) at ($(l1) + ({-90+\angleB}:{\nodeDist})$) {};
+        \node[concept,color=c3] (l21) at ($(l2) + ({90-\angleB}:{\nodeDist})$) {};
+        \node[concept,color=c5] (l22) at ($(l2) + ({-90+\angleB}:{\nodeDist})$) {};
+        % \node[concept] (l1) at ($(root) + ({180+\angleA}:{\nodeDist})$) {};
+        % \node[concept] (l2) at ($(root) + ({-\angleA}:{\nodeDist})$) {};
+        % \node[concept] (l11) at ($(l1) + ({180+\angleB}:{\nodeDist})$) {};
+        % \node[concept] (l12) at ($(l1) + ({-\angleB}:{\nodeDist})$) {};
+        % \node[concept] (l21) at ($(l2) + ({180+\angleB}:{\nodeDist})$) {};
+        % \node[concept] (l22) at ($(l2) + ({-\angleB}:{\nodeDist})$) {};
         \draw[->] (root) -- (l1);
         \draw[->] (root) -- (l2);
         \draw[->] (l1) -- (l11);
@@ -63,53 +71,76 @@
         \draw[->] (l2) -- (l21);
         \draw[->] (l2) -- (l22);
 
-        \node[align=center] (caption) at ($(root) + (0, 0.8)$) {Ontology};
+        \node[anchor=west,inner sep=0,align=left] (caption) at ($(root.west) + (0.4, 1.9)$) {\small Dataset};
 
-        \newcommand{\docSpace}{0.75}
-        \node[doc,fill=c1] (doc1) at ($(l11) + (0, -\docSpace)$) {};
-        \node[doc,fill=c2] (doc2) at ($(l12) + (0, -\docSpace)$) {};
-        \node[doc,fill=c3] (doc3) at ($(l21) + (0, -\docSpace)$) {};
-        \node[doc,fill=c4] (doc4) at ($(doc1.south) + (0, -0.3)$) {};
-        \node[doc] (doc5) at ($(doc2.south) + (0, -0.3)$) {...};
-        \node[doc] (doc6) at ($(l22) + (0, -\docSpace)$) {...};
-        \draw[densely dashed] (l11) -- (doc1);
-        \draw[densely dashed] (l12) -- (doc2);
-        \draw[densely dashed] (l21) -- (doc3);
-        \draw[densely dashed,bend right=40] (l11) to (doc4);
+        \newcommand{\docSpace}{0.66}
+        \node[doc,fill=c1] (doc1) at ($(l11) + (\docSpace, 0)$) {};
+        \node[doc,fill=c2] (doc2) at ($(l12) + (\docSpace, 0)$) {};
+        \node[doc,fill=c3] (doc3) at ($(l21) + (\docSpace, 0.26)$) {};
+        \node[doc,fill=c4] (doc4) at ($(l11) + (\docSpace, -1.5)$) {};
+        \node[doc,fill=c5] (doc7) at ($(l22) + (\docSpace, 0)$) {};
+        \node[doc] (doc5) at ($(doc2)!0.5!(doc4)$) {...};
+        \node[doc] (doc6) at ($(doc3)!0.5!(doc7)$) {...};
+        \draw[dashdotted] (l11) -- (doc1);
+        \draw[dashdotted] (l12) -- (doc2);
+        \draw[dashdotted] (l21) -- (doc3);
+        \draw[dashdotted] (l22) -- (doc7);
+        \draw[dashdotted,bend right] (l1) to (doc4);
 
         % line to separate the ontology into train and test
-        \draw[dashed] ($(root) + (0, 0.4)$) -- ($(root) + (0, -2.8)$);
-        \node at ($(root) + (1.1, -0.1)$) {Train};
-        \node at ($(root) + (-1.1, -0.1)$) {Test};
+        % \draw[dashed] ($(root) + (0, 0.4)$) -- ($(root) + (0, -2.6)$);
+        % \node at ($(root) + (1.1, -0.1)$) {Train};
+        % \node at ($(root) + (-1.1, -0.1)$) {Test};
+
+        % \draw[dashed] ($(root) + (-0.4, 0)$) -- ($(root) + (2.0, 0)$);
+        % \node[anchor=west,inner sep=0] at ($(root.west) + (0, 1.1)$) {\small Train};
+        % \node[anchor=west,inner sep=0] at ($(root.west) + (0, -1.5)$) {\small Test};
 
         % PART B: Training
         \newcommand{\trainSpace}{0.7}
-        \node[doc,fill=c3] (input) at ($(root) + (3.8, 1.6)$) {};
-        \node[llm,anchor=west] (llm) at ($(input.east) + (\trainSpace, 0)$) {LLM};
-        \node[anchor=west,align=center] (loss) at ($(llm.east) + (\trainSpace, 0)$) {Mask-regularised loss};
-        \node[concept] (sgRoot) at ($(loss.east) + (\trainSpace + 0.1, 0.6)$) {};
-        \node[concept] (sg2) at ($(sgRoot) + ({-\angleA}:{\nodeDist})$) {};
-        \node[concept] (sg21) at ($(sg2) + ({180+\angleB}:{\nodeDist})$) {};
+        \node[doc,fill=c3] (input) at ($(doc3) + (1.0, -0.3)$) {};
+
+        \node[llm,anchor=west] (llm) at ($(input.east) + (\trainSpace, 0)$) {\small LLM};
+        \node[anchor=west,align=center] (loss) at ($(llm.east) + (\trainSpace, 0)$) {\small Mask-regularised loss};
+        \begin{scope}[local bounding box=sg,shift={($(loss.east) + (0.7, 0.4)$)}]
+            \node[concept,color=c0] (sgRoot) {};
+            \node[concept,color=c6] (sg2) at ($(sgRoot) + ({-\angleA}:{\nodeDistShort})$) {};
+            \node[concept,color=c3] (sg21) at ($(sg2) + ({-\angleB}:{\nodeDistShort})$) {};
+            \draw[->] (sgRoot) -- (sg2);
+            \draw[->] (sg2) -- (sg21);
+        \end{scope}
         \draw[->] (input) -- (llm);
         \draw[->] (llm) -- (loss);
-        \draw[->] ($(loss.east) + (\trainSpace-0.1, 0)$) -- (loss);
-        \draw[->] (sgRoot) -- (sg2);
-        \draw[->] (sg2) -- (sg21);
+        \draw[->] (sg) -- (loss);
         \draw[->,bend right] (loss) to node [midway,above,align=center] {\scriptsize Backpropagate} (llm);
+        \node at ($(input) + (0, 0.6)$) {\scriptsize Input};
+        \node at ($(sg) + (0, 0.8)$) {\scriptsize Target};
 
         % PART C: Inference
-        \node[llm] (llm1) at ($(llm) + (0, -3.0)$) {LLM};
+        \node[llm] (llm1) at ($(llm) + (0, -2.3)$) {\small LLM};
         \node[doc,fill=c1,anchor=east] (input1) at ($(llm1.west) + (-\trainSpace, 0.8)$) {};
-        \node[concept] (sgRoot1) at ($(llm1.east) + (\trainSpace + 0.9, 1.1)$) {};
-        \node[concept] (sg11) at ($(sgRoot1) + ({180+\angleA}:{\nodeDist})$) {};
-        \node[concept] (sg12) at ($(sgRoot1) + ({-\angleA}:{\nodeDist})$) {};
-        \node[concept] (sg111) at ($(sg11) + ({180+\angleB}:{\nodeDist})$) {};
-        \node[doc,fill=c2,anchor=east] (input2) at ($(llm1.west) + (-\trainSpace, -0.7)$) {};
-        \node[concept] (sgRoot2) at ($(llm1.east) + (\trainSpace + 0.9, -0.5)$) {};
-        \node[concept] (sg21) at ($(sgRoot2) + ({180+\angleA}:{\nodeDist})$) {};
-        \node[concept] (sg212) at ($(sg21) + ({-\angleB}:{\nodeDist})$) {};
-        \node (dots) at ($(input1)!0.5!(input2) + (0, 0.1)$) {$\vdots$};
-        \node (dots2) at ($(dots) + (4.35, 0)$) {$\vdots$};
+
+        \begin{scope}[local bounding box=sg2,shift={($(llm1.east) + (\trainSpace + 0.8, 1.1)$)}]
+            \node[concept,color=c0] (sgRoot2) {};
+            \node[concept,color=c4] (sg21) at ($(sgRoot2) + ({180+\angleA}:{\nodeDistShort})$) {};
+            \node[concept,color=c1] (sg212) at ($(sg21) + ({-\angleB}:{\nodeDistShort})$) {};
+            \draw[->] (sgRoot2) -- (sg21);
+            \draw[->] (sg21) -- (sg212);
+        \end{scope}
+
+        \begin{scope}[local bounding box=sg1,shift={($(llm1.east) + (\trainSpace + 0.8, -0.45)$)}]
+            \node[concept,color=c0] (sgRoot1) {};
+            \node[concept,color=c4] (sg11) at ($(sgRoot1) + ({180+\angleA}:{\nodeDistShort})$) {};
+            \node[concept,color=c6] (sg12) at ($(sgRoot1) + ({-\angleA}:{\nodeDistShort})$) {};
+            \node[concept,color=c2] (sg111) at ($(sg11) + ({180+\angleB}:{\nodeDistShort})$) {};
+            \node[doc,fill=c2,anchor=east] (input2) at ($(llm1.west) + (-\trainSpace, -0.7)$) {};
+            \draw[->] (sgRoot1) -- (sg12);
+            \draw[->] (sgRoot1) -- (sg11);
+            \draw[->] (sg11) -- (sg111);
+        \end{scope}
+
+        \node (dots) at ($(input1)!0.5!(input2)$) {...};
+        \node (dots2) at ($(dots) + (4.0, 0)$) {...};
         \newcommand{\vertSpace}{0.25}
         \draw (input1) -| ($(input1.east)!0.5!(llm1.west)$) |- ($(llm1.west) + (0, \vertSpace)$);
         \coordinate (out1) at ($(llm1.east) + (\trainSpace, 0.8)$);
@@ -127,9 +158,6 @@
         % \node[concept] (sg111) at ($(sg11) + ({180+\angleB}:{\nodeDist})$) {};
         % \draw[->] (input1) -- (llm1);
         % \draw[->] (llm1) -- ($(llm1) + (\trainSpace-0.25, 0)$);
-        \draw[->] (sgRoot1) -- (sg12);
-        \draw[->] (sgRoot1) -- (sg11);
-        \draw[->] (sg11) -- (sg111);
 
         % \node[doc,fill=c2] (input2) at ($(input1) + (0, -1.7)$) {};
         % \node[llm] (llm2) at ($(input2) + (\trainSpace, 0)$) {LLM};
@@ -138,42 +166,45 @@
         % \node[concept] (sg212) at ($(sg21) + ({-\angleB}:{\nodeDist})$) {};
         % \draw[->] (input2) -- (llm2);
         % \draw[->] (llm2) -- ($(llm2) + (\trainSpace-0.25, 0)$);
-        \draw[->] (sgRoot2) -- (sg21);
-        \draw[->] (sg21) -- (sg212);
 
-        \node[concept] (testOutRoot) at ($(input1)!0.5!(input2) + (9.0, 0.4)$) {};
-        \node[concept] (testOut1) at ($(testOutRoot) + ({180+\angleA}:{\nodeDist})$) {};
-        \node[concept] (testOut11) at ($(testOut1) + ({-\angleB}:{\nodeDist})$) {};
-        \node[concept] (testOut12) at ($(testOut1) + ({180+\angleB}:{\nodeDist})$) {};
-        \node[concept] (testOut2) at ($(testOutRoot) + ({-\angleA}:{\nodeDist})$) {};
+        \node[concept,color=c0] (testOutRoot) at ($(input1)!0.5!(input2) + (7.5, 0.4)$) {};
+        \node[concept,color=c4] (testOut1) at ($(testOutRoot) + ({180+\angleA}:{\nodeDist})$) {};
+        \node[concept,color=c1] (testOut11) at ($(testOut1) + ({-\angleB}:{\nodeDist})$) {};
+        \node[concept,color=c2] (testOut12) at ($(testOut1) + ({180+\angleB}:{\nodeDist})$) {};
+        \node[concept,color=c6] (testOut2) at ($(testOutRoot) + ({-\angleA}:{\nodeDist})$) {};
+        \node at ($(testOutRoot) + (0, 0.45)$) {\scriptsize Output};
         \draw[->] (testOutRoot) -- (testOut1);
         \draw[->] (testOut1) -- (testOut11);
         \draw[->] (testOut1) -- (testOut12);
         \draw[->] (testOutRoot) -- pic[midway,-,rotate=-\angleA] {Cross={3.5 and red}} (testOut2);
-        \draw[->] ($(input1)!0.5!(input2) + (5.1, 0)$) -- node [midway,above,align=center] {\scriptsize Sum and prune} ($(input1)!0.5!(input2) + (8.0, 0)$);
+        \draw[->] ($(input1)!0.5!(input2) + (4.6, 0)$) -- node [midway,above,align=center] {\scriptsize Sum and prune} ($(input1)!0.5!(input2) + (6.5, 0)$);
 
         % PART D: Evaluation
-        \coordinate (start) at ($(doc4)!0.5!(doc5) + (0, -0.4)$);
-        \coordinate (inter) at ($(start) + (6.8, -0.5)$);
-        \coordinate (end) at ($(testOutRoot) + (0, -1.5)$);
+        \coordinate (start) at ($(l1) + (0, -0.8)$);
+        \coordinate (inter) at ($(start) + (5.5, -1.5)$);
+        \coordinate (end) at ($(testOutRoot) + (0, -1.2)$);
         \draw[<->,rounded corners] (start) |- (inter) -| (end);
-        \node[below] at (inter) {Gold standard evaluation};
+        \node[below] at (inter) {\small Gold standard evaluation};
 
         % Draw a separation line between Part B and Part C
-        \draw[color={black!20}] ($(input)!0.5!(input1) + (-1.8, 0)$) -- ($(input)!0.5!(input1) + (9.8, 0)$);
+        \draw[color={black!30},dashed] ($(root) + (-0.8, 0)$) -- ($(root) + (13.2, 0)$);
         % Caption Part B
-        \node[color={black!60},anchor=west] at ($(input)!0.5!(input1) + (-1.8, 1.8)$) {Training};
+        \node[color={black!60},anchor=west,inner sep=0,rotate=90] at ($(root) + (-0.5, 0.2)$) {\small Training};
         % Caption Part C
-        \node[color={black!60},anchor=west] at ($(input)!0.5!(input1) + (-1.8, -0.4)$) {Inference};
+        \node[color={black!60},anchor=west,inner sep=0,rotate=90,anchor=east] at ($(root) + (-0.5,-0.5)$) {\small Evaluation};
         % Arrow connection llm train to llm inference.
-        \draw[->,color={black!30}] (llm) -- (llm1);
+        \draw[->,color={black!30}] (llm) |- ($(llm)!0.5!(llm1)$) -| (llm1);
         % Legend
-        \node[doc,fill={black!50}] (docLegend) at ($(root) + (-1.3, 2.4)$) {};
-        \node[anchor=west] (docDesc) at ($(docLegend) + (0.2, 0)$) {\footnotesize Document};
+        \node[doc,fill={black!50}] (docLegend) at ($(root) + (11.6, -1.9)$) {};
+        \node[anchor=west] (docDesc) at ($(docLegend) + (0.2, 0)$) {\scriptsize Document};
         \node[concept] (conceptLegend) at ($(docLegend) + (0, -0.6)$) {};
-        \node[anchor=west] (conceptDesc) at ($(conceptLegend) + (0.2, 0)$) {\footnotesize Concept};
+        \node[anchor=west] (conceptDesc) at ($(conceptLegend) + (0.2, 0)$) {\scriptsize Concept};
+        \node (arrow1) at ($(docLegend.west) + (-0.05, -1.08)$) {};
+        \node (arrow2) at ($(arrow1) + (0.65, 0)$) {};
+        \draw[->] (arrow1) -- (arrow2);
+        \node[anchor=west] (arrowDesc) at ($(conceptDesc.west) + (0, -0.47)$) {\scriptsize is-a relation};
     \end{tikzpicture}
 
-    \caption{Overview of \name. A finetuned LLM is used to model the relevant subgraph for each document in the source corpus. The generated subgraphs (sub-ontologies) are then summed into a weighted graph, and pruning is applied to obtain the final output ontology.}
+    \caption{Overview of \name. Using annotations of documents with their relevant concepts, we train an LLM to model relevant subgraphs of the target ontology with a custom regulariser. During inference, the generated subgraphs for each document are summed and pruned to give the final output ontology. For evaluation, we measure the similarity between the generated ontology and the ground truth. \todo{Label `target' in training, `output/generated' in inference, rotate ontology 90 deg? add visual cues to the concepts. Align the documents on the same line}}
     \label{fig:overview}
 \end{figure}
