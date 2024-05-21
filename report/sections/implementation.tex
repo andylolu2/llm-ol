@@ -18,23 +18,46 @@ At the time of writing, Wikipedia has 2,351,998 categories and 6,825,439 article
 
 \subsection{arXiv}
 
-The arXiv taxonomy is much simpler and can be obtained from its taxonomy page or its source code directly. To collect the main corpus, I take a subset from the arXiv dataset on Kaggle\footnote{https://www.kaggle.com/datasets/Cornell-University/arxiv} by selecting all papers uploaded in the years 2020--2022 with more than or equal to 10 citations. The citation count is not part of the metadata available in the arXiv dataset, and instead is taken from the Semantic Scholar API\footnote{\url{https://api.semanticscholar.org/}}. For each paper, the title, abstract and category assignment is taken. The final dataset has 161 concepts, 166 taxonomic relations and 126,001 documents.
+The arXiv taxonomy is much simpler and can be obtained from its taxonomy page or its source code directly. To collect the main corpus, I take a subset from the arXiv dataset on Kaggle\footnote{\url{https://www.kaggle.com/datasets/Cornell-University/arxiv}} by selecting all papers uploaded in the years 2020--2022 with more than or equal to 10 citations. The citation count is not part of the metadata available in the arXiv dataset, and instead is taken from the Semantic Scholar API\footnote{\url{https://api.semanticscholar.org/}}. For each paper, the title, abstract and category assignment is taken. The final dataset has 161 concepts, 166 taxonomic relations and 126,001 documents.
 
 \section{Baselines}  \label{sec:implementation:baselines}
 
-We give a brief overview of the baseline methods here. The full implementation details can be found in \cref{appendix:exp-details}. All baselines produce weighted directed graphs which we apply the same post-processing steps as \name (\cref{sec:method:post-processing}) to obtain the final predicted graph.
+Given the novelty of the task studied, we first need to establish a set of baselines that we know a priori are \emph{reliable} and can serve as a \emph{meaningful} reference point. Our ideal baselines should thus be at least partially validated by existing research and be simple to implement. Since most prior work in OL is based on subtask composition, we design two methods from this paradigm as our baselines: Concept discovery + Hearst patterns \cite{hearst1998automated} and Concept discovery + REBEL \cite{cabot2021rebel}. Both methods follow the general procedure of first discovering the target concepts (nodes) and then finding the relations (edges) between them. This section describes the implementation details of these baselines.
 
-\paragraph{Memorisation}
-Simply memorising the train graph is a surprisingly strong baseline due to the overlap between train and test graphs, especially for Wikipedia. The weight of each edge is given by the number of relevant subgraphs in which it appears.
+\subsection{Concept discovery}
 
-\paragraph{Hearst}
-We follow the improved implementation of Hearst patterns by \citet{roller2018hearst}. The authors propose spmi, a method which uses low-rank approximations to smooth the relation matrix so that two concepts can be compared even if there are no direct matches between them. We use the smoothed relation matrix to weigh the relations between the ground truth concepts. The additional hyperparameter for the rank of the smoothed matrix is tuned by grid search over the validation set.
+The first step in both baselines is to discover the concepts that should be present in the target ontology. Concept discovery is commonly done via entity extraction from the source corpus, such as by identifying noun phrases after dependency parsing. However, I am not aware of any one-size-fits-all entity extraction method that is widely accepted as the standard. Many proposed methods are domain-specific and may utilise custom rules for filtering concepts. \todo{citations!!} To bypass this issue, I decided to \emph{skip concept discovery entirely} and \emph{use the graph truth concepts} as the output of this step. While such data leakage diminishes the applied value of the baselines, it makes them more reliable as we no longer have to worry about the error propagation from the concept discovery step. It also strengthens the research value of this project: Using the ground truth concepts allows us to estimate an upper bound to the performance of our baselines. If we can demonstrate that our proposed methods can outperform the baselines even under the best-case scenario (shown to be true in \cref{sec:results}), we can have strong confidence in the validity of our approach.
 
-\paragraph{REBEL}
+\subsection{Hearst}
+Hearst patterns \cite{hearst1998automated} is one of the most tested methods for relation extraction. As explained in \cref{sec:hearst}, Hearst patterns rely on a set of hand-crafted regular expressions defined on top of part-of-speech and lemmatisation tags to extract taxonomic relations from text. An example of a Hearst pattern aimed to match patterns like ``Fibonacci's sequence is a type of number sequence'' is shown below:
+\begin{lstlisting}
+(RB.? )* (JJ|JJR|JJS|VBN)? (N.+ of|--|'s)? N.+ (which)? [[be]] an? JJ? ([[subgenus|example|class|group|form|type|kind]]) of (RB.? )* (JJ|JJR|JJS|VBN)? (N.+ of|--|'s)? N.+
+\end{lstlisting}
+where capitalised words are part-of-speech tags, and words in \texttt{[[...]]} denote their lemmatised form.
+
+For the baseline, I reproduce the implementation by \citet{roller2018hearst}. It leverages the tokenization, part-of-speech tagging, lemmatisation, and token regex functionality of the CoreNLP library \cite{manning2014stanford} to extract the relations according to their 28 Hearst patterns. Given the relations $\mathcal{R} = (u_1 \to v_1), \dots, (u_n \to v_n)$ extracted from the source corpus and the ground truth concepts $C = (c_1, \dots, c_k)$, the output graph $G = (V, E)$ is defined as $V = C$ and $E = \{(u, v) \in C \times C \mid (u \to v) \in \mathcal{R}\}$. Inspecting the output, we see that Hearst patterns successfully extracts taxonomic relations with relatively high precision but substantially worse recall:
+\begin{table}[H]
+    \centering
+    \begin{tabular}{lrr}
+        \toprule
+                  & Precision & Recall \\
+        \midrule
+        Wikipedia & -         & -      \\
+        arXiv     & -         & -      \\
+        \bottomrule
+    \end{tabular}
+    \caption{Precision and recall of Hearst patterns on the test splits.}
+    \label{table:hearst-precision-recall}
+\end{table}
+
+\subsection{REBEL}
 The REBEL-large model \cite{cabot2021rebel} is an encoder-decoder LLM trained to extract many types of relations from Wikipedia articles. We only take the ``subclass of'', ``instance of'', ``member of'' and ``part of'' relations that were extracted. Similar to \textbf{Hearst}, we find that it fails to find many direct relations between ground truth concepts. The same low-rank smoothing technique is applied to give a higher recall.
 
-\paragraph{Prompting}
-We test the \textbf{zero/one/three-shot} performance of instruction-tuned LLMs on the subgraph modelling task described in \cref{sec:method:subgraph}. We use Mistral 7B Instruct v0.2 \cite{jiang2023mistral} as the instruct model. We perform manual prompt engineering to describe the task and steer the model to return outputs of the same format as that described in \cref{sec:method:subgraph}. The prompt can be found in \cref{appendix:prompt-template}.
+\subsection{Memorisation}
+Simply memorising the train graph is a surprisingly strong baseline due to the overlap between train and test graphs, especially for Wikipedia. The weight of each edge is given by the number of relevant subgraphs in which it appears.
+
+% \paragraph{Prompting}
+% We test the \textbf{zero/one/three-shot} performance of instruction-tuned LLMs on the subgraph modelling task described in \cref{sec:method:subgraph}. We use Mistral 7B Instruct v0.2 \cite{jiang2023mistral} as the instruct model. We perform manual prompt engineering to describe the task and steer the model to return outputs of the same format as that described in \cref{sec:method:subgraph}. The prompt can be found in \cref{appendix:prompt-template}.
 
 
 \section{\name}  \label{sec:implementation:core}

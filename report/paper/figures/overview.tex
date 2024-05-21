@@ -112,7 +112,7 @@
             \draw[->] (sg2) -- (sg21);
         \end{scope}
 
-        \begin{scope}[local bounding box=target2,shift={($(loss.east) + (0.7, -0.7)$)},outer sep=3pt]
+        \begin{scope}[local bounding box=target2,shift={($(loss.east) + (0.7, -0.8)$)},outer sep=3pt]
             \node[concept,color=c0] (sgRoot) {};
             \node[concept,color=c6] (sg2) at ($(sgRoot) + ({90-\angleA-20}:{\nodeDistShort})$) {};
             \node[concept,color=c5] (sg22) at ($(sg2) + ({-90+\angleB}:{\nodeDistShort})$) {};
@@ -128,8 +128,8 @@
         \draw[color=c5] (doc7) -| ($(doc7.east)!0.5!(out)$) |- (out);
         \draw[->,color=c5] ($(llm.east) + (0, -\vertSpace)$) -- ($(loss.west) + (0, -\vertSpace)$);
 
-        \draw[->,color=c3,bend right] (target1) to (loss);
-        \draw[->,color=c5,bend left] (target2) to (loss);
+        \draw[->,color=c3] (target1) -- (loss);
+        \draw[->,color=c5] (target2) -- (loss);
         \draw[->,bend right,color=c3] (loss) to node [midway,above,align=center,color=black] {\scriptsize Backpropagate} (llm);
         \draw[->,bend left,color=c5] (loss) to (llm);
         \node at ($(target1) + (0, 0.6)$) {\scriptsize Target};
@@ -185,17 +185,19 @@
         % \draw[->] (input2) -- (llm2);
         % \draw[->] (llm2) -- ($(llm2) + (\trainSpace-0.25, 0)$);
 
-        \node[concept,color=c0] (testOutRoot) at ($(doc1)!0.5!(doc2) + (7.1, 0.0)$) {};
+        \node[concept,color=c0] (testOutRoot) at ($(doc1)!0.5!(doc2) + (7.6, 0.0)$) {};
         \node[concept,color=c4] (testOut1) at ($(testOutRoot) + ({-90+\angleA+20}:{\nodeDist})$) {};
         \node[concept,color=c2] (testOut11) at ($(testOut1) + ({-90+\angleB}:{\nodeDist})$) {};
         \node[concept,color=c1] (testOut12) at ($(testOut1) + ({90-\angleB}:{\nodeDist})$) {};
         \node[concept,color=c6] (testOut2) at ($(testOutRoot) + ({90-\angleA-20}:{\nodeDist})$) {};
         \node at ($(testOutRoot) + (0.4, 0.9)$) {\scriptsize Output};
+        \node[fill={black!20},outer sep=2pt] (snp) at ($(doc1)!0.5!(doc2) + (5.8, 0)$) {\scriptsize Sum and prune};
         \draw[->] (testOutRoot) -- (testOut1);
         \draw[->] (testOut1) -- (testOut11);
         \draw[->] (testOut1) -- (testOut12);
         \draw[->] (testOutRoot) -- pic[midway,-,rotate=60] {Cross={3.5 and red}} (testOut2);
-        \draw[->] ($(doc1)!0.5!(doc2) + (4.6, 0)$) -- node [midway,above,align=center,draw,rounded corners=0.8pt,inner sep=1.4pt,outer sep=3.2pt] {\scriptsize Sum and prune} ($(doc1)!0.5!(doc2) + (6.8, 0)$);
+        \draw[->] ($(snp.west) + (-0.2, 0)$) to (snp) to ($(snp.east) + (0.3, 0)$);
+        % \draw[->] ($(doc1)!0.5!(doc2) + (4.6, 0)$) -- node [midway,above,align=center,draw,rounded corners=0.8pt,inner sep=1.4pt,outer sep=3.2pt] {\scriptsize Sum and prune} ($(doc1)!0.5!(doc2) + (6.8, 0)$);
 
         % PART D: Evaluation
         \coordinate (start) at ($(l1) + (0, -0.4)$);

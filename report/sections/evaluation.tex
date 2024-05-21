@@ -24,7 +24,7 @@ We finetune Mistral 7B v0.2 \cite{jiang2023mistral} with Low-Rank Adaptation \ci
 
 The hyperparameters for the post-processing steps are tuned by grid search on the validation set. We sweep over $\alpha \in 1 - \text{geomspace}(1 / |E_\text{raw}|, 1, 21)$ and $\beta \in \text{geomspace}(0.1, 1, 21) - 0.1$ and use the values that maximises the continuous F1 metric. For Wikipedia, we choose the subgraph modelling path length $N=4$ as it is the smallest $N$ such that almost all edges ($>99\%$) occur in at least one induced subgraph. Such criterion is used as smaller $N$ results in smaller subgraphs which we expect to be easier to model accurately. We choose $N=3$ for arXiv for the same reason.
 
-\subsection{Results}
+\subsection{Results}  \label{sec:results}
 
 \input{figures/metrics}
 
