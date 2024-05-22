@@ -1,20 +1,22 @@
-\begin{table}[t]
-\caption{\todo{End with a take home message}}
+{
+\addtolength{\tabcolsep}{-0.2em}
+\begin{table}[t!]
+\caption{Evaluation metrics of \name and baselines on Wikipedia and arXiv. \name performs particularly well in modelling semantics, and remains competitive syntactically and structurally.}
 \label{table:metrics}
 \centering
+\begin{small}
 \begin{tabularx}{\linewidth}{l l X X X X l}
 \toprule
- &  & Literal F1 & Fuzzy F1 & Cont. F1 & Graph F1 & Motif Dist. \\
-Dataset & Method & $\uparrow$ & $\uparrow$ & $\uparrow$ & $\uparrow$ & $\downarrow$ \\
+Dataset & Method & Literal F1 $\uparrow$ & Fuzzy F1 $\uparrow$ & Cont. F1 $\uparrow$ & Graph F1 $\uparrow$ & Motif Dist. $\downarrow$ \\
 \midrule
-\multirow[t]{8}{*}{Wikipedia} & Memorisation & \textbf{0.134} & 0.837 & 0.314 & 0.419 & \textbf{0.063} \\
+\multirow[t]{8}{*}{Wikipedia} & Memorisation & \textbf{0.134} & 0.837 & 0.314 & 0.419 & 0.063 \\
  & Hearst & 0.003 & 0.538 & 0.350 & 0.544 & 0.163 \\
  & Rebel & 0.004 & 0.624 & 0.356 & 0.072 & 0.132 \\
  & Zero-shot & 0.007 & 0.871 & 0.455 & 0.639 & 0.341 \\
  & One-shot & 0.031 & 0.888 & 0.477 & 0.610 & 0.314 \\
  & Three-shot & 0.031 & 0.880 & 0.475 & 0.622 & 0.354 \\
- & Finetune & 0.124 & 0.884 & 0.470 & 0.588 & 0.050 \\
- & \name & 0.093 & \textbf{0.915} & \textbf{0.500} & \textbf{0.644} & 0.080 \\
+ & Finetune & 0.124 & 0.884 & 0.470 & 0.588 & \textbf{0.050} \\
+ & \textbf{\name} & 0.093 & \textbf{0.915} & \textbf{0.500} & \textbf{0.644} & 0.080 \\
 \midrule
 \multirow[t]{8}{*}{arXiv} & Memorisation & 0.000 & 0.207 & 0.257 & 0.525 & \textbf{0.037} \\
  & Hearst & 0.000 & 0.000 & 0.151 & 0.553 & 0.098 \\
@@ -25,7 +27,10 @@ Dataset & Method & $\uparrow$ & $\uparrow$ & $\uparrow$ & $\uparrow$ & $\downarr
  % & Finetune & 0.000 & 0.196 & 0.228 & 0.359 & 0.606 \\
  % & Finetune masked & 0.000 & 0.097 & 0.169 & 0.385 & 0.413 \\
  & Finetune (transfer) & 0.000 & 0.440 & 0.225 & 0.441 & 0.148 \\
-& \name (transfer) & 0.040 & \textbf{0.570} & \textbf{0.357} & \textbf{0.633} & 0.097 \\
+& \textbf{\name} (transfer) & 0.040 & \textbf{0.570} & \textbf{0.357} & \textbf{0.633} & 0.097 \\
 \bottomrule
 \end{tabularx}
+\vspace*{-4mm}
+\end{small}
 \end{table}
+}

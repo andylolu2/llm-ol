@@ -8,6 +8,8 @@ For the Wikipedia experiment, we use Mistral 7B v0.2 (not instruction-tuned) \ci
 
 For the arXiv experiment, we further finetune the model trained on Wikipedia with masked loss objective on 2048 document-subgraph pairs from the arXiv training set. We merge the LoRA adaptors from the Wikipedia experiment and initialise new ones with $r=8$ and $\alpha=8$. The model is trained with batch size 16 and Adam with constant learning rate 3e-6 and warp-up from zero for the first 10 steps. Early stopping is used to terminate training when the loss stops improving on the evaluation set, which happened at step 288. \textbf{Finetune (transfer)} uses the same configuration. Eearly stopping happened at step 192.
 
+\input{figures/linearisation_template.tex}
+
 \section{Hearst}
 
 The \textbf{Hearst} baseline follows the implementation by \citet{roller2018hearst}. We give a description of the implementation here. \todo{CoreNLP, blah blah blah...}

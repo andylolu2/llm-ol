@@ -1,0 +1,14 @@
+\begin{figure}[h]
+    \centering
+    \begin{lstlisting}[frame=single]
+<s>[INST]\
+Title: {{ title }}
+{{ abstract }}[/INST]\
+{% for path in paths %}
+{{ path | join(" -> ") }}
+{% endfor %}\
+</s>
+\end{lstlisting}
+    \caption{Linearisation template for \name training.}
+    \label{fig:linearisation-template}
+\end{figure}

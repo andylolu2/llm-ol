@@ -1,16 +1,22 @@
 \begin{figure}[t]
+\vspace*{-2mm}  
     \centering
     \begin{subfigure}[c]{\textwidth}
         \centering
         \includegraphics[width=\linewidth,trim={0 1cm 0 0},clip]{media/vanilla.png}
+        
+        \vspace*{-1mm}
         \caption{Direct finetuning}
     \end{subfigure}%
     \hfill
     \begin{subfigure}[c]{\textwidth}
         \centering
         \includegraphics[width=\linewidth,trim={0 1cm 0 0},clip]{media/masked.png}
+        
+        \vspace*{-1mm}  
         \caption{Finetuning with masked loss}
     \end{subfigure}%
-    \caption{Per token loss on an example from the test set of the final model trained with and without the custom masked loss objective. We observe that using the masked loss objective improves generalisation on the high-level relations while maintaining performance on lower-level relations.}
+    \caption{Per token loss on a test set example of the final model trained with and without the custom masked loss objective. Within the top-level concepts (children of the root) shown here, ``Culture'' and ``Humanities'' are in the training set while others are not. Using the masked loss objective improves generalisation on the high-level relations while maintaining performance on lower-level relations.}
     \label{fig:vanilla-vs-mask}
+    \vspace*{-2mm}  
 \end{figure}

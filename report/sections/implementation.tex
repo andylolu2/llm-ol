@@ -1,6 +1,6 @@
 \chapter{Design and implementation}
 
-One of the goals of this project is to explore the paradigm shift from traditional subtask composition OL to end-to-end OL. The novelty of the task in of itself means that many components of the project has to be built from ground up. This chapter documents the implementation and design decisions made for each of these building blocks, including curating the datasets (\cref{sec:implementation:data-collection}), building reliable baselines (\cref{sec:implementation:baselines}), introducing our own method \name (\cref{sec:implementation:core}), and developing robust methods of evaluation (\cref{sec:implementation:evaluation}).
+One of the goals of this project is to explore the paradigm shift from traditional subtask composition OL to end-to-end OL. The novelty of the task in of itself means that many components of the project has to be built from ground up. This chapter documents the implementation and design decisions made for each of these building blocks, including curating the datasets (\cref{sec:implementation:data-collection}), developing our own method named \textbf{\name} (\cref{sec:implementation:core}), building reliable baselines for comparison (\cref{sec:implementation:baselines}), and developing robust methods of evaluation (\cref{sec:implementation:evaluation}).
 
 % \section{Starting point}
 
@@ -19,6 +19,57 @@ At the time of writing, Wikipedia has 2,351,998 categories and 6,825,439 article
 \subsection{arXiv}
 
 The arXiv taxonomy is much simpler and can be obtained from its taxonomy page or its source code directly. To collect the main corpus, I take a subset from the arXiv dataset on Kaggle\footnote{\url{https://www.kaggle.com/datasets/Cornell-University/arxiv}} by selecting all papers uploaded in the years 2020--2022 with more than or equal to 10 citations. The citation count is not part of the metadata available in the arXiv dataset, and instead is taken from the Semantic Scholar API\footnote{\url{https://api.semanticscholar.org/}}. For each paper, the title, abstract and category assignment is taken. The final dataset has 161 concepts, 166 taxonomic relations and 126,001 documents.
+
+\section{\name}  \label{sec:implementation:core}
+
+This section introduces one of the main contributions of this project: \name, our novel, simple and scalable method for end-to-end OL with LLMs. On a high level, \name uses an LLM to model concept subgraphs of the target ontology by utilising a linearisation scheme to transform subgraphs into string sequences. In contrast to learning individual edges, modelling subgraphs allows the model to learn higher-order structures, such as the interactions between three or more nodes. To create the training dataset, \name relies on the annotations of documents to concepts to generate document-subgraph pairings. Such subgraphs are much smaller than the complete graph, so they can be learned by the model more easily. The generated subgraphs for each document are summed into a weighted graph, and simple post-processing is applied to obtain the final predicted ontology. I would like to emphasise the novelty of \name as it is not a direct extension of any existing methods in OL or machine learning in general, though some inspiration is taken from graph generative modelling \cite{li2018learning} and multitask learning \cite{caruana1997multitask}. Such connections will be discussed in greater detail later in this section.
+
+\subsection{Subgraph modeling}  \label{sec:method:subgraph}
+
+\input{figures/prompt_template}
+
+We first need to create document-subgraph pairs from our dataset to serve as inputs and targets for training our model. Given a document and its associated set of concepts $C$, define the \emph{relevant paths} as the set of paths of at most length $N$ from the root to any of the concepts in $C$. The \emph{relevant subgraph} is the set of nodes (concepts) and edges (taxonomic relations) that occur at least once in the relevant paths. An example is shown in \cref{fig:prompt-example} (left). The choice of $N$ is task-specific and I describe the method for choosing $N$ in \cref{sec:implementation}.
+
+To employ LLMs to model the subgraphs, we must linearise the graph into a string sequence. Existing methods for autoregressive graph generation employ BFS \cite{you2018graphrnn} or DFS \cite{goyal2020graphgen} ordering starting at an arbitrary node. We instead choose to linearise the subgraph as a list of relevant paths that produced the subgraph in the first place. We do so over BFS/DFS ordering for three reasons: 1)~the subgraph is defined from the relevant paths, which makes them the most natural representation; 2)~we hypothesise that the hierarchy of concepts in each path is a desirable inductive bias for the hierarchical nature of an ontology. 3)~the path-based representation is much easier to describe in natural language instructions so that our LLM prompting-based baselines may produce reasonable results without finetuning. The linearisation template can be found in \cref{fig:linearisation-template} in \cref{appendix:training-details}.
+
+\subsection{Masked loss regularisation}
+
+\input{figures/vanilla_vs_masked}
+
+Given the linearised training targets described in the previous section, one might expect that directly training an LLM to model the string sequences using the standard language modelling loss will result in a model that can accurately generate subgraphs. My initial experiments, however, showed that this is not the case. Inspecting the training loss curves, we observe that the model demonstrates a clear sign of overfitting, even though it has not completed a single epoch!
+
+\todo{Insert train/val loss curves.}
+
+We discover that directly finetuning an LLM on the sequences defined in \cref{sec:method:subgraph} produces poor results due to overfitting. Analysing the per-token loss of a naively finetuned model on the test split shows that the model tends to memorise high-level relations from the training set, leading to poor generalisation as shown in \cref{fig:vanilla-vs-mask} (top). This occurs because high-level relations are present in many relevant subgraphs and thus repeated many times in the training set. This problem is not solvable by early stopping since terminating training early will result in a model that massively underfits lower-level relations.
+
+This issue is akin to multi-task learning \cite{caruana1997multitask} where the standard solution is to apply some loss weighting factor to rebalance training objectives \cite{sermanet2013overfeat,kendall2018multi}. We draw inspiration from this connection and propose a new training objective that randomly masks the loss contribution from frequently occurring relations. Suppose a relation $u \to v$ is present $n$ times in the training set. During training, when $u \to v$ appears in one of the relevant paths, we mask the tokens for $v$ with probability $\max(1 - M/n, 0)$, where $M$ is a constant for the average number of times a relation is present in the training set. Note that while $v$ is masked from the target, its tokens are still present in the input sequence as context for later tokens. A concrete example is shown in \cref{fig:prompt-template} (right).
+
+\subsection{Post-processing}  \label{sec:method:post-processing}
+
+The final output graph is obtained by summing all generated subgraphs for each document and pruning low-weighted components. Given the generated subgraphs $G_1 = (V_1, E_1), \dots, G_n = (V_n, E_n)$, the raw output graph is defined as $G_{\text{raw}} = (V_{\text{raw}}, E_{\text{raw}})$ where $V_\text{raw} = \cup_{i=1}^n V_n$ and $E_\text{raw} = \cup_{i=1}^n E_n$. Each edge $(u, v) \in E_\text{raw}$ is additionally weighted by the number of times they occur in the collection of subgraphs: $w_{u, v} = \sum_{i=1}^n \mathbb{1}[(u,v) \in E_n]$. A few simple post-processing steps are then applied to $G_\text{raw}$:
+\begin{enumerate}
+    \item Self-loop pruning: All edge $(u, u) \in E_\text{raw}$ are removed.
+    \item Inverse-edge pruning: All edges $(u, v) \in E_\text{raw}$ where $(v, u) \in E_\text{raw}$ and $w_{v, u} > w_{u, v}$ are removed.
+    \item Absolute thresholding: Edges in $E_\text{raw}$ with weight below the $\alpha$-th quantile are removed, where $0 \leq \alpha \leq 1$ is a hyperparamter.
+    \item Relative thresholding: For each vertex $u \in V_\text{raw}$, let $e_1, \dots, e_k$ be the outgoing edges from $u$ sorted by weight in ascending order. Define the cumulative weight as $C(e_i) = \sum_{j=1}^i w_{e_j} / \sum_{j=1}^k w_{e_j}$. The edges $\{e_i\ |\ C(e_i) \leq \beta\}$ are pruned, where $0 \leq \beta \leq 1$ is a hyperparameter.
+    \item Clean up: After pruning all edges, nodes with no incoming or outgoing edges are removed.
+\end{enumerate}
+In our implementation, we choose the hyperparameters $\alpha$ and $\beta$ by tuning on the validation set.
+
+\subsection{Implementation}
+
+We finetune Mistral 7B v0.2 \cite{jiang2023mistral} with Low-Rank Adaptation \cite{hu2021lora} on the masked loss objective. The model is trained on the Wikipedia dataset for two epochs with Adam. During inference, the outputs are generated with temperature 0.1 and nucleus sampling \cite{holtzman2019curious} top-$p$ of 0.9. The weight of each edge is given by the number of generated subgraphs in which it appears. We include a finetuning baseline without the masked loss objective, denoted as \textbf{Finetune}. To adapt \name for arXiv, we further finetune the model on 2048 document-subgraph pairs from arXiv. We initialise new low-rank adaptors and train until the loss stops improving on the validation set. We name these models \textbf{\name (transfer)} and \textbf{Finetune (transfer)} for training without and without the masked loss objective respectively. Full details for the Wikipedia and arXiv experiments can be found in \cref{appendix:training-details}.
+
+The hyperparameters for the post-processing steps are tuned by grid search on the validation set. We sweep over $\alpha \in 1 - \text{geomspace}(1 / |E_\text{raw}|, 1, 21)$ and $\beta \in \text{geomspace}(0.1, 1, 21) - 0.1$ and use the values that maximises the continuous F1 metric. For Wikipedia, we choose the subgraph modelling path length $N=4$ as it is the smallest $N$ such that almost all edges ($>99\%$) occur in at least one induced subgraph. Such criterion is used as smaller $N$ results in smaller subgraphs which we expect to be easier to model accurately. We choose $N=3$ for arXiv for the same reason.
+
+
+% Key points:
+% \begin{enumerate}
+%     \item Aggregate inference outputs into a weighted directed graph.
+%     \item Following \cite{roller2018hearst}, we prune self loops and edge $u \to v$ if $v \to u$ is also in the graph with a higher weight.
+%     \item Apply two thresholding values to prune the graph further. The first threshold $\alpha$ where the lowest-weighted $100 \alpha\%$ of edges are pruned. The second threshold $\beta$ is a relative threshold where \emph{for each node}, the lowest-weighted outgoing edges that are in the bottom $100\beta\%$ cumulative probability mass are removed. \todo{Perhaps easier to describe in equations.}
+%     \item The hyperparameters $\alpha$ and $\beta$ are tuned on the evaluation set.
+% \end{enumerate}
 
 \section{Baselines}  \label{sec:implementation:baselines}
 
@@ -49,9 +100,13 @@ For the baseline, I reproduce the implementation by \citet{roller2018hearst}. It
     \caption{Precision and recall of Hearst patterns on the test splits.}
     \label{table:hearst-precision-recall}
 \end{table}
+This is classic issue of Hearst patterns due to the non-exhaustive nature of the set of patterns: Concepts in taxonomic relations might appear in the exact formats that the patterns are designed to match. To improve Hearst patterns, one can exploit the structure of the extracted relations to make more informed decisions about the missing relations. For example, the relation $u \to v$ is more likely to be true if $u$ is a parent of many other concepts. To formalise this intuition, \citet{roller2018hearst} proposes to use a low-rank approximation \cite{schmidt1907theorie} (commonly used to handle missing values) of the weighted adjacency matrix to enable comparison between any two concepts even if they are not directly connected. \todo{Either say we omit the details here or link to appendix.}
+
+\todo{Show some qualitative results to confirm the validity of the implementation.}
 
 \subsection{REBEL}
-The REBEL-large model \cite{cabot2021rebel} is an encoder-decoder LLM trained to extract many types of relations from Wikipedia articles. We only take the ``subclass of'', ``instance of'', ``member of'' and ``part of'' relations that were extracted. Similar to \textbf{Hearst}, we find that it fails to find many direct relations between ground truth concepts. The same low-rank smoothing technique is applied to give a higher recall.
+
+The REBEL-large model \cite{cabot2021rebel} is an encoder-decoder LLM trained to extract many types of relations from Wikipedia articles. We only take the ``subclass of'', ``instance of'', ``member of'' and ``part of'' relations that were extracted. Similar to Hearst patterns, we find that it fails to find many direct relations between ground truth concepts. The same low-rank smoothing technique is applied to give a higher recall.
 
 \subsection{Memorisation}
 Simply memorising the train graph is a surprisingly strong baseline due to the overlap between train and test graphs, especially for Wikipedia. The weight of each edge is given by the number of relevant subgraphs in which it appears.
@@ -59,52 +114,6 @@ Simply memorising the train graph is a surprisingly strong baseline due to the o
 % \paragraph{Prompting}
 % We test the \textbf{zero/one/three-shot} performance of instruction-tuned LLMs on the subgraph modelling task described in \cref{sec:method:subgraph}. We use Mistral 7B Instruct v0.2 \cite{jiang2023mistral} as the instruct model. We perform manual prompt engineering to describe the task and steer the model to return outputs of the same format as that described in \cref{sec:method:subgraph}. The prompt can be found in \cref{appendix:prompt-template}.
 
-
-\section{\name}  \label{sec:implementation:core}
-
-This section introduces \name, a simple and scalable method for end-to-end OL with LLMs. On a high level, \name uses an LLM to model linearised subgraphs of the target ontology. In contrast to learning individual edges, modelling subgraphs allows the model to learn higher-order structures, such as the interactions between three or more nodes. To create the training dataset, \name relies on the assignment of documents to concepts which induces a relevant subgraph for each document. Such subgraphs are much smaller than the complete graph so they can be learned by the model more easily. The generated subgraphs for each document are summed into a weighted graph and simple post-processing is applied to obtain the final predicted ontology.
-
-% Highlight the core components and insights for \name.
-% \begin{enumerate}
-%     \item The idea to model subgraphs instead of edges. Motivation: More efficient inference, captures the global structure of an ontology (the hierarchical structure is "baked in").
-%     \item Components: 1. Document $\to$ subgraph. 2. Aggregrate subgraphs induced by each document into a weighted global graph. 3. Apply post-processing and pruning.
-%     \item Argue that this setup is appealing for scaling: Inference can be parallelised across the source documents, so inference duration is inversely proportional to the amount of hardware available. 
-% \end{enumerate}
-
-\subsection{Subgraph modeling}  \label{sec:method:subgraph}
-
-\input{figures/prompt_template}
-
-Here, we describe the method for creating document-subgraph pairings. Given a document and its associated set of concepts $C$, we define the \emph{relevant paths} as the set paths of at most length $N$ from the root to any of the concepts in $C$. The \emph{relevant subgraph} is the set of nodes and edges that occur at least once in the relevant paths. An example is shown in the left subfigure of \cref{fig:prompt-template}. The choice of $N$ is task-specific and we describe our method for choosing $N$ in \cref{sec:implementation}.
-
-To employ LLMs to model the subgraphs, we must linearise the graph into a string for sequence modelling. Existing methods for autoregressive graph generation employ BFS \cite{you2018graphrnn} or DFS \cite{goyal2020graphgen} ordering starting at an arbitrary node. We instead choose to linearise the subgraph as a list of relevant paths that produced the subgraph in the first place. We do so for three reasons: Firstly, the subgraph is defined from such a collection of paths which makes them the most natural representation; Secondly, we hypothesise the hierarchy of concepts on each path is a desirable inductive bias for the hierarchical nature of an ontology; Thirdly, the path-based representation is much easier to describe in natural language instructions so that our LLM prompting-based baselines may produce reasonable results without finetuning. The linearisation template can be found in \cref{appendix:prompt-template}.
-
-% Key points:
-% \begin{enumerate}
-%     \item Explain how to construct document-subgraph pairing from the training dataset. E.g., the path length cutoff is selected as the smallest number that still covers almost all of the edges.
-%     \item Linearisation of subgraph to a sequence. Why choose the method of ``subgraph as a set of paths''? Ans: More natural language-like, easier for zero/few-shot to comprehend so we have stronger baselines.
-%     \item \fig{Example output format.}
-% \end{enumerate}
-
-\subsection{Post-processing}  \label{sec:method:post-processing}
-
-The final output graph is obtained by summing all generated subgraphs for each document and pruning low-weighted components. Given the generated subgraphs $G_1 = (V_1, E_1), \dots, G_n = (V_n, E_n)$, the raw output graph is defined as $G_{\text{raw}} = (V_{\text{raw}}, E_{\text{raw}})$ where $V_\text{raw} = \cup_{i=1}^n V_n$ and $E_\text{raw} = \cup_{i=1}^n E_n$. Each edge $(u, v) \in E_\text{raw}$ is additionally weighted by the number of times they occur in the collection of subgraphs: $w_{u, v} = \sum_{i=1}^n \mathbb{1}[(u,v) \in E_n]$. A few simple post-processing steps are then applied to $G_\text{raw}$:
-\begin{enumerate}
-    \item Self-loop pruning: All edge $(u, u) \in E_\text{raw}$ are removed.
-    \item Inverse-edge pruning: All edges $(u, v) \in E_\text{raw}$ where $(v, u) \in E_\text{raw}$ and $w_{v, u} > w_{u, v}$ are removed.
-    \item Absolute thresholding: Edges in $E_\text{raw}$ with weight below the $\alpha$-th quantile are removed, where $0 \leq \alpha \leq 1$ is a hyperparamter.
-    \item Relative thresholding: For each vertex $u \in V_\text{raw}$, let $e_1, \dots, e_k$ be the outgoing edges from $u$ sorted by weight in ascending order. Define the cumulative weight as $C(e_i) = \sum_{j=1}^i w_{e_j} / \sum_{j=1}^k w_{e_j}$. The edges $\{e_i\ |\ C(e_i) \leq \beta\}$ are pruned, where $0 \leq \beta \leq 1$ is a hyperparameter.
-    \item Clean up: After pruning all edges, nodes with no incoming or outgoing edges are removed.
-\end{enumerate}
-In our implementation, we choose the hyperparameters $\alpha$ and $\beta$ by tuning on the validation set.
-
-% Key points:
-% \begin{enumerate}
-%     \item Aggregate inference outputs into a weighted directed graph.
-%     \item Following \cite{roller2018hearst}, we prune self loops and edge $u \to v$ if $v \to u$ is also in the graph with a higher weight.
-%     \item Apply two thresholding values to prune the graph further. The first threshold $\alpha$ where the lowest-weighted $100 \alpha\%$ of edges are pruned. The second threshold $\beta$ is a relative threshold where \emph{for each node}, the lowest-weighted outgoing edges that are in the bottom $100\beta\%$ cumulative probability mass are removed. \todo{Perhaps easier to describe in equations.}
-%     \item The hyperparameters $\alpha$ and $\beta$ are tuned on the evaluation set.
-% \end{enumerate}
 
 \section{How to evaluate end-to-end OL?}  \label{sec:implementation:evaluation}
 

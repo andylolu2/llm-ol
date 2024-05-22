@@ -1,18 +1,18 @@
-\begin{figure}
+\begin{wrapfigure}{r}{0.5\textwidth}
+    \vspace{-3mm}
     \centering
-    \hspace*{\fill}%
-    \begin{subfigure}[t]{0.3\textwidth}
+    \begin{subfigure}[t]{0.5\linewidth}
         \centering
-        \includegraphics[width=\linewidth]{media/Wikipedia_train_eval_test_split.pdf}
+        \includegraphics[width=\linewidth,trim={0.4cm 0.65cm 0.5cm 0.9cm},clip]{media/Wikipedia_train_eval_test_split.pdf}
         \caption{Wikipedia}
     \end{subfigure}%
-    \hfill
-    \begin{subfigure}[t]{0.35\textwidth}
+    \begin{subfigure}[t]{0.4\linewidth}
         \centering
-        \includegraphics[width=\linewidth]{media/arXiv_train_eval_test_split.pdf}
+        \includegraphics[width=\linewidth,trim={1cm 1cm 1cm 1.2cm},clip]{media/arXiv_train_eval_test_split.pdf}
         \caption{arXiv}
     \end{subfigure}
-    \hspace*{\fill}%
-    \caption{Intersection of nodes in the train, eval and test split of the datasets.}
+    \vspace*{-2mm}
+    \caption{Intersection of concepts among the train, validation and test splits of the datasets.}
+    \vspace*{-3mm}
     \label{fig:dataset-overlap}
-\end{figure}
+\end{wrapfigure}
