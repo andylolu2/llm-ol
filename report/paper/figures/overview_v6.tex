@@ -98,7 +98,7 @@
         % \node[anchor=west,inner sep=0] at ($(root.west) + (0, -1.5)$) {\small Test};
 
         % PART B: Training
-        \newcommand{\vertSpace}{0.2}
+        \newcommand{\vertSpace}{0.22}
         \newcommand{\trainSpace}{0.7}
         % \node[doc,fill=c3] (input) at ($(doc3) + (1.0, 0)$) {};
         % \node[doc,fill=c5] (inputp) at ($(doc7) + (1.0, 0)$) {};
@@ -106,7 +106,7 @@
         \node[llm,anchor=west,fill=llmcolor] (llm) at ($(doc3)!0.5!(doc7) + (1, 0)$) {\small LLM};
         \node[anchor=west,align=center,rounded corners=1.5pt,outer sep=3pt,inner sep=6pt,fill=losscolor] (loss) at ($(llm.east) + (\trainSpace + 0.2, 0)$) {\small Mask-regularised loss};
 
-        \begin{scope}[local bounding box=target1,shift={($(loss.east) + (0.7, 0.2)$)},outer sep=3pt]
+        \begin{scope}[local bounding box=target1,shift={($(loss.east) + (1.1, 0.2)$)},outer sep=3pt]
             \node[concept,color=c0] (sgRoot) {};
             \node[concept,color=c6] (sg2) at ($(sgRoot) + ({90-\angleA-20}:{\nodeDistShort})$) {};
             \node[concept,color=c3] (sg21) at ($(sg2) + ({90-\angleB}:{\nodeDistShort})$) {};
@@ -114,7 +114,7 @@
             \draw[->] (sg2) -- (sg21);
         \end{scope}
 
-        \begin{scope}[local bounding box=target2,shift={($(loss.east) + (0.7, -0.7)$)},outer sep=3pt]
+        \begin{scope}[local bounding box=target2,shift={($(loss.east) + (1.1, -0.85)$)},outer sep=3pt]
             \node[concept,color=c0] (sgRoot) {};
             \node[concept,color=c6] (sg2) at ($(sgRoot) + ({90-\angleA-20}:{\nodeDistShort})$) {};
             \node[concept,color=c5] (sg22) at ($(sg2) + ({-90+\angleB}:{\nodeDistShort})$) {};
@@ -130,8 +130,10 @@
         \draw[color=c5] (doc7) -| ($(doc7.east)!0.5!(out)$) |- (out);
         \draw[->,color=c5] ($(llm.east) + (0, -\vertSpace)$) -- ($(loss.west) + (0, -\vertSpace)$);
 
-        \draw[->,color=c3,bend right] (target1) to (loss);
-        \draw[->,color=c5,bend left] (target2) to (loss);
+        \coordinate (out) at ($(loss.east) + (0, \vertSpace)$);
+        \draw[->,color=c3] (target1) -| ($(target1)!0.5!(out)$) |- (out);
+        \coordinate (out) at ($(loss.east) + (0, -\vertSpace)$);
+        \draw[->,color=c5] (target2) -| ($(target2)!0.5!(out)$) |- (out);
         \draw[->,bend right,color=c3] (loss) to node [midway,above,align=center,color=black] {\scriptsize Backpropagate} (llm);
         \draw[->,bend left,color=c5] (loss) to (llm);
         \node at ($(target1) + (0, 0.6)$) {\scriptsize Target};
@@ -163,10 +165,10 @@
         % \node (dots2) at ($(dots) + (4.0, 0)$) {...};
         \node[rotate=90] at ($(sg1)!0.5!(sg2) + (0, -0.15)$) {...};
         \draw[color=c1] (doc1) -| ($(doc1.east)!0.5!(llm1.west)$) |- ($(llm1.west) + (0, \vertSpace)$);
-        \coordinate (out1) at ($(llm1.east) + (\trainSpace, 0.6)$);
+        \coordinate (out1) at ($(llm1.east) + (\trainSpace, 0.75)$);
         \draw[->,color=c1] ($(llm1.east) + (0, \vertSpace)$) -| ($(llm1.east)!0.5!(out1)$) |- (out1);
         \draw[color=c2] (doc2) -| ($(doc2.east)!0.5!(llm1.west)$) |- ($(llm1.west) + (0, -\vertSpace)$);
-        \coordinate (out2) at ($(llm1.east) + (\trainSpace, -0.6)$);
+        \coordinate (out2) at ($(llm1.east) + (\trainSpace, -0.75)$);
         \draw[->,color=c2] ($(llm1.east) + (0, -\vertSpace)$) -| ($(llm1.east)!0.5!(out2)$) |- (out2);
 
 
@@ -209,9 +211,9 @@
         % Draw a separation line between Part B and Part C
         \draw[color={black!30},dashed] ($(root) + (-0.85, 0)$) -- ($(root) + (12.65, 0)$);
         % Caption Part B
-        \node[color={black!60},inner sep=0,rotate=90] at ($(l2) + (-0.8, 0)$) {\small Training};
+        \node[color={black!50},inner sep=0,rotate=90] at ($(l2) + (-0.8, 0)$) {\small Training};
         % Caption Part C
-        \node[color={black!60},inner sep=0,rotate=90,align=center] at ($(l1) + (-0.8,0)$) {\small Evaluation /\\Inference};
+        \node[color={black!50},inner sep=0,rotate=90,align=center] at ($(l1) + (-0.8,0)$) {\small Evaluation /\\Inference};
         % Arrow connection llm train to llm inference.
         \draw[->,color={black!30}] (llm) |- ($(llm)!0.5!(llm1)$) -| (llm1);
         % Legend

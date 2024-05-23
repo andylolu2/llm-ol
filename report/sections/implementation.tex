@@ -20,6 +20,19 @@ At the time of writing, Wikipedia has 2,351,998 categories and 6,825,439 article
 
 The arXiv taxonomy is much simpler and can be obtained from its taxonomy page or its source code directly. To collect the main corpus, I take a subset from the arXiv dataset on Kaggle\footnote{\url{https://www.kaggle.com/datasets/Cornell-University/arxiv}} by selecting all papers uploaded in the years 2020--2022 with more than or equal to 10 citations. The citation count is not part of the metadata available in the arXiv dataset, and instead is taken from the Semantic Scholar API\footnote{\url{https://api.semanticscholar.org/}}. For each paper, the title, abstract and category assignment is taken. The final dataset has 161 concepts, 166 taxonomic relations and 126,001 documents.
 
+\subsection{Train and test splits}
+
+Generating the train and test splits from the collected datasets is also a non-trivial problem. In most of machine learning, a dataset is considered to be a set of independent and identically distributed samples from the true data distribution. One can then randomly partition this set into two to obtain the train and test splits. However, in end-to-end OL, the task is to build an ontology given a source corpus---to obtain an equivalent dataset one would have to collect many ontologies, which is impractical given the data engineering work required and the limited number of ontologies available. Instead, I propose a strategy to split a single ontology into train, validation, and test ontolgies.
+
+\input{figures/dataset}
+
+We want to design a method to split ontologies that maximises the \emph{research value}: our train and test splits should help us distinguish methods that generalise well from those that do not. For example, the naive approach of randomly splitting the edges in the ontology into train and test splits likely leads to data leakage as nodes with multiple incident edges might occur in both train and test splits. A model that memorises the concepts in the training set will perform very well without actually learning the underlying concept distribution. I instead exploit the hierarchical structure of Wikipedia and arXiv to ensures that the test split contains sufficiently many unseen concepts (and thus relations) while still being representative of the full ontology (\cref{fig:dataset-overlap}). The method is as follows:
+\begin{enumerate}[leftmargin=*]
+    \item Let $V^\text{top}$ be the set of top-level nodes, that is, children of the root node. Randomly partition $V^\text{top}$ into train $V^\text{top}_{\text{train}}$, validation $V^\text{top}_{\text{val}}$, and test $V^\text{top}_{\text{test}}$ splits in 7:3:10 ratio.
+    \item Let $d$ be the depth on the full graph, that is, the distance of the furthest node from the root. The nodes of the train graph are taken as the union of all the nodes that are within distance $d - 1$ from any node in $V^\text{top}_\text{train}$, plus $V_\text{train}^\text{top}$ and the root. The edges are all the edges in the full graph that have both endpoints in the train graph. Similar applies for $V^\text{top}_\text{val}$ and $V^\text{top}_\text{test}$.
+\end{enumerate}
+
+
 \section{\name}  \label{sec:implementation:core}
 
 This section introduces one of the main contributions of this project: \name, our novel, simple and scalable method for end-to-end OL with LLMs. On a high level, \name uses an LLM to model concept subgraphs of the target ontology by utilising a linearisation scheme to transform subgraphs into string sequences. In contrast to learning individual edges, modelling subgraphs allows the model to learn higher-order structures, such as the interactions between three or more nodes. To create the training dataset, \name relies on the annotations of documents to concepts to generate document-subgraph pairings. Such subgraphs are much smaller than the complete graph, so they can be learned by the model more easily. The generated subgraphs for each document are summed into a weighted graph, and simple post-processing is applied to obtain the final predicted ontology. I would like to emphasise the novelty of \name as it is not a direct extension of any existing methods in OL or machine learning in general, though some inspiration is taken from graph generative modelling \cite{li2018learning} and multitask learning \cite{caruana1997multitask}. Such connections will be discussed in greater detail later in this section.
@@ -36,83 +49,119 @@ To employ LLMs to model the subgraphs, we must linearise the graph into a string
 
 \input{figures/vanilla_vs_masked}
 
-Given the linearised training targets described in the previous section, one might expect that directly training an LLM to model the string sequences using the standard language modelling loss will result in a model that can accurately generate subgraphs. My initial experiments, however, showed that this is not the case. Inspecting the training loss curves, we observe that the model demonstrates a clear sign of overfitting, even though it has not completed a single epoch!
+Given the linearised training targets described in the previous section, one might expect that directly training an LLM to model the string sequences using the standard language modelling loss will result in a model that can accurately generate subgraphs. My initial experiments, however, showed that this is not the case. Inspecting the training loss curves, we observe that the model demonstrates a clear sign of overfitting:
+\begin{figure}[H]
+    \centering
+    \includegraphics[width=0.5\linewidth]{media/finetune_loss.pdf}
+    \captionsetup{width=0.6\linewidth}
+    \caption{Training loss curves of a LLM directly finetuned on the linearised subgraph sequences. The model overfits the training set even before completing a single epoch.}
+\end{figure}
+Analysing the per-token loss on some test split sequences reveals that the model tends to memorise high-level relations from the training set, leading to poor generalisation, as shown in \cref{fig:vanilla-vs-mask} (top). The crux of the problem is that low-level relations are substantially more diverse than high-level ones: since we present both types of relations at the same rate to the model, it tends to overfit on high-level relations while underfitting on low-level ones.
 
-\todo{Insert train/val loss curves.}
+To alleviate this issue, I introduce a new training objective that randomly masks the loss contribution of frequently occurring relations. Suppose a relation $u \to v$ is present $n$ times in the training set. During training, when $u \to v$ appears in one of the relevant paths, we mask the loss contribution of the tokens for $v$ with probability $\max(1 - \nicefrac{M}{n}, 0)$, where $M$ is a constant for the average number of times a relation is present in the training set. Intuitively, this regulariser ensures that relations that are more frequent than the average will only seen $\approx\!M$ times as targets throughout training, while relations less frequent than the average will always be present. This is similar the standard technique of reweighing training objectives in multitask learning \cite{caruana1997multitask}. In our case, the model is learning multiple levels of relations in parallel, so down-weighing the loss on higher-level relations helps to reduce overfitting on those relations while not affecting the learning of lower-level relations. As shown in \cref{fig:vanilla-vs-mask} (bottom), the masked loss objective indeed improves generalisation on the test set.
 
-We discover that directly finetuning an LLM on the sequences defined in \cref{sec:method:subgraph} produces poor results due to overfitting. Analysing the per-token loss of a naively finetuned model on the test split shows that the model tends to memorise high-level relations from the training set, leading to poor generalisation as shown in \cref{fig:vanilla-vs-mask} (top). This occurs because high-level relations are present in many relevant subgraphs and thus repeated many times in the training set. This problem is not solvable by early stopping since terminating training early will result in a model that massively underfits lower-level relations.
-
-This issue is akin to multi-task learning \cite{caruana1997multitask} where the standard solution is to apply some loss weighting factor to rebalance training objectives \cite{sermanet2013overfeat,kendall2018multi}. We draw inspiration from this connection and propose a new training objective that randomly masks the loss contribution from frequently occurring relations. Suppose a relation $u \to v$ is present $n$ times in the training set. During training, when $u \to v$ appears in one of the relevant paths, we mask the tokens for $v$ with probability $\max(1 - M/n, 0)$, where $M$ is a constant for the average number of times a relation is present in the training set. Note that while $v$ is masked from the target, its tokens are still present in the input sequence as context for later tokens. A concrete example is shown in \cref{fig:prompt-template} (right).
+A concrete masked training sequence can be found in \cref{fig:prompt-example} (right).
 
 \subsection{Post-processing}  \label{sec:method:post-processing}
 
-The final output graph is obtained by summing all generated subgraphs for each document and pruning low-weighted components. Given the generated subgraphs $G_1 = (V_1, E_1), \dots, G_n = (V_n, E_n)$, the raw output graph is defined as $G_{\text{raw}} = (V_{\text{raw}}, E_{\text{raw}})$ where $V_\text{raw} = \cup_{i=1}^n V_n$ and $E_\text{raw} = \cup_{i=1}^n E_n$. Each edge $(u, v) \in E_\text{raw}$ is additionally weighted by the number of times they occur in the collection of subgraphs: $w_{u, v} = \sum_{i=1}^n \mathbb{1}[(u,v) \in E_n]$. A few simple post-processing steps are then applied to $G_\text{raw}$:
-\begin{enumerate}
-    \item Self-loop pruning: All edge $(u, u) \in E_\text{raw}$ are removed.
-    \item Inverse-edge pruning: All edges $(u, v) \in E_\text{raw}$ where $(v, u) \in E_\text{raw}$ and $w_{v, u} > w_{u, v}$ are removed.
-    \item Absolute thresholding: Edges in $E_\text{raw}$ with weight below the $\alpha$-th quantile are removed, where $0 \leq \alpha \leq 1$ is a hyperparamter.
-    \item Relative thresholding: For each vertex $u \in V_\text{raw}$, let $e_1, \dots, e_k$ be the outgoing edges from $u$ sorted by weight in ascending order. Define the cumulative weight as $C(e_i) = \sum_{j=1}^i w_{e_j} / \sum_{j=1}^k w_{e_j}$. The edges $\{e_i\ |\ C(e_i) \leq \beta\}$ are pruned, where $0 \leq \beta \leq 1$ is a hyperparameter.
+The final output graph is obtained by summing all generated subgraphs for each document and pruning low-weighted components. Given the generated subgraphs $G_1 = (V_1, E_1), \dots, G_n = (V_n, E_n)$, the raw output graph is defined as $G_\text{raw} = (V_\text{raw}, E_\text{raw})$, where $V_\text{raw} = \cup_{i=1}^n V_n$ and $E_\text{raw} = \cup_{i=1}^n E_n$. Each edge $(u, v) \in E_\text{raw}$ is additionally weighted by the number of times it occurs in the collection of subgraphs: $w(u, v) = \sum_{i=1}^n \mathbbm{1}[(u,v) \in E_n]$. A few simple post-processing steps are then applied to $G_\text{raw}$ in order to prune it:
+\begin{enumerate}[leftmargin=*]
+    \item Self-loop pruning: All edges $(u, u) \in E_\text{raw}$ are removed.
+    \item Inverse-edge pruning: For $(u, v) \in E_\text{raw}$, if $(v, u) \in E_\text{raw}$ and $w(v, u) > w(u, v)$, remove $(u, v)$. That is, bidirectional edges are turned into unidirectional ones.
+    \item Absolute thresholding: Edges in $E_\text{raw}$ with weight below the $\alpha$-th quantile are removed, where $0 \leq \alpha \leq 1$ is a hyperparameter. This removes edges that are globally less important.
+    \item Relative thresholding: For each vertex $u \in V_\text{raw}$, let $e_1, \dots, e_k$ be the outgoing edges from $u$ sorted by weight in ascending order. Let the cumulative weight be $C(e_i) = \sum_{j=1}^i w(e_j) / \sum_{j=1}^k w(e_j)$. The edges $\{e_i\ |\ C(e_i) \leq \beta\}$ are pruned, where $0 \leq \beta \leq 1$ is a hyperparameter. This is similar to top-$p$ sampling \cite{holtzman2019curious} which we use to remove edges that are less important than their neighbours.
     \item Clean up: After pruning all edges, nodes with no incoming or outgoing edges are removed.
 \end{enumerate}
-In our implementation, we choose the hyperparameters $\alpha$ and $\beta$ by tuning on the validation set.
+The hyperparameters $\alpha$ and $\beta$ are chosen by tuning on the validation set (\cref{sec:implementation}).
+
+\todo{Draw a diagram explaining each of the 4 rules.}
 
 \subsection{Implementation}
 
-We finetune Mistral 7B v0.2 \cite{jiang2023mistral} with Low-Rank Adaptation \cite{hu2021lora} on the masked loss objective. The model is trained on the Wikipedia dataset for two epochs with Adam. During inference, the outputs are generated with temperature 0.1 and nucleus sampling \cite{holtzman2019curious} top-$p$ of 0.9. The weight of each edge is given by the number of generated subgraphs in which it appears. We include a finetuning baseline without the masked loss objective, denoted as \textbf{Finetune}. To adapt \name for arXiv, we further finetune the model on 2048 document-subgraph pairs from arXiv. We initialise new low-rank adaptors and train until the loss stops improving on the validation set. We name these models \textbf{\name (transfer)} and \textbf{Finetune (transfer)} for training without and without the masked loss objective respectively. Full details for the Wikipedia and arXiv experiments can be found in \cref{appendix:training-details}.
+One of the reasons for using LLMs to build ontologies is that pretrained LLMs already have a some understanding of the semantics of the concepts in the target ontology. In fact, as shown later in \cref{sec:results}, pretrained LLMs performs reasonably well in end-to-end OL without any finetuning. To leverage this strong inductive bias, we want to use a powerful pretrained LLM as the base model and perform only a small amount of finetuning to preserve its innate natural language understanding capabilities. I choose to use Mistral 7B v0.2~\cite{jiang2023mistral} as the base model since it is accessible in terms of computational resources and, at the time of the project, is the best model in its size class \cite{chiang2024chatbot}.
 
-The hyperparameters for the post-processing steps are tuned by grid search on the validation set. We sweep over $\alpha \in 1 - \text{geomspace}(1 / |E_\text{raw}|, 1, 21)$ and $\beta \in \text{geomspace}(0.1, 1, 21) - 0.1$ and use the values that maximises the continuous F1 metric. For Wikipedia, we choose the subgraph modelling path length $N=4$ as it is the smallest $N$ such that almost all edges ($>99\%$) occur in at least one induced subgraph. Such criterion is used as smaller $N$ results in smaller subgraphs which we expect to be easier to model accurately. We choose $N=3$ for arXiv for the same reason.
+Instead of training all the weights in the base model, I perform training with Low-Rank Adaptation (LoRA)~\cite{hu2021lora}. LoRA is a method that constrains the updates to the base model to be low-rank, thus enforcing the final trained model to stay similar to the base model. Specifically, for each weight matrix $\m{W} \in \R^{m \times n}$ in the base model, LoRA replaces it with
+\[
+    \m{W}' = \m{W}_{\text{frozen}} + \frac{\alpha}{r} \m{A} \m{B}^\top
+\]
+where $\m{A} \in \R^{m \times r}$ and $\m{B} \in \R^{n \times r}$ are the trainable low-rank factors, $\m{W}_{\text{frozen}}$ is a frozen copy of $\m{W}$, and $\alpha$ is a scaling factor. Typically, $r$ is chosen to be much smaller than $m$ or $n$ so $\m{A}\m{B}^\top$ has limited capacity to change the weights of $\m{W}$. LoRA also comes with the benefit that it dramatically reduces the number of trainable parameters from $mn$ to $r(m + n)$, which substantially reduces the memory requirements during training.
 
-
-% Key points:
-% \begin{enumerate}
-%     \item Aggregate inference outputs into a weighted directed graph.
-%     \item Following \cite{roller2018hearst}, we prune self loops and edge $u \to v$ if $v \to u$ is also in the graph with a higher weight.
-%     \item Apply two thresholding values to prune the graph further. The first threshold $\alpha$ where the lowest-weighted $100 \alpha\%$ of edges are pruned. The second threshold $\beta$ is a relative threshold where \emph{for each node}, the lowest-weighted outgoing edges that are in the bottom $100\beta\%$ cumulative probability mass are removed. \todo{Perhaps easier to describe in equations.}
-%     \item The hyperparameters $\alpha$ and $\beta$ are tuned on the evaluation set.
-% \end{enumerate}
+Other aspects of training (e.g., hyperparameter choices) are experiment-dependent and are described in \cref{sec:implementation}.
 
 \section{Baselines}  \label{sec:implementation:baselines}
 
-Given the novelty of the task studied, we first need to establish a set of baselines that we know a priori are \emph{reliable} and can serve as a \emph{meaningful} reference point. Our ideal baselines should thus be at least partially validated by existing research and be simple to implement. Since most prior work in OL is based on subtask composition, we design two methods from this paradigm as our baselines: Concept discovery + Hearst patterns \cite{hearst1998automated} and Concept discovery + REBEL \cite{cabot2021rebel}. Both methods follow the general procedure of first discovering the target concepts (nodes) and then finding the relations (edges) between them. This section describes the implementation details of these baselines.
+Given the novelty of the task studied, we first need to establish a set of baselines that we know a priori are \emph{reliable} and can serve as a \emph{meaningful} reference point. Our ideal baselines should thus be at least partially validated by existing research and be simple to implement. Since most prior work in OL is based on subtask composition, we design two methods from this paradigm as our baselines: Concept discovery + Hearst patterns \cite{hearst1998automated} and Concept discovery + REBEL \cite{cabot2021rebel}. Both methods follow the general procedure of first discovering the target concepts (nodes) and then finding the relations (edges) between them. This section describes the implementation details of these baselines. For fairness, I design the baselines such that they produce weighted directed graphs as raw outputs. The same post-processing steps as \name (\cref{sec:method:post-processing}) is then applied to obtain the final predicted graph.
 
 \subsection{Concept discovery}
 
 The first step in both baselines is to discover the concepts that should be present in the target ontology. Concept discovery is commonly done via entity extraction from the source corpus, such as by identifying noun phrases after dependency parsing. However, I am not aware of any one-size-fits-all entity extraction method that is widely accepted as the standard. Many proposed methods are domain-specific and may utilise custom rules for filtering concepts. \todo{citations!!} To bypass this issue, I decided to \emph{skip concept discovery entirely} and \emph{use the graph truth concepts} as the output of this step. While such data leakage diminishes the applied value of the baselines, it makes them more reliable as we no longer have to worry about the error propagation from the concept discovery step. It also strengthens the research value of this project: Using the ground truth concepts allows us to estimate an upper bound to the performance of our baselines. If we can demonstrate that our proposed methods can outperform the baselines even under the best-case scenario (shown to be true in \cref{sec:results}), we can have strong confidence in the validity of our approach.
 
 \subsection{Hearst}
-Hearst patterns \cite{hearst1998automated} is one of the most tested methods for relation extraction. As explained in \cref{sec:hearst}, Hearst patterns rely on a set of hand-crafted regular expressions defined on top of part-of-speech and lemmatisation tags to extract taxonomic relations from text. An example of a Hearst pattern aimed to match patterns like ``Fibonacci's sequence is a type of number sequence'' is shown below:
-\begin{lstlisting}
+Hearst patterns \cite{hearst1998automated} is one of the most tested methods for relation extraction. As explained in \cref{sec:hearst}, Hearst patterns rely on a set of hand-crafted regular expressions defined on top of part-of-speech and lemmatisation tags to extract taxonomic relations from text. An example of a Hearst pattern is shown below:
+
+\begin{figure}[h]
+    \begin{lstlisting}[frame=single]
 (RB.? )* (JJ|JJR|JJS|VBN)? (N.+ of|--|'s)? N.+ (which)? [[be]] an? JJ? ([[subgenus|example|class|group|form|type|kind]]) of (RB.? )* (JJ|JJR|JJS|VBN)? (N.+ of|--|'s)? N.+
 \end{lstlisting}
-where capitalised words are part-of-speech tags, and words in \texttt{[[...]]} denote their lemmatised form.
+    \caption{A Hearst pattern for matching ``[noun phrase] is a type/example/kind/class/group/form/subgenus of [noun phrase]''. Capitalised characters are Penn Treebank part-of-speech tags~\cite{marcus1993building}, and words in \texttt{[[...]]} denote their lemmatised form.}
+\end{figure}
 
-For the baseline, I reproduce the implementation by \citet{roller2018hearst}. It leverages the tokenization, part-of-speech tagging, lemmatisation, and token regex functionality of the CoreNLP library \cite{manning2014stanford} to extract the relations according to their 28 Hearst patterns. Given the relations $\mathcal{R} = (u_1 \to v_1), \dots, (u_n \to v_n)$ extracted from the source corpus and the ground truth concepts $C = (c_1, \dots, c_k)$, the output graph $G = (V, E)$ is defined as $V = C$ and $E = \{(u, v) \in C \times C \mid (u \to v) \in \mathcal{R}\}$. Inspecting the output, we see that Hearst patterns successfully extracts taxonomic relations with relatively high precision but substantially worse recall:
-\begin{table}[H]
-    \centering
-    \begin{tabular}{lrr}
-        \toprule
-                  & Precision & Recall \\
-        \midrule
-        Wikipedia & -         & -      \\
-        arXiv     & -         & -      \\
-        \bottomrule
-    \end{tabular}
-    \caption{Precision and recall of Hearst patterns on the test splits.}
-    \label{table:hearst-precision-recall}
-\end{table}
+For the baseline, I reproduce the implementation by \citet{roller2018hearst}. It leverages the tokenization, part-of-speech tagging, lemmatisation, and token regex functionality of the CoreNLP library \cite{manning2014stanford} to extract the relations according to their 28 Hearst patterns. Given the relations $\mathcal{R} = (u_1 \to v_1), \dots, (u_n \to v_n)$ extracted from the source corpus and the ground truth concepts $C = (c_1, \dots, c_k)$, the output graph $G = (V, E)$ is defined as $V = C$ and $E = \{(u, v) \in C \times C \mid (u \to v) \in \mathcal{R}\}$. However, comparing $G$ with the ground truth, we see that Hearst patterns can extract taxonomic relations with relatively high precision but substantially worse recall. On Wikipedia, it achieves a precision of 0.2157 but a recall of only 0.0023.
+
 This is classic issue of Hearst patterns due to the non-exhaustive nature of the set of patterns: Concepts in taxonomic relations might appear in the exact formats that the patterns are designed to match. To improve Hearst patterns, one can exploit the structure of the extracted relations to make more informed decisions about the missing relations. For example, the relation $u \to v$ is more likely to be true if $u$ is a parent of many other concepts. To formalise this intuition, \citet{roller2018hearst} proposes to use a low-rank approximation \cite{schmidt1907theorie} (commonly used to handle missing values) of the weighted adjacency matrix to enable comparison between any two concepts even if they are not directly connected. \todo{Either say we omit the details here or link to appendix.}
 
-\todo{Show some qualitative results to confirm the validity of the implementation.}
+\todo{Show some qualitative results.}
+
+\begin{figure}
+    \centering
+    % ('Society', 'Government')
+    % ('Humanities', 'Government')
+    % ('History', 'Government')
+    % ('Nazis', 'Suicides')
+    % ('Copernican Revolution', 'Suicides')
+    % ('Philosophers', 'Suicides')
+    % ('Jurisprudence', 'Suicides')
+    % ('Competition', 'Suicides')
+    % ('Information Age', 'Suicides')
+    % ('Home', 'Suicides')
+    \begin{tikzpicture}[
+            >=latex,
+            node distance=0.6cm and 0.6cm
+        ]
+        \sffamily
+        \node (society) {Society};
+        \node[right=of society] (humanities) {Humanities};
+        \node[right=of humanities] (history) {History};
+        \node[below=of humanities] (government) {Government};
+        \draw[->] (history) -- (government);
+        \draw[->] (humanities) -- (government);
+        \draw[->] (society) -- (government);
+
+        \node[right=of history] (philosophers) {Philosophers};
+        \node[right=of philosophers] (jurisprudence) {Jurisprudence};
+        \node[right=of jurisprudence] (home) {Home};
+        \node[below=of jurisprudence] (suicides) {Suicides};
+        \draw[->] (philosophers) -- (suicides);
+        \draw[->] (jurisprudence) -- (suicides);
+        \draw[->] (home) -- (suicides);
+    \end{tikzpicture}
+    \caption{Example relations extracted by Hearst patterns.}
+    \label{fig:hearst-example}
+\end{figure}
 
 \subsection{REBEL}
 
-The REBEL-large model \cite{cabot2021rebel} is an encoder-decoder LLM trained to extract many types of relations from Wikipedia articles. We only take the ``subclass of'', ``instance of'', ``member of'' and ``part of'' relations that were extracted. Similar to Hearst patterns, we find that it fails to find many direct relations between ground truth concepts. The same low-rank smoothing technique is applied to give a higher recall.
+Instead of using hand-crafted patterns, one can use a more data-driven approach to relation extraction. The authors of REBEL~\cite{cabot2021rebel} frame relation extraction task as a neural translation problem: Given the source text (e.g., \texttt{A chihuahua is a kind of dog.}), the authors define the translation target in an invented ``relations language'' (e.g.,\texttt{<triplet> chihuahua <subj> dog <obj> subclass of}.). The author shares the trained model, REBEL-large\footnote{\url{https://huggingface.co/Babelscape/rebel-large}}, an encoder-decoder LLM based on BART-large \cite{lewis2019bart} trained to extract many types of relations from Wikipedia articles. Since we are only interested in taxonomic relations, I only use the ``subclass of'', ``instance of'', ``member of'' and ``part of'' relations that are extracted. Similar to Hearst patterns, I find that it fails to find many direct relations between ground truth concepts. The same low-rank smoothing technique is applied to give a higher recall.
 
-\subsection{Memorisation}
+\todo{Some qualitative results}
+
+\subsection{Other baselines}
+
+\paragraph{Memorisation}
 Simply memorising the train graph is a surprisingly strong baseline due to the overlap between train and test graphs, especially for Wikipedia. The weight of each edge is given by the number of relevant subgraphs in which it appears.
 
-% \paragraph{Prompting}
-% We test the \textbf{zero/one/three-shot} performance of instruction-tuned LLMs on the subgraph modelling task described in \cref{sec:method:subgraph}. We use Mistral 7B Instruct v0.2 \cite{jiang2023mistral} as the instruct model. We perform manual prompt engineering to describe the task and steer the model to return outputs of the same format as that described in \cref{sec:method:subgraph}. The prompt can be found in \cref{appendix:prompt-template}.
+\paragraph{Prompting}
+We test the Zero/One/Three-shot performance of instruction-tuned LLMs on the subgraph modelling task described in \cref{sec:method:subgraph}. To obtain more comparable results, we use Mistral 7B Instruct v0.2, the instruction-tuned version of the base model of \name, as the LLM for our prompting baseline. For One-shot and Three-shot, random examples from the training set are sampled for each query. The output is parsed using regular expressions and results that do not match the patterns are discarded. I perform manual prompt engineering to optimise the model's responses by inspecting individual responses. The prompt template used is shown in \cref{fig:prompt-template} in Appendix~\ref{appendix:exp-details}.
 
 
 \section{How to evaluate end-to-end OL?}  \label{sec:implementation:evaluation}
@@ -126,38 +175,19 @@ Since our problem setup is uncommon in existing literature, we also develop new 
 %     \item How do we overcome this? 1. Use a ground truth ontology as a proxy for ``good ontology'' and measure how similar the generated ontology is to the ground truth. 2. Propose a series of evaluation metrics to capture various aspects of the generated output.
 % \end{enumerate}
 
-\subsection{Create train and test splits}
-
-\input{figures/dataset}
-
-Generating the train and test splits from the datasets is also a non-trivial problem. As described in \cref{sec:method:subgraph}, each training example consists of a document and its induced subgraph. The naive approach of randomly selecting a subset of documents for the training set likely leads to data leakage as there might be a significant overlap between subgraphs in the training set and the test set. Instead, we propose to first split the full ontology in train and test graphs and then generate the training document-subgraph pairs. Our method is as follows:
-\begin{enumerate}
-    \item Let $V^\text{top}$ be the set of top-level nodes, i.e. children of the root node. Randomly partition $V^\text{top}$ into train $V^\text{top}_{\text{train}}$, validation $V^\text{top}_{\text{val}}$, and test $V^\text{top}_{\text{test}}$ splits in 7:3:10 ratio.
-    \item Let $d$ be the depth on the full graph, i.e. the distance of the furthest node from the root. The nodes of the train graph are taken as the union of all the nodes that are within distance $d - 1$ from any node in $V^\text{top}_\text{train}$, plus $V_\text{train}^\text{top}$ and the root. The edges are all the edges in the full graph that have both endpoints in the train graph. Similar applies for $V^\text{top}_\text{val}$ and $V^\text{top}_\text{test}$.
-\end{enumerate}
-Our methods ensure that there are sufficiently many unseen concepts (and thus relations) in the test split, as shown in \cref{fig:dataset-overlap}.
-
-% Key points:
-% \begin{enumerate}
-%     \item Describe the data collection procedure.
-%     \item Report the dataset statistics, e.g., number of nodes/edges/documents. Wikipedia: 13886 / 28375 / 362067. arXiv: 161 / 166 / 126001.
-%     \item Highlight the thought process behind the creation of the train-eval-test split (Balance between the diversity of the training set and having unseen nodes/edges in the eval/test split).
-%     \item \fig{Venn diagram to show the overlap between the train/eval/test splits. \cref{fig:dataset-overlap}}
-% \end{enumerate}
-
 \subsection{Metrics}
 
-Existing methods for measuring similarity between ontologies rely on outdated techniques such as edit distance or document co-occurrence statistics for text comparison. To obtain more reliable evaluation results, we propose a suite of similarity metrics that uses more modern methods like text embeddings. Multiple metrics are used as they trade off interpretability with comprehensiveness, and we aim to make them complementary by capturing different aspects of an ontology. In this section, we denote the ground truth ontology graph as $G = (V, E)$ and the generated graph as $G' = (V', E')$.
+Many existing methods for comparing ontologies rely on syntactic measures like string edit distance~\cite{Ehrig2005SimilarityFO} as a proxy for semantic similarity, or require every concept to be tagged with descriptions or documents for distributional semantics comparison~\cite{Zavitsanos2011GoldSE}. To obtain more robust and general evaluation results, we introduce a suite of similarity metrics that use modern methods like text embeddings~\cite{reimers-2019-sentence-bert}. Multiple metrics are used as they trade off between interpretability and comprehensiveness, and we aim to make them complementary by capturing different aspects of an ontology. We denote the ground truth ontology graph as $G = (V, E)$ and the generated graph as $G' = (V', E')$.
 
-\paragraph{Literal F1 \cite{Kashyap2005TaxaMinerAE}}
-While literal text matching is unreliable, it is also the simplest and the most interpretable. The Literal F1 metric is given by the harmonic mean of the precision and recall of the edges:
+\textbf{Literal~F1 }
+While literal text matching is unreliable, it is also the simplest and the most interpretable. We treat this metric as a reference metric for sanity check. The Literal~F1 metric~\cite{Kashyap2005TaxaMinerAE} is given by the harmonic mean of the precision and recall of the edges:
 \[
     \text{Literal precision} = \frac{|E \cap E'|}{|E'|} \qquad
     \text{Literal recall} = \frac{|E \cap E'|}{|E|}
 \]
 
-\paragraph{Fuzzy F1}
-The literal F1 metric puts a strong emphasis on using the correct wording, while in practice, we are interested in evaluating the semantics of an ontology. For example, using a synonymous phrase for a concept should not be penalised. We utilise embeddings from a pretrained sentence transformer and use the cosine similarity of the embeddings to measure semantic similarity. Specifically, let $\nodesim(u, u') \in V \times V' \to [-1, 1]$ be the cosine similarity between the sentence embeddings for $u$ and $u'$. The Fuzzy F1 score is obtained from the fuzzy precision and recall, defined as:
+\textbf{Fuzzy~F1 }
+The Literal~F1 metric puts a strong emphasis on using the correct wording, while in practice, we are interested in evaluating the semantics of an ontology. For example, using a synonymous phrase for a concept should not be penalised. We utilise embeddings from a pretrained sentence transformer \cite{reimers-2019-sentence-bert} and use the cosine similarity of the embeddings to measure semantic similarity. Specifically, let $\nodesim(u, u') \in V \times V' \to [-1, 1]$ be the cosine similarity between the sentence embeddings for $u$ and $u'$. The Fuzzy~F1 score is obtained from the fuzzy precision and recall, defined as:
 \begin{equation*}
     \begin{aligned}
         \text{Fuzzy precision} & = \frac{|
@@ -172,23 +202,23 @@ The literal F1 metric puts a strong emphasis on using the correct wording, while
         |}{|E|}                            \\
     \end{aligned}
 \end{equation*}
-where $t$ is the matching threshold. We use all-MiniLM-L6-v2 \cite{wang2020minilm,reimers-2019-sentence-bert} as the embedding model and choose $t$ as the median cosine similarity between the synonyms in WordNet \cite{miller1995wordnet}, computed to be 0.436.
+where $t$ is the matching threshold. We use all-MiniLM-L6-v2~\cite{wang2020minilm,reimers-2019-sentence-bert} as the embedding model, and choose $t$ as the median cosine similarity between the synonyms in WordNet~\cite{miller1995wordnet}, computed as~0.436.
 
-\paragraph{Continuous F1}
-With fuzzy comparisons, the matches between the edges of the generated and the ground truth graph are no longer one-to-one. This is problematic: Consider two graphs $A \rightarrow B$ and $B \leftarrow A \rightarrow B'$, where $B$ and $B'$ match fuzzily. Such graphs will achieve a perfect fuzzy F1 score yet they significantly differ. Additionally, we found that the previous metrics fail to provide a useful signal for hyperparameter tuning, particularly for our baselines where the generated graphs are poor. The continuous F1 metric solves these issues by computing the highest-scoring edge matching between the two graphs, where the similarity score between $(u, v)$ and $(u', v')$ is given by $\min(\nodesim(u, u'), \nodesim(v, v'))$. Obtaining such matching is equivalent to solving the linear assignment problem \cite{martello1987linear}, which can be computed by the Hungarian algorithm \cite{kuhn1955hungarian}. The Continuous F1 is obtained from the continuous precision and recall, given by:
+\textbf{Continuous~F1 }
+With fuzzy comparisons, the matches between the edges of the generated and the ground truth graph are no longer one-to-one. This is problematic: consider two graphs $A\!\rightarrow\!B$ and $B\!\leftarrow\!A\!\rightarrow\!B'$, where $B$ and $B'$ match fuzzily. Such graphs will achieve a perfect Fuzzy~F1 score yet they significantly differ. Additionally, we found that the previous metrics fail to provide a useful signal for hyperparameter tuning, particularly for our baselines where the generated graphs are poor. The Continuous~F1 metric solves these issues by computing the highest-scoring edge matching between the two graphs, where the similarity score between $(u, v)$ and $(u', v')$ is given by $\min(\nodesim(u, u'), \nodesim(v, v'))$. Obtaining such matching is equivalent to solving the linear assignment problem~\cite{martello1987linear}, which can be computed by the Hungarian algorithm~\cite{kuhn1955hungarian}. The Continuous~F1 score is obtained from the continuous precision and recall, given by:
 \[
     \text{Continuous precision} = \frac{s_\text{cont}}{|E'|} \qquad
     \text{Continuous recall} = \frac{s_\text{cont}}{|E|}
 \]
 where $s_\text{cont}$ is the score achieved by the best edge matching.
 
-\paragraph{Graph F1}
-Instead of individual edges, this metric aims to capture the wider structure of the two graphs. Intuitively, we want to know how concepts are related to their local neighbourhood. We do so by using simple graph convolutions \cite{wu2019simplifying} with $K=2$ to compute graph-aware node embeddings after embedding each node with the pretrained embedder. Such embeddings in $G$ are compared against those in $G'$ by cosine similarity, and the highest-scoring node matching, similar to the continuous F1 metric, gives the graph similarity score. The Graph F1 is computed from the graph precision and recall, defined to be:
+\textbf{Graph~F1 }
+Instead of individual edges, this metric aims to capture the wider structure of the two graphs. Intuitively, we want to know how concepts are related to their local neighbourhood. We do so by using simple graph convolutions~\cite{wu2019simplifying} with $K=2$ to compute graph-aware node embeddings after embedding each node with the pretrained embedder. Such embeddings in $G$ are compared against those in $G'$ by cosine similarity, and the highest-scoring node matching, similar to the Continuous~F1 metric, gives the graph similarity score. The Graph~F1 score is computed from the graph precision and recall, defined as:
 \[
     \text{Graph precision} = \frac{s_\text{graph}}{|V'|} \qquad
     \text{Graph recall} = \frac{s_\text{graph}}{|V|}
 \]
 where $s_\text{graph}$ is the score achieved by the best node matching.
 
-\paragraph{Motif distance}
-Taking inspiration from classical network analysis, we use \emph{network motifs} \cite{milo2002network,shen2002network} to evaluate the structural integrity of the generated graphs. Network motifs are reoccurring subgraphs in a larger graph, most commonly 3-vertex subgraphs. They are typically indicative of the structural characteristics of the full graph. We define the motif distance as the 1-Wasserstein distance between the distribution of all 3-vertex subgraphs in $G$ and $G'$.
+\textbf{Motif distance }
+Taking inspiration from classical network analysis, we use \emph{network motifs}~\cite{milo2002network,shen2002network} to evaluate the structural integrity of the generated graphs. Network motifs are reoccurring subgraphs in a larger graph, most commonly 3-vertex subgraphs. They are typically indicative of the structural characteristics of the full graph. We define the motif distance as the 1-Wasserstein distance~\cite{Kantorovich1960MathematicalMO} between the distribution of all 3-vertex subgraphs in $G$ and $G'$.

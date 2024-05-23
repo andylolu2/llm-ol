@@ -6,9 +6,9 @@
 
 For the Wikipedia experiment, we use Mistral 7B v0.2 (not instruction-tuned) \cite{jiang2023mistral} as the base model. We attach LoRA \cite{hu2021lora} adaptors to all attention and feed-forward layers with parameters $r=32$ and $\alpha=16$. The model is trained for 2 epochs ($\approx$ 17K steps) with batch size 16, context length 2048, and is optimised with Adam using a constant learning rate of 1e-5 with warm-up from zero for the first 100 steps. Finetune uses the same configuration. Training takes 12 A100-hours.
 
-For the arXiv experiment, we further finetune the model trained on Wikipedia with masked loss objective on 2048 document-subgraph pairs from the arXiv training set. We merge the LoRA adaptors from the Wikipedia experiment and initialise new ones with $r=8$ and $\alpha=8$. The model is trained with batch size 16 and Adam with constant learning rate 3e-6 and warp-up from zero for the first 10 steps. Early stopping terminates training when the loss stops improving on the evaluation set, which happened at step 288. Finetune (transfer) uses the same configuration. Early stopping happened at step 192.
+For the arXiv experiment, we further finetune the model trained on Wikipedia with masked loss objective on 2048 document-subgraph pairs from the arXiv training set. We merge the LoRA adaptors from the Wikipedia experiment and initialise new ones with $r=8$ and $\alpha=8$. The model is trained with batch size 16 and Adam with constant learning rate 3e-6 and warp-up from zero for the first 10 steps. Training terminates when the loss stops improving on the evaluation set, which happened at step 288. Finetune (transfer) uses the same configuration. Early stopping happened at step 192.
 
-For both experiments, we finetune the model with the instruction template similar to that of Mistral 7B instruct v0.2. The format is shown in \cref{fig:linearisation-template}.
+For both experiments, we finetune the model with the instruction template similar to that of Mistral 7B instruct v0.2. The format is shown below:
 
 \begin{figure}[h]
 \centering
@@ -25,7 +25,7 @@ Title: {{ title }}
 \label{fig:linearisation-template}
 \end{figure}
 
-For inference, we use the vLLM \cite{kwon2023efficient} server with a throughput of $\approx 10$ documents per second. Inference on the validation and test splits of both datasets takes 12 A100-hours.
+For inference, we use the vLLM \cite{kwon2023efficient} server which achieves a throughput of $\approx 10$ documents per second. Inference on the validation and test splits of both datasets takes 12 A100-hours in total.
 
 \subsubsection{Hearst}
 
