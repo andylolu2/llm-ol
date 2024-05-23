@@ -1,8 +1,6 @@
 \chapter{Summary and conclusions}
 
-As you might imagine: summarizes the dissertation, and draws any
-conclusions. Depending on the length of your work, and how well you
-write, you may not need a summary here.
+\textbf{Limitations } We only study and evaluate the construction of simple ontologies with only concepts and taxonomic relations. A potential approach to extend \name to produce non-taxonomic relations is to add tags indicating the relation type to each edge when linearising the subgraphs for sequence modelling. New evaluation metrics might also be required to handle multiple types of relations. Another limitation is that the taxonomic relations in the generated ontologies are not necessarily transitive due to the existence of cycles. This is a general problem for many OL methods and there are existing works on cycle removal algorithms for cleaning hierarchies~\cite{sun2017breaking,zesch2007analysis}. We were also unable to fully control for data contamination as the pretraining dataset of Mistral 7B is not publically known. We do, however, observe that the generated ontologies are sufficiently different from the ground truth, indicating that \name is not directly remembering samples from its pretraining stage.
 
-You will generally want to draw some conclusions, and point to
-potential future work.
+
+\textbf{Conclusion } In this paper, we introduce a general method for building ontologies in an end-to-end fashion. We propose a set of metrics for end-to-end OL that measures the semantic and structural similarity between arbitrary labelled graphs. Our model, \name, outperforms traditional subtask composition methods in reconstructing the Wikipedia categories, and can be transferred to build ontologies for arXiv after finetuning on a small number of examples. Using LLMs as the backbone for subgraph modelling opens up exciting avenues for future research. For example, one may generate ontologies from corpora with images using vision language models~\cite{donahue2015long}.

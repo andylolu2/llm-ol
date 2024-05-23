@@ -1,6 +1,88 @@
 \chapter{Evaluation}
 
-\section{Experiments}
+In this chapter, we aim to answer our research questions:
+\begin{enumerate}[leftmargin=*]
+    \item Does \name produce better ontologies than traditional methods by subtask composition?
+    \item Can \name be easily adapted to a new domain?
+\end{enumerate}
+Since our problem setup is uncommon in existing literature, we also develop new evaluation methods. Evaluating a quality of an ontolgoy is a hard problem as there are no quantitative definitions of what constitutes a ``good ontology'', and metrics generally only capture one aspect (e.g., structure but not semantics) of an ontology. We approach evaluation by treating the ground truth as a proxy for a good ontology, and comparing the generated ontologies against the ground truth.
+
+In \cref{sec:metrics}, we introduce new metrics that are more robust for measuring ontology similarity. We design our experiments to answer the research questions in \cref{sec:experiments}, and present the results in \cref{sec:results}. We show that \name outperforms all of our baselines and can be easily adapted to a new domain using a small number of training samples, demonstrating the potential of \name for end-to-end OL.
+
+\section{Metrics}  \label{sec:metrics}
+
+Many existing methods for comparing ontologies rely on syntactic measures like string edit distance~\cite{Ehrig2005SimilarityFO} as a proxy for semantic similarity, or require every concept to be tagged with descriptions or documents for distributional semantics comparison~\cite{Zavitsanos2011GoldSE}. To obtain more robust and general evaluation results, we introduce a suite of similarity metrics that use modern methods like text embeddings~\cite{reimers-2019-sentence-bert}. Multiple metrics are used as they trade off between interpretability and comprehensiveness, and we aim to make them complementary by capturing different aspects of an ontology. In this section, we denote the ground truth ontology graph as $G = (V, E)$ and the generated graph as $G' = (V', E')$.
+
+\paragraph{Literal~F1}
+While literal text matching is unreliable, it is also the simplest and the most interpretable. We treat this metric as a reference metric for sanity check. The Literal~F1 metric~\cite{Kashyap2005TaxaMinerAE} is given by the harmonic mean of the precision and recall of the edges:
+\[
+    P_{\text{literal}} = \frac{|E \cap E'|}{|E'|} \qquad
+    R_{\text{literal}} = \frac{|E \cap E'|}{|E|} \qquad
+    \text{Literal~F1} = \left(\frac{1}{P_{\text{literal}}} + \frac{1}{R_{\text{literal}}}\right)^{-1}
+\]
+
+\paragraph{Fuzzy~F1}
+The Literal~F1 metric puts a strong emphasis on using the correct wording, while in practice, we are interested in evaluating the semantics of an ontology. For example, using a synonymous phrase for a concept should not be penalised. The current state-of-the-art for semantic textual similarity tasks are sentence transformers \cite{reimers-2019-sentence-bert,jiang2022improved,jiang2019smart}. On a high level, a sentence transformer is an embedding function $f: \text{string} \to \mathbb{R}^d$ that maps a string to a $d$-dimensional vector space such that semantically similar strings are close in the vector space, usually measured by cosine similarity:
+\[
+    \nodesim(u, u') = \frac{f(u) \cdot f(u')}{\|f(u)\| \|f(u')\|}
+\]
+We consider two nodes $u$ and $u'$ as a fuzzy match if $\nodesim(u, u') > t$, where $t$ is a threshold, chosen to be the median cosine similarity between the synonyms in WordNet~\cite{miller1995wordnet} (computed as 0.436). Two edges $(u, v)$ and $(u', v')$ are a fuzzy match if both $u$ and $v$ are fuzzy matches with $u'$ and $v'$ respectively. The Fuzzy~F1 score is given by the precision and recall of the fuzzy matches:
+\begin{equation*}
+    \begin{aligned}
+        P_{\text{fuzzy}} & = \frac{|
+            \{(u', v') \in E' \mid \exists (u, v) \in E.
+            \nodesim(u, u') > t \land \nodesim(v, v') > t
+            \}
+        |}{|E'|}                                                                                       \\
+        R_{\text{fuzzy}} & = \frac{|
+            \{(u, v) \in E \mid \exists (u', v') \in E'.
+            \nodesim(u, u') > t \land \nodesim(v, v') > t
+            \}
+        |}{|E|}                                                                                        \\
+        \text{Fuzzy~F1}  & = \left(\frac{1}{P_{\text{fuzzy}}} + \frac{1}{R_{\text{fuzzy}}}\right)^{-1}
+    \end{aligned}
+\end{equation*}
+The Fuzzy~F1 metric can be seen as a generalisation of the Literal~F1 metric: we recover the Literal~F1 metric if $t = 1$. We use all-MiniLM-L6-v2~\cite{wang2020minilm,reimers-2019-sentence-bert} as the embedding model.
+
+\paragraph{Continuous~F1}
+With fuzzy comparisons, the matches between the edges of the generated and the ground truth graph are no longer one-to-one. This is problematic when there are repetitive elements:
+\begin{figure}[H]
+    \centering
+    \begin{tikzpicture}[>=latex]
+        \sffamily
+        \newcommand{\dist}{1.5cm}
+        \node (A1) {A};
+        \node (B1) at ($(A1) + (0, -\dist)$) {B};
+        \draw[->] (A1) -- (B1);
+
+        \node (A2) at ($(A1) + (2.5, 0)$) {A};
+        \node (B2) at ($(A2) + (-0.8, -\dist)$) {B};
+        \node (B2') at ($(A2) + (0.8, -\dist)$) {B'};
+        \draw[->] (A2) -- (B2);
+        \draw[->] (A2) -- (B2');
+    \end{tikzpicture}
+\end{figure}
+\vspace{-1em}
+where $B$ and $B'$ match fuzzily. This pair of graphs achieves a perfect Fuzzy~F1 score, yet they are clearly different. Additionally, we found that the discrete nature of Fuzzy F1 makes it unable to provide useful signals for hyperparameter tuning, particularly for our baselines where the generated graphs are poor. The Continuous~F1 metric solves these issues by computing the highest-scoring edge matching between the two graphs, where the similarity score between $(u, v)$ and $(u', v')$ is given by $\min(\nodesim(u, u'), \nodesim(v, v'))$. We choose to use $\min(\nodesim(u, u'), \nodesim(v, v'))$ as the similarity score to ensure that only edges where both nodes partially match (i.e. cosine similarity $> 0$) can contribute to the total matching score. Obtaining such matching is equivalent to solving the linear assignment problem~\cite{martello1987linear}, which can be computed by the Hungarian algorithm~\cite{kuhn1955hungarian}. Given the score $s_{\text{cout}}$ achieved by the best edge matching, the Continuous~F1 score is obtained from the continuous precision and recall, given by:
+\[
+    P_{\text{cont}} = \frac{s_{\text{cout}}}{|E'|} \qquad
+    R_{\text{cont}} = \frac{s_{\text{cout}}}{|E|} \qquad
+    \text{Continuous~F1} = \left(\frac{1}{P_{\text{cont}}} + \frac{1}{R_{\text{cont}}}\right)^{-1}
+\]
+
+\paragraph{Graph~F1}
+Instead of comparing individual edges, this metric aims to capture the wider structure of the two graphs. Intuitively, we want to know how concepts are related to their local neighbourhood. A well known method for capturing graph structure in vectors is node embeddings, as discussed in \cref{sec:node-embeddings}. Concretely, we use simple graph convolutions \cite{wu2019simplifying} with identity weights and $K=2$ as a parameter-free method to compute graph-aware node representations after embedding each node with the pretrained embedder. Such embeddings in $G$ are compared against those in $G'$ by cosine similarity, and the highest-scoring node matching, similar to the Continuous~F1 metric, gives the graph similarity score $s_{\text{graph}}$. The Graph~F1 score is computed from the graph precision and recall, defined as:
+\[
+    P_{\text{graph}} = \frac{s_{\text{graph}}}{|V'|} \qquad
+    R_{\text{graph}} = \frac{s_{\text{graph}}}{|V|} \qquad
+    \text{Graph~F1} = \left(\frac{1}{P_{\text{graph}}} + \frac{1}{R_{\text{graph}}}\right)^{-1}
+\]
+
+\paragraph{Motif distance}
+Taking inspiration from classical network analysis, we use \emph{network motifs}~\cite{milo2002network,shen2002network} to evaluate the structural integrity of the generated graphs. Network motifs are reoccurring subgraphs in a larger graph, most commonly 3-vertex subgraphs. They are typically indicative of the structural characteristics of the full graph. We define the motif distance as the 1-Wasserstein distance~\cite{Kantorovich1960MathematicalMO} between the distribution of all 3-vertex subgraphs in $G$ and $G'$.
+
+
+\section{Experiments}  \label{sec:experiments}
 
 We design our experiments to answer the following research questions:
 \begin{enumerate}
@@ -18,7 +100,7 @@ The model is trained on the Wikipedia dataset for two epochs with Adam. During i
 The hyperparameters for the post-processing steps are tuned by grid search on the validation set. We sweep over $\alpha \in 1 - \text{geomspace}(1 / |E_\text{raw}|, 1, 21)$ and $\beta \in \text{geomspace}(0.1, 1, 21) - 0.1$ and use the values that maximise Continuous~F1. For Wikipedia, we choose the subgraph modelling path length $N=4$ as it is the smallest $N$ such that almost all edges ($>99\%$) occur in at least one relevant subgraph. Such criterion is used since smaller $N$ results in smaller subgraphs, which we expect to be easier to model accurately. We choose $N=3$ for arXiv for the same reason.
 
 
-\subsection{Results}  \label{sec:results}
+\section{Results}  \label{sec:results}
 
 \input{figures/metrics}
 

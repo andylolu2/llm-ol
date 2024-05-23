@@ -3,24 +3,30 @@
 \label{firstcontentpage} % start page count here
 
 An ontology is a formal and structural way of representing domain-specific concepts and their relations~\cite{gruber1995toward}.
-They can be simplistic consisting of \emph{concepts} and only a small number of types of \emph{taxonomic relations} (e.g., \emph{is-a} relationships). Or they can be complex consisting of axioms and many types of relations. For example, a simple ontology for programming languages might be:
+They can be simple (e.g., Wikipedia categories) consisting of \emph{concepts} and only a small number of types of \emph{taxonomic relations} (e.g., \emph{is-a} relationships), or they can be complex (e.g., Schema.org) consisting of axioms or many types of relations. For example, a simple ontology for programming languages might be:
+
 \begin{figure}[H]
     \centering
+    \sffamily
+    \newcommand{\dist}{1.5cm}
     \begin{tikzpicture}[>=latex]
-        \node[rectangle, draw] (dynamically-typed) {Dynamically-typed language};
-        \node[rectangle, draw, right=of dynamically-typed] (python) {Python};
+        \node[rectangle] (dynamically-typed) {Dynamically-typed language};
+        \node[rectangle] (python) at ($(dynamically-typed) + (-\dist, -\dist)$) {Python};
+        \node[rectangle] (js) at ($(dynamically-typed) + (\dist, -\dist)$) {JavaScript};
         \draw[->] (dynamically-typed) -- (python);
+        \draw[->] (dynamically-typed) -- (js);
     \end{tikzpicture}
 \end{figure}
-\vspace{-1em}
-It has two concepts and one relation, representing the knowledge that Python is a dynam\-ically-typed language. A more complex ontology might contain axioms too, for example, ``all programming languages are either dynamically or statically typed''. In this project, I focus on ontologies with only concepts and taxonomic relations. Compared to typical deep learning models which represent knowledge implicitly in its weights, ontologies capture knowledge in a structured and explicit manner, making them reliable, easy to edit and human-interpretable. Such benefits of ontologies have led to their wide adoption in practice. For example, the Wikipedia categories have been used for entity ranking~\cite{vercoustre2008using} and information retrieval~\cite{sorg2012exploiting} or the Schema.org~\cite{Schema.org_2011} ontology which is part of the Semantic Web~\cite{antoniou2004semantic} initiative.
 
-While ontologies are useful, building ontologies often requires substantial manual effort. Ontology learning (OL) is the study of automating the construction of high-quality ontologies at scale. For a simplistic ontology, this amounts to discovering the concepts and taxonomic relations, usually based on a source corpus. This project aims contribute to this field by researching domain-independent methods for OL that are scalable and produce better ontologies.
+It has three concepts and two relations, representing the knowledge that Python and JavaScript are a dynamically-typed languages. A more complex ontology might contain axioms too, for example, ``all programming languages are either dynamically or statically typed''.
+In this project, we focus on ontologies with only concepts and taxonomic relations. Compared to typical deep learning models, which represent knowledge implicitly in its weights, ontologies capture knowledge in a structured and explicit manner, making them reliable, easy to edit and human-interpretable. Such benefits of ontologies have led to their wide adoption in practice. For example, Wikipedia categories have been used for entity ranking~\cite{vercoustre2008using} and information retrieval~\cite{sorg2012exploiting}, or Schema.org~\cite{Schema.org_2011} is a core component of the Semantic Web~\cite{antoniou2004semantic} initiative.
+
+While ontologies are useful, building ontologies often requires substantial manual effort. Ontology learning (OL) is the study of automating the construction of high-quality ontologies at scale. For a simple ontology, this amounts to discovering the concepts and taxonomic relations, usually based on a source corpus. In this project we aim to develop domain-independent methods for OL that are scalable and produce better ontologies.
 
 \section{Project goals}
 
-Traditionally, OL is viewed as a composition of subtasks~\cite{asim2018survey}, such as concept discovery and relation extraction. In particular, prior works have demonstrated that state-of-the-art large language models (LLMs) can solve such subtasks effectively~\cite{babaei2023llms4ol}. While studying subtasks permits fine-grained analysis and evaluation, it does not directly indicate the subsequent impact on the final ontology. Moreover, there is potential room for improvement by combining several subtasks into one. In this project, I instead develop and evaluate methods that construct ontologies in an end-to-end fashion to answer the following research questions:
-\begin{enumerate}
+Traditionally, OL is viewed as a composition of subtasks~\cite{asim2018survey}, such as concept discovery and relation extraction. In particular, prior works have demonstrated that state-of-the-art large language models (LLMs) can solve such subtasks effectively~\cite{babaei2023llms4ol}. While studying subtasks permits fine-grained analysis and evaluation, it does not directly indicate the subsequent impact on the quality of the final ontology. Moreover, there is potential room for improvement by combining several subtasks into one, such as by modelling concepts and relations in conjunction. In this project, we instead develop and evaluate methods that construct ontologies in an end-to-end fashion to answer the following research questions:
+\begin{enumerate}[leftmargin=*]
     \item How can we leverage LLMs' knowledge base to build ontologies from scratch?
     \item Does our method scale efficiently to practical problem sizes?
     \item How well does our method generalise to new domains?
@@ -28,15 +34,15 @@ Traditionally, OL is viewed as a composition of subtasks~\cite{asim2018survey}, 
 
 \section{Achievements}
 
-\input{paper/figures/overview.tex}
+\input{paper/figures/overview_v6.tex}
 
-I introduce \name, an end-to-end method for using LLMs to construct ontologies at scale. Rather than focusing on individual relations between concepts, I finetune an LLM to model entire sub-components of the target ontology. The output ontology is generated by taking the sum of generated sub-components and applying simple post-processing. An overview of the pipeline is shown in \cref{fig:overview}. To train \name, I collect the categorisation metadata for a subset of Wikipedia articles. I attempt to adapt an LLM to model the relevant categorisation subgraph for a particular Wikipedia article, but discover that direct finetuning leads to poor generalisation due to overfitting to high-level, frequently occurring concepts. Instead, I propose a custom regulariser that reweights each concept based on its frequency of occurrence, which substantially improves generalisation.
+We introduce \name, an end-to-end method for using LLMs to construct ontologies at scale. Rather than focusing on individual relations between concepts, we finetune an LLM to model entire sub-components of the target ontology. The output ontology is generated by taking the sum of generated sub-components and applying simple post-processing. An overview of the pipeline is shown in \cref{fig:overview}. To train \name, we collect the categorisation metadata for a subset of Wikipedia articles. We attempt to adapt an LLM to model the relevant categorisation subgraph for a particular Wikipedia article, but discover that direct finetuning leads to poor generalisation due to overfitting to high-level, frequently occurring concepts. Instead, we propose a custom regulariser that reweights each concept based on its frequency of occurrence, which substantially improves generalisation.
 
-I evaluate \name by measuring the similarity of the generated ontology with the ground truth. Current approaches for comparing ontologies rely on mapping classes of the two ontologies onto each other, most commonly by literal text matching. \todo{Add citation} This is unreliable when the two ontologies are not already sufficiently similar. Instead, I propose a suite of evaluation metrics suitable for comparing arbitrary labelled graphs. These metrics compare edges and subgraphs of the two ontologies using pretrained text embedders to test for semantic and structural similarity. The results reveal that an LLM can already outperform existing extraction-based methods out of the box, and the performance can be further improved by finetuning with our custom regulariser. I additionally demonstrate that \name can be adapted to build the arXiv ontology using only a small number of training examples, suggesting that our model can be applied to new domains in a data-efficient way.
-
-\textbf{Contributions}
-\begin{enumerate}
-    \item I constructed two datasets based on Wikipedia and arXiv, which can serve as standard datasets for future work studying end-to-end OL.
-    \item I created \name, a method that utilises LLMs to build ontologies from scratch. \name produces high-quality ontologies and serves as a strong baseline for end-to-end OL.
-    \item I developed new evaluation metrics for end-to-end OL.
+We evaluate \name by measuring the similarity of the generated ontology with the ground truth. Current approaches for comparing ontologies rely on mapping components of the two ontologies onto each other, most commonly by literal text matching \cite{maedche2002measuring,Treeratpituk2013GraphbasedAT}. This is unreliable when the two ontologies are not already sufficiently similar. Instead, we propose a suite of evaluation metrics suitable for comparing arbitrary labelled graphs. These metrics compare edges and subgraphs of the two ontologies using pretrained text embedders to test for semantic and structural similarity. Both our quantitative and qualitative results reveal that an LLM can already outperform existing extraction-based methods out of the box, and the performance is further improved by finetuning with our custom regulariser. We additionally demonstrate that \name can be adapted to build the arXiv ontology using only a small number of training examples, suggesting that our model can be applied to new domains in a data-efficient way. In summary, our contributions are:
+\begin{enumerate}[leftmargin=*]
+    \item We constructed two datasets based on Wikipedia and arXiv, which can serve as standard datasets for future work studying end-to-end OL.
+    \item We created \name, a method that utilises LLMs to build ontologies from scratch. \name produces high-quality ontologies and serves as a strong baseline for end-to-end OL.
+    \item We developed new evaluation metrics for assessing the quality of the generated ontologies.
 \end{enumerate}
+
+This dissertation was submitted to NeurIPS 2024 main conference, pending review.
