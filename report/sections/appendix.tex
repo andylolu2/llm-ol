@@ -2,28 +2,17 @@
 
 \chapter{Experiment details}  \label{appendix:exp-details}
 
-\section{\name training}  \label{appendix:training-details}
+\section{\name}  \label{appendix:training-details}
 
-For the Wikipedia experiment, we use Mistral 7B v0.2 (not instruction-tuned) \cite{jiang2023mistral} as the base model. We attach LoRA \cite{hu2021lora} adaptors to all attention and feed-forward layers with parameters $r=32$ and $\alpha=16$. The model is trained for 2 epochs ($\approx$ 17K steps) with batch size 16, context length 2048, and is optimised with Adam using a constant learning rate of 1e-5 with warm-up from zero for the first 100 steps. \textbf{Finetune} uses the same configuration. Training on two A100 GPUs takes $\approx 6$ hours.
+For the Wikipedia experiment, we use Mistral 7B v0.2 (not instruction-tuned) \cite{jiang2023mistral} as the base model. We attach LoRA \cite{hu2021lora} adaptors to all attention and feed-forward layers with parameters $r=32$ and $\alpha=16$. The model is trained for 2 epochs ($\approx$ 17K steps) with batch size 16, context length 2048, and is optimised with Adam using a constant learning rate of 1e-5 with warm-up from zero for the first 100 steps. Finetune uses the same configuration. Training takes 12 A100-hours.
 
-For the arXiv experiment, we further finetune the model trained on Wikipedia with masked loss objective on 2048 document-subgraph pairs from the arXiv training set. We merge the LoRA adaptors from the Wikipedia experiment and initialise new ones with $r=8$ and $\alpha=8$. The model is trained with batch size 16 and Adam with constant learning rate 3e-6 and warp-up from zero for the first 10 steps. Early stopping is used to terminate training when the loss stops improving on the evaluation set, which happened at step 288. \textbf{Finetune (transfer)} uses the same configuration. Eearly stopping happened at step 192.
+For the arXiv experiment, we further finetune the model trained on Wikipedia with masked loss objective on 2048 document-subgraph pairs from the arXiv training set. We merge the LoRA adaptors from the Wikipedia experiment and initialise new ones with $r=8$ and $\alpha=8$. The model is trained with batch size 16 and Adam with constant learning rate 3e-6 and warp-up from zero for the first 10 steps. Training terminates when the loss stops improving on the evaluation set, which happened at step 288. Finetune (transfer) uses the same configuration. Early stopping happened at step 192.
 
-\input{figures/linearisation_template.tex}
+For both experiments, we finetune the model with the instruction template similar to that of Mistral 7B instruct v0.2. The format is shown below:
 
-\section{Hearst}
-
-The \textbf{Hearst} baseline follows the implementation by \citet{roller2018hearst}. We give a description of the implementation here. \todo{CoreNLP, blah blah blah...}
-
-\section{REBEL}
-
-\section{Prompting}
-We sample the one/three-shot examples from the training set for each query. The output is parsed using regex and results that do not match the regex are discarded.
-
-\section{Prompt templates}  \label{appendix:prompt-template}
-
-\subsection*{\name finetuning template}
-
-\begin{lstlisting}[frame=single]
+\begin{figure}[h]
+    \centering
+    \begin{lstlisting}[frame=single]
 <s>[INST]\
 Title: {{ title }}
 {{ abstract }}[/INST]\
@@ -32,10 +21,31 @@ Title: {{ title }}
 {% endfor %}\
 </s>
 \end{lstlisting}
+    \caption{Linearisation template for \name training.}
+    \label{fig:linearisation-template}
+\end{figure}
 
-\subsection*{Zero, one, and three-shot prompt template}
+For inference, we use the vLLM \cite{kwon2023efficient} server which achieves a throughput of $\approx 10$ documents per second. Inference on the validation and test splits of both datasets takes 12 A100-hours in total.
 
-\begin{lstlisting}[frame=single]
+\section{Hearst}
+
+The Hearst baseline follows the implementation by \citet{roller2018hearst}. Using the tokenization, part-of-speech tagging, lemmatisation, and token regex functionality of the CoreNLP pipeline \cite{manning2014stanford}, taxonomic relations are extracted according to the 28 Hearst patterns used by the authors. Processing all documents takes 10 CPU-hours.
+
+Following the spmi method, low-rank smoothing is applied to the relation matrix to allow comparison between any two concepts even if they are not directly related by an extracted relation. The rank of the smoothed matrix, $r$, is a hyperparameter which we tune by sweeping over $r \in \{5, 10, 15, 20, 25, 50, 100, 150, 200, 250\}$ on the validation set. This defines a dense weighted graph as the raw output. Unfortunately, computing Continuous F1 on a dense graph is very slow, especially for Wikipedia. This is because the Hungarian algorithm used for solving the optimal matching between edges has time complexity $O(N^3)$, where $N$ is the number of edges. To bypass this issue, we perform a pre-filtering step of only exporting the top $10|V|$ weighted edges in the smoothed relation matrix, where $|V|$ is the number of nodes in the graph. For the datasets considered, this density of edges is still much higher than that of the ground truth, and thus, we expect this to have minimal impact on the final output after post-processing.
+
+\section{REBEL}
+
+We use REBEL-large \cite{cabot2021rebel} in the implementation. The model is an encoder-decoder transformer based on BART-large \cite{lewis2019bart} with 406M parameters. We sample the model with the default configuration used by \citet{cabot2021rebel}. The model is trained to predict 220 types of relations, most of which are not taxonomic relations. We filter the extracted relations and only keep those tagged with ``subclass of'', ``instance of'', ``member of'', and ``part of'' relation types. The same low-rank smoothing method as Hearst is applied to the raw extractions. Processing all documents takes 3 A100-hours.
+
+\section{Prompting}
+
+To obtain more comparable results, we use Mistral 7B Instruct v0.2, the instruction-tuned version of the base model of \name, as the LLM for our prompting baseline. For One-shot and Three-shot, we randomly sample examples from the training set for each query. The output is parsed using regex and results that do not match the regex are discarded. We perform manual prompt engineering by inspecting individual responses. The final prompt template is shown in \cref{fig:prompt-template}. The total inference cost for all prompting baselines is $\approx 50$ A100-hours.
+
+
+
+\begin{figure}
+    \centering
+    \begin{lstlisting}[frame=single]
 The following is an article's title and abstract. Your task is to assign this article to suitable category hierarchy. A category is typically represented by a word or a short phrase, representing broader topics/concepts that the article is about. A category hierarchy represented by a collection of paths from the generic root category "Main topic classifications" to a specific category suitable for the article. The topics titles should become more and more specific as you move from the root to the leaf. 
 
 {% if examples|length > 0 %}
@@ -69,16 +79,230 @@ Use the same format as the examples above.
 Use the format described above.
 {% endif %}
 \end{lstlisting}
+    \caption{Prompt template used for the Zero/One/Three-shot baselines.}
+    \label{fig:prompt-template}
+\end{figure}
+
+
+\section{Hyperparameters}
+
+The raw generated outputs of all methods are post-processed with the same scheme as described in \cref{sec:method:post-processing}. The best hyperparameters for the post-processing step found by grid search on the validation are reported in \cref{tab:hyperparams}.
+
+\begin{table}[t]
+    \centering
+    \captionsetup{width=.9\linewidth}
+    \caption{Values of the best hyperparameters found by grid search. $r$ is the rank of the low-rank smoothing, only applicable to Hearst and REBEL. $\alpha = \beta = 0$ means no edges are pruned from the raw output apart from self-loop and inverse edge removal.}
+    \label{tab:hyperparams}
+    \begin{tabular}{lllll}
+        \toprule
+        Dataset & Method              & $\alpha$ & $\beta$  & $r$ \\
+        \midrule
+        \multirow[t]{8}{*}{Wikipedia}
+                & Memorisation        & 0        & 0.058489 & -   \\
+                & Hearst              & 0.786685 & 0        & 5   \\
+                & REBEL               & 0.872544 & 0        & 20  \\
+                & Zero-shot           & 0.976781 & 0.298107 & -   \\
+                & One-shot            & 0.990906 & 0.346684 & -   \\
+                & Three-shot          & 0.991955 & 0.530957 & -   \\
+                & Finetune            & 0.883848 & 0.058489 & -   \\
+                & \name               & 0.974330 & 0.025893 & -   \\
+        \midrule
+        \multirow[t]{8}{*}{arXiv}
+                & Memorisation        & 0.340246 & 0        & -   \\
+                & Hearst              & 0.595878 & 0        & 150 \\
+                & REBEL               & 0.836685 & 0        & 100 \\
+                & Zero-shot           & 0.999896 & 0.346684 & -   \\
+                & One-shot            & 0.999611 & 0.401187 & -   \\
+                & Three-shot          & 0.999851 & 0.298107 & -   \\
+                & Finetune (transfer) & 0.988129 & 0.346684 & -   \\
+                & \name (transfer)    & 0.983681 & 0.123872 & -   \\
+        \bottomrule
+    \end{tabular}
+\end{table}
 
 \newpage
 
-\chapter{Visualisations} \label{appendix:visualisation}
+\chapter{Visualisation of generated ontologies} \label{appendix:visualisation}
 
-% \subsubsection{Ground truth}
+\section{Wikipedia} \label{appendix:viz-wiki}
+
+We include some generated outputs for Wikipedia here. Since the full generated output is too large to visualise, we plot subgraphs of the output instead. We sample the subgraphs by the following method:
+\begin{enumerate}
+    \item Pick a random node in the generated graph.
+    \item Get the induced subgraph by the 1-hop neighbourhood of the chosen node.
+    \item Include the shortest path from the root ``Main topic classifications'' to the chosen node if such path exists.
+    \item Repeat from step 1 if the subgraph has more than 30 nodes or less than 5 nodes.
+\end{enumerate}
+We apply the filtering step (step 4) as subgraphs with too many nodes are difficult to inspect manually, and those with too few are uninformative. For Hearst, we choose the filtering upper bound to be 50 nodes as we fail to find subgraphs smaller than 30 nodes quickly. We additionally colour each edge \textcolor{black}{\textbf{black}} if it occurs literally in the training graph, \textcolor{blue}{blue} if it occurs literally in the test graph, and \textcolor{red}{red} otherwise.
+
+\newpage
+\begin{figure}[H]
+    \centering
+    \begin{subfigure}{0.9\textwidth}
+        \centering
+        \includegraphics[width=\linewidth]{media/wiki_viz/ollm/Biology_subgraph.pdf}
+        \caption{Biology}
+    \end{subfigure}
+    \begin{subfigure}{0.9\textwidth}
+        \centering
+        \includegraphics[width=\linewidth]{media/wiki_viz/ollm/Language policy_subgraph.pdf}
+        \caption{Language policy}
+    \end{subfigure}
+    \begin{subfigure}{0.9\textwidth}
+        \centering
+        \includegraphics[width=\linewidth]{media/wiki_viz/ollm/Mathematical structures_subgraph.pdf}
+        \caption{Mathematical structures}
+        \label{fig:ollm-wiki-samples-math}
+    \end{subfigure}
+    \caption{Sub-ontologies for Wikipedia generated by \name, centred on various topics.}
+\end{figure}
+
+\begin{figure}[H]
+    \centering
+    \begin{subfigure}{1.0\textwidth}
+        \centering
+        \includegraphics[width=\linewidth]{media/wiki_viz/finetune/Energy economics_subgraph.pdf}
+        \caption{Energy economics}
+    \end{subfigure}
+    \begin{subfigure}{1.0\textwidth}
+        \centering
+        \includegraphics[width=\linewidth]{media/wiki_viz/finetune/Internet activism_subgraph.pdf}
+        \caption{Internet activism}
+    \end{subfigure}
+    \begin{subfigure}{1.0\textwidth}
+        \centering
+        \includegraphics[width=\linewidth]{media/wiki_viz/finetune/Theories_subgraph.pdf}
+        \caption{Theories}
+    \end{subfigure}
+    \caption{Sub-ontologies for Wikipedia generated by Finetune, centred on various topics.}
+\end{figure}
+
+\begin{figure}[H]
+    \centering
+    \begin{subfigure}{1.0\textwidth}
+        \centering
+        \includegraphics[width=\linewidth]{media/wiki_viz/memorisation/Artificial objects_subgraph.pdf}
+        \caption{Aritificial objects}
+    \end{subfigure}
+    \begin{subfigure}{0.9\textwidth}
+        \centering
+        \includegraphics[width=\linewidth]{media/wiki_viz/memorisation/Fraud_subgraph.pdf}
+        \caption{Fraud}
+    \end{subfigure}
+    \begin{subfigure}{0.9\textwidth}
+        \centering
+        \includegraphics[width=\linewidth]{media/wiki_viz/memorisation/Nature and religion_subgraph.pdf}
+        \caption{Nature and religion}
+    \end{subfigure}
+    \caption{Sub-ontologies for Wikipedia generated by Memorisation, centred on various topics.}
+\end{figure}
+
+\begin{figure}[H]
+    \centering
+    \begin{subfigure}{0.7\textwidth}
+        \centering
+        \includegraphics[width=\linewidth]{media/wiki_viz/hearst/Drugs_subgraph.pdf}
+        \caption{Drugs}
+    \end{subfigure}
+    \begin{subfigure}{0.6\textwidth}
+        \centering
+        \includegraphics[width=\linewidth]{media/wiki_viz/hearst/Government_subgraph.pdf}
+        \caption{Government}
+    \end{subfigure}
+    \begin{subfigure}{0.7\textwidth}
+        \centering
+        \includegraphics[width=\linewidth]{media/wiki_viz/hearst/Society_subgraph.pdf}
+        \caption{Society}
+    \end{subfigure}
+    \caption{Sub-ontologies for Wikipedia generated by Hearst, centred on various topics.}
+\end{figure}
+
+\begin{figure}[H]
+    \centering
+    \begin{subfigure}{0.9\textwidth}
+        \centering
+        \includegraphics[width=\linewidth]{media/wiki_viz/rebel/Elections_subgraph.pdf}
+        \caption{Elections}
+    \end{subfigure}
+    \begin{subfigure}{0.8\textwidth}
+        \centering
+        \includegraphics[width=\linewidth]{media/wiki_viz/rebel/Money_subgraph.pdf}
+        \caption{Money}
+    \end{subfigure}
+    \begin{subfigure}{0.8\textwidth}
+        \centering
+        \includegraphics[width=\linewidth]{media/wiki_viz/rebel/Vocal music_subgraph.pdf}
+        \caption{Vocal music}
+    \end{subfigure}
+    \caption{Sub-ontologies for Wikipedia generated by REBEL, centred on various topics.}
+\end{figure}
+
+\begin{figure}[H]
+    \centering
+    \begin{subfigure}{1.0\textwidth}
+        \centering
+        \includegraphics[width=\linewidth]{media/wiki_viz/prompting_0/Criminal Justice System_subgraph.pdf}
+        \caption{Criminal Justice System}
+    \end{subfigure}
+    \begin{subfigure}{1.0\textwidth}
+        \centering
+        \includegraphics[width=\linewidth]{media/wiki_viz/prompting_0/Denmark_subgraph.pdf}
+        \caption{Denmark}
+    \end{subfigure}
+    \begin{subfigure}{1.0\textwidth}
+        \centering
+        \includegraphics[width=\linewidth]{media/wiki_viz/prompting_0/Machine Learning_subgraph.pdf}
+        \caption{Machine Learning}
+    \end{subfigure}
+    \caption{Sub-ontologies for Wikipedia generated by Zero-shot, centred on various topics.}
+\end{figure}
+
+\begin{figure}[H]
+    \centering
+    \begin{subfigure}{1.0\textwidth}
+        \centering
+        \includegraphics[width=\linewidth]{media/wiki_viz/prompting_1/Athletics_subgraph.pdf}
+        \caption{Athletics}
+    \end{subfigure}
+    \begin{subfigure}{1.0\textwidth}
+        \centering
+        \includegraphics[width=\linewidth]{media/wiki_viz/prompting_1/Legal studies_subgraph.pdf}
+        \caption{Legal studies}
+    \end{subfigure}
+    \begin{subfigure}{1.0\textwidth}
+        \centering
+        \includegraphics[width=\linewidth]{media/wiki_viz/prompting_1/Physiology_subgraph.pdf}
+        \caption{Physiology}
+    \end{subfigure}
+    \caption{Sub-ontologies for Wikipedia generated by One-shot, centred on various topics.}
+\end{figure}
+
+\begin{figure}[H]
+    \centering
+    \begin{subfigure}{0.9\textwidth}
+        \centering
+        \includegraphics[width=\linewidth]{media/wiki_viz/prompting_3/Aerospace technology_subgraph.pdf}
+        \caption{Aerospace technology}
+    \end{subfigure}
+    \begin{subfigure}{1.0\textwidth}
+        \centering
+        \includegraphics[width=\linewidth]{media/wiki_viz/prompting_3/Artificial intelligence and machine learning_subgraph.pdf}
+        \caption{Artificial intelligence and machine learning}
+    \end{subfigure}
+    \begin{subfigure}{1.0\textwidth}
+        \centering
+        \includegraphics[width=\linewidth]{media/wiki_viz/prompting_3/Elections_subgraph.pdf}
+        \caption{Elections}
+        \label{fig:3shot-wiki-samples-election}
+    \end{subfigure}
+    \caption{Sub-ontologies for Wikipedia generated by Three-shot, centred on various topics.}
+\end{figure}
+
+\section{arXiv}  \label{appendix:viz-arxiv}
 
 \begin{figure}[h]
     \centering
-    \includegraphics[width=0.9\linewidth]{media/arxiv_v2_test_gt_graph.pdf}
+    \includegraphics[width=\linewidth]{media/arxiv_v2_test_gt_graph.pdf}
     \caption{Ground truth test split ontology for arXiv}
 \end{figure}
 
@@ -86,8 +310,9 @@ Use the format described above.
 
 \begin{figure}[h]
     \centering
-    \includegraphics[width=0.9\linewidth]{media/arxiv_v2_Finetune masked (transfer)_graph.pdf}
+    \includegraphics[width=\linewidth]{media/arxiv_v2_Finetune masked (transfer)_graph.pdf}
     \caption{Ontology for arXiv generated by \name}
+    \label{fig:ollm-arxiv}
 \end{figure}
 
 % \subsubsection{Finetune}
@@ -102,7 +327,7 @@ Use the format described above.
 
 \begin{figure}[h]
     \centering
-    \includegraphics[width=0.9\linewidth]{media/arxiv_v2_Memorisation_graph.pdf}
+    \includegraphics[width=\linewidth]{media/arxiv_v2_Memorisation_graph.pdf}
     \caption{Ontology for arXiv generated by Memorisation}
 \end{figure}
 
@@ -110,41 +335,37 @@ Use the format described above.
 
 \begin{figure}[h]
     \centering
-    \includegraphics[width=0.9\linewidth]{media/arxiv_v2_Hearst better_graph.pdf}
+    \includegraphics[width=\linewidth]{media/arxiv_v2_Hearst better_graph.pdf}
     \caption{Ontology for arXiv generated by Hearst}
+    \label{fig:hearst-arxiv}
 \end{figure}
 
 % \subsubsection{REBEL}
 
 \begin{figure}[h]
     \centering
-    \includegraphics[width=0.8\linewidth]{media/arxiv_v2_Rebel better_graph.pdf}
+    \includegraphics[width=\linewidth]{media/arxiv_v2_Rebel better_graph.pdf}
     \caption{Ontology for arXiv generated by REBEL}
+    \label{fig:rebel-arxiv}
 \end{figure}
 
 % \subsubsection{Prompting}
 
 \begin{figure}[h]
     \centering
-    \includegraphics[width=0.8\linewidth]{media/arxiv_v2_0 shot_graph.pdf}
-    \caption{Ontology for arXiv generated by zero-shot}
+    \includegraphics[width=\linewidth]{media/arxiv_v2_0 shot_graph.pdf}
+    \caption{Ontology for arXiv generated by Zero-shot}
 \end{figure}
 
 \begin{figure}[h]
     \centering
-    \includegraphics[width=0.9\linewidth]{media/arxiv_v2_1 shot_graph.pdf}
-    \caption{Ontology for arXiv generated by one-shot}
+    \includegraphics[width=\linewidth]{media/arxiv_v2_1 shot_graph.pdf}
+    \caption{Ontology for arXiv generated by One-shot}
 \end{figure}
 
 \begin{figure}[h]
     \centering
-    \includegraphics[width=0.9\linewidth]{media/arxiv_v2_3 shot_graph.pdf}
-    \caption{Ontology for arXiv generated by three-shot}
+    \includegraphics[width=\linewidth]{media/arxiv_v2_3 shot_graph.pdf}
+    \caption{Ontology for arXiv generated by Three-shot}
+    \label{fig:3shot-arxiv}
 \end{figure}
-
-% \begin{figure}
-%     \centering
-%     \includegraphics[width=\linewidth]{media/arxiv_ground_truth.pdf}
-%     \caption{Ground truth ontology for arXiv}
-%     \label{fig:arxiv-ground-truth}
-% \end{figure}

@@ -1,8 +1,9 @@
-\chapter{Evaluation}
+\chapter{Evaluation}  \label{chap:evaluation}
 
-In this chapter, we aim to answer our research questions:
+In this chapter, we aim to answer our research questions (\cref{chap:introduction}):
 \begin{enumerate}[leftmargin=*]
     \item Does \name produce better ontologies than traditional methods by subtask composition?
+    \item Does \name scale efficiently to practical problem sizes?
     \item Can \name be easily adapted to a new domain?
 \end{enumerate}
 Since our problem setup is uncommon in existing literature, we also develop new evaluation methods. Evaluating a quality of an ontolgoy is a hard problem as there are no quantitative definitions of what constitutes a ``good ontology'', and metrics generally only capture one aspect (e.g., structure but not semantics) of an ontology. We approach evaluation by treating the ground truth as a proxy for a good ontology, and comparing the generated ontologies against the ground truth.
@@ -78,40 +79,56 @@ Instead of comparing individual edges, this metric aims to capture the wider str
     \text{Graph~F1} = \left(\frac{1}{P_{\text{graph}}} + \frac{1}{R_{\text{graph}}}\right)^{-1}
 \]
 
-\paragraph{Motif distance}
-Taking inspiration from classical network analysis, we use \emph{network motifs}~\cite{milo2002network,shen2002network} to evaluate the structural integrity of the generated graphs. Network motifs are reoccurring subgraphs in a larger graph, most commonly 3-vertex subgraphs. They are typically indicative of the structural characteristics of the full graph. We define the motif distance as the 1-Wasserstein distance~\cite{Kantorovich1960MathematicalMO} between the distribution of all 3-vertex subgraphs in $G$ and $G'$.
+\paragraph{Motif Distance}
+Taking inspiration from classical network analysis, we use network motifs (\cref{sec:network-motifs}) to evaluate the structural integrity of the generated graphs. Specifically, we compare total variation distance \cite{levin2017markov} between the distribution of all 3-vertex graphlets in the generated and ground truth graphs. There are 12 unique 3-vertex graphlets $\mathcal{M}_1, \ldots, \mathcal{M}_{12}$, and the Motif Distance is given by:
+\[
+    \text{Motif Distance} = \frac{1}{2} \sum_{i=1}^{12} \left|
+    \frac{c(\mathcal{M}_i, G)}{\sum_{j=1}^{12} c(\mathcal{M}_j, G)} -
+    \frac{c(\mathcal{M}_i, G')}{\sum_{j=1}^{12} c(\mathcal{M}_j, G')}
+    \right|
+\]
+where $c(\mathcal{M}_i, G)$ is the number of times the motif $\mathcal{M}_i$ occurs in graph $G$. Note that this metric is entirely structural and does not consider the semantics of the nodes and edges. We include this metric to provide a more holistic evaluation of the generated graphs.
 
 
-\section{Experiments}  \label{sec:experiments}
+\section{Experiments}  \label{sec:experiments} \label{sec:implementation}
 
-We design our experiments to answer the following research questions:
-\begin{enumerate}
-    \item Does \name produce better ontologies than traditional methods by subtask composition?
-    \item Can \name be easily adapted to a new domain?
-\end{enumerate}
-We approach the questions by training \name on the Wikipedia dataset and further transfer the model to arXiv with a small number of arXiv samples. As baselines, we use two relation extraction methods, Hearst patterns \cite{hearst1998automated,roller2018hearst} and REBEL \cite{cabot2021rebel}. Relation extraction depends on successful concept discovery to produce high-quality ontologies. To estimate a ceiling to such baselines, \emph{we give the baselines a substantial advantage} by providing them with the ground truth concepts in the test graph. The results show that even with such an advantage, \name outperforms the baselines on many metrics, demonstrating the potential of \name for end-to-end OL.
+We design two experiments to answer the research questions stated at the beginning of the chapter (\cref{chap:evaluation}). To test the performance and scalability of \name, we train the model on the Wikipedia dataset and compare it to our baselines to see if \name can appropriately model ontologies with many concepts and relations. Then we transfer the model to arXiv by further finetuning on a small number of arXiv samples to see if \name can be easily adapted to a new domain. This is a challenging task as the arXiv ontology has a distinct style (more simplistic and science-focused) compared to the Wikipedia ontology (more general and diverse). The writing style of the documents in the arXiv dataset is also a lot more technical and academic compared to Wikipedia, which may also affect the transferability of the model.
 
-\subsection{Implementation details}  \label{sec:implementation}
+For the Wikipedia experiment, we attach LoRA adaptors to all attention and feed-forward layers of the base model with parameters $r=32$ and $\alpha=16$. The model is trained for 2 epochs ($\approx$ 17K steps) with batch size 16, context length 2048, and is optimised with Adam using a constant learning rate of 1e-5 with warm-up from zero for the first 100 steps. We include a finetuning baseline without the masked loss objective but otherwise uses the same configuration, denoted as Finetune. During inference, the outputs are generated with temperature 0.1 and nucleus sampling~\cite{holtzman2019curious} top-$p$ of 0.9. We use the vLLM \cite{kwon2023efficient} inference server which achieves a throughput of $\approx 10$ documents per second.
 
-
-The model is trained on the Wikipedia dataset for two epochs with Adam. During inference, the outputs are generated with temperature 0.1 and nucleus sampling~\cite{holtzman2019curious} top-$p$ of 0.9. We include a finetuning baseline without the masked loss objective, denoted as Finetune. To adapt \name for arXiv, we further finetune the model on 2048 document-subgraph pairs from arXiv. We initialise new low-rank adaptors and train until the loss stops improving on the validation set. We name these models \name (transfer) and Finetune (transfer) for training with and without the masked loss objective, respectively. Full details for the Wikipedia and arXiv experiments can be found in~\cref{appendix:training-details}.
-
+For the arXiv experiment, we further finetune the model trained on Wikipedia with masked loss objective on 2048 document-subgraph pairs from the arXiv training set. We merge the LoRA adaptors from the Wikipedia experiment and initialise new ones with $r=8$ and $\alpha=8$. The model is trained with batch size 16 and Adam with constant learning rate 3e-6 and warp-up from zero for the first 10 steps. Training terminates when the loss stops improving on the validation set, which happened at step 288. Finetune (transfer) uses the same configuration. Early stopping happened at step 192.
 
 The hyperparameters for the post-processing steps are tuned by grid search on the validation set. We sweep over $\alpha \in 1 - \text{geomspace}(1 / |E_\text{raw}|, 1, 21)$ and $\beta \in \text{geomspace}(0.1, 1, 21) - 0.1$ and use the values that maximise Continuous~F1. For Wikipedia, we choose the subgraph modelling path length $N=4$ as it is the smallest $N$ such that almost all edges ($>99\%$) occur in at least one relevant subgraph. Such criterion is used since smaller $N$ results in smaller subgraphs, which we expect to be easier to model accurately. We choose $N=3$ for arXiv for the same reason.
 
+Our baselines Hearst and REBEL have an additional hyperparameter $r$ for the rank of the low-rank smoothed matrix. We tune $r$ by sweeping over $r \in \{$5, 10, 15, 20, 25, 50, 100, 150, 200, 250$\}$ on the validation set. The smoothing step allows comparison between any two concepts which in tern defines a dense weighted graph as the raw output. Unfortunately, computing Continuous F1 on a dense graph is very slow, especially for Wikipedia. This is because the Hungarian algorithm used for solving the optimal matching between edges has time complexity $O(N^3)$, where $N$ is the number of edges. To bypass this issue, we perform a pre-filtering step of only exporting the top $10|V|$ weighted edges in the smoothed relation matrix, where $|V|$ is the number of nodes in the graph. For the datasets considered, this density of edges is still much higher than that of the ground truth, and thus, we expect this to have minimal impact on the final output after post-processing.
 
 \section{Results}  \label{sec:results}
 
 \input{figures/metrics}
 
+\subsection{Wikipedia}
+
 We first evaluate whether \name can accurately create ontologies with many concepts and relations, such as the Wikipedia categories. Computationally, \name required 12 A100-hours for training and 7 A100-hours for inference to generate an ontology for Wikipedia. This is a modest cost in current standards, which demonstrates the scalability of \name for real-world problems.
 In terms of performance, \name produces the most semantically accurate ontology in comparison to our baselines as presented in \cref{table:metrics}. Across all of Fuzzy~F1, Continuous~F1 and Graph~F1, we observe the trend that \name scores the best, followed by Finetune and Prompting, and lastly Hearst and REBEL. This is surprising, as it suggests that the combination of LLMs with our subgraph modelling framework is a sufficiently strong inductive bias for LLMs to outperform traditional methods even without finetuning. However, prompting alone is not sufficient to build high-quality ontologies.
 On the Motif Distance metric, prompting methods score poorly at 0.314--0.354 in comparison to 0.050 and 0.080 for Finetune and \name respectively. This shows that using LLMs out-of-the-box for subgraph modelling results in poor structural integrity, though this issue is solved by finetuning.
-Qualitatively, we observe that \name can adhere to the clear, explicit naming style of Wikipedia, even on unseen topics in the test set. For example, it generates ``Mathematical categories'' and ``Groups (mathematics)'' under the parent concept ``Mathematical structures'' to distinguish from the natural language sense of categories and groups (\cref{fig:ollm-wiki-samples-math}). Such style is not learned by the prompting baselines: Three-shot generated ``Elections $\to$ France'', while it most likely meant ``Elections $\to$ Elections in France'' (\cref{fig:3shot-wiki-samples-election}). More sample outputs are shown in \cref{appendix:viz-wiki}.
+
+\input{figures/wiki_qualitative.tex}
+
+Qualitatively, we observe that \name can adhere to the clear, explicit naming style of Wikipedia, even on unseen topics in the test set. For example in \cref{fig:wiki-examples:ollm}, it generates ``Mathematical categories'' and ``Groups (mathematics)'' under the parent concept ``Mathematical structures'' to distinguish from the natural language sense of categories and groups (\cref{fig:ollm-wiki-samples-math}). Such style is not learned by the prompting baselines: Three-shot generated ``Elections $\to$ France'', while it most likely meant ``Elections $\to$ Elections in France'' (\cref{fig:wiki-examples:prompting}). More sample outputs are shown in \cref{appendix:viz-wiki}.
+
+\subsection{arXiv}
 
 The arXiv task differs from the Wikipedia task as it has much fewer relations, and there is even less overlap between the train and test split. This imposes a great challenge on Finetune and \name as they need to generalise with a limited diversity of training samples. Despite such constraints, \name is substantially better than other methods in modelling the semantics of the test graph.
 On the Fuzzy~F1, Continuous~F1, and Graph~F1 metrics, \name performs the best among all methods with 0.570, 0.357, and 0.633, significantly higher than the next-best of 0.460, 0.290 and 0.546 respectively.
-Inspecting the generated ontologies (\cref{appendix:viz-arxiv}), we observe that prompting baselines tend to produce repetitive concepts such as ``Machine Learning and Artificial Intelligence'' and ''Artificial Intelligence and Machine Learning'' (\cref{fig:3shot-arxiv}), while Hearst and REBEL put almost all concepts under the same parent concept(s) (\cref{fig:hearst-arxiv,fig:rebel-arxiv}).
-We also found that \name's output for arXiv contains concepts from Wikipedia, but restructured in a way that fits the arXiv ontology. For example, ``Life sciences'' and ``Biological evolution'' appear in the Wikipedia training set under the same parent category ``Life'' with no direct links between them. On the generated graph for arXiv, ``Life sciences'' is instead promoted to one of the top-level concepts with ``Biological Evolution'' as one of its children, which better fits the ``fields of science'' style of the arXiv ontology (\cref{fig:ollm-arxiv}). This demonstrates that \name can adapt to produce a new type of ontology by restructuring its learned concepts, all using just a small number of training samples.
+
+\input{figures/arxiv_qualitative.tex}
+
+Inspecting the generated ontologies (\cref{fig:arxiv-examples}), we observe that prompting baselines tend to produce repetitive concepts such as ``Machine Learning and Artificial Intelligence'' and ''Artificial Intelligence and Machine Learning'' (\cref{fig:arxiv-examples:prompting}), while REBEL puts almost all concepts under the same parent concept(s) (\cref{fig:arxiv-examples:rebel}).
+We also found that \name's output for arXiv contains concepts from Wikipedia, but restructured in a way that fits the arXiv ontology. For example, ``Life sciences'' and ``Biological evolution'' appear in the Wikipedia training set under the same parent category ``Life'' with no direct links between them. On the generated graph for arXiv, ``Life sciences'' is instead promoted to one of the top-level concepts with ``Biological Evolution'' as one of its children, which better fits the ``fields of science'' style of the arXiv ontology (\cref{fig:arxiv-examples:ollm}). This demonstrates that \name can adapt to produce a new type of ontology by restructuring its learned concepts, all using just a small number of training samples.
 
 In summary, \name scores the best or is competitive across all metrics in both tasks, with the notable exception of the Literal~F1 metric. We attribute this to the fact that Literal~F1 is sensitive to factors like casing and choice of words, and generally only measures syntactic similarity. For example, we see that a suboptimal baseline like Memorisation scores the best on this metric with 0.134 on the Wikipedia task. This reflects that syntactic similarity generally does not entail semantic similarity so syntax-based metrics should not be used as stand-alone measures for ontology quality.
+
+
+\section{Meta-evaluation}
+
+\input{figures/graph_matching.tex}

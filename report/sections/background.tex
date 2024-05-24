@@ -37,7 +37,7 @@ Similar to OL, knowledge graph construction is rarely studied in an end-to-end f
 
 Since we treat ontologies as graphs in this project, standard graph analysis techniques are applicable too. In particular, these ideas will become relevant when we design metrics for analysing and evaluating the generated ontologies. This section explains two key concepts used in this project: \emph{network motifs} and \emph{node embeddings}.
 
-\subsection{Network motifs}
+\subsection{Network motifs}  \label{sec:network-motifs}
 
 Network motifs are recurring subgraphs that appear more frequently in a graph than in a random graph \cite{milo2002network}. Studying the frequency or the location of the motifs in a graph can provide insights into the graph's global structures. For example, the fully-connected three-vertex graph is a motif commonly found in social networks \cite{stone2019network}, indicating the general property that if Alice is friends with Bob and Bob is friends with Charlie, then Alice and Charlie are likely to be friends as well. More generally, motif analysis is an instantiation of \emph{graphlet counting} \cite{ribeiro2021survey} which aims to compute the frequency of all possible subgraphs of a certain size. Graphlet counting has been used to evaluate graph generation models \cite{you2018graphrnn} by comparing the $n$-node graphlet counts between two graph distributions. In this project, however, we are interested in comparing two specific graph instances (the generated ontology versus the ground truth) hence such metrics do not directly apply.
 
