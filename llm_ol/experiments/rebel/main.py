@@ -113,7 +113,7 @@ def main(_):
             max_length=256,
             min_length=12,
             no_repeat_ngram_size=0,
-            num_beams=4,  # Recommend 4 but 2 is faster
+            num_beams=4,
         )
         outputs = tokenizer.batch_decode(generated_tokens, skip_special_tokens=False)
 
