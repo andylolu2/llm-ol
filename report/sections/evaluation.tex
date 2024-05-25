@@ -1,29 +1,29 @@
 \chapter{Evaluation}  \label{chap:evaluation}
 
 In this chapter, we aim to answer our research questions (\cref{chap:introduction}):
-\begin{enumerate}[leftmargin=*]
+\begin{enumerate}
     \item Does \name produce better ontologies than traditional methods by subtask composition?
     \item Does \name scale efficiently to practical problem sizes?
     \item Can \name be easily adapted to a new domain?
 \end{enumerate}
-Since our problem setup is uncommon in existing literature, we also develop new evaluation methods. Evaluating a quality of an ontolgoy is a hard problem as there are no quantitative definitions of what constitutes a ``good ontology'', and metrics generally only capture one aspect (e.g., structure but not semantics) of an ontology. We approach evaluation by treating the ground truth as a proxy for a good ontology, and comparing the generated ontologies against the ground truth.
+Since our problem setup is uncommon in the existing literature, we also have to develop new evaluation methods. Evaluating the quality of an ontology is a hard problem as there are no quantitative definitions of what constitutes a ``good ontology'', and metrics generally only capture one aspect (e.g., structure but not semantics) of an ontology. We approach evaluation by treating the ground truth as a proxy for a good ontology and comparing the generated ontologies against the ground truth.
 
 In \cref{sec:metrics}, we introduce new metrics that are more robust for measuring ontology similarity. We design our experiments to answer the research questions in \cref{sec:experiments}, and present the results in \cref{sec:results}. We show that \name outperforms all of our baselines and can be easily adapted to a new domain using a small number of training samples, demonstrating the potential of \name for end-to-end OL.
 
 \section{Metrics}  \label{sec:metrics}
 
-Many existing methods for comparing ontologies rely on syntactic measures like string edit distance~\cite{Ehrig2005SimilarityFO} as a proxy for semantic similarity, or require every concept to be tagged with descriptions or documents for distributional semantics comparison~\cite{Zavitsanos2011GoldSE}. To obtain more robust and general evaluation results, we introduce a suite of similarity metrics that use modern methods like text embeddings~\cite{reimers-2019-sentence-bert}. Multiple metrics are used as they trade off between interpretability and comprehensiveness, and we aim to make them complementary by capturing different aspects of an ontology. In this section, we denote the ground truth ontology graph as $G = (V, E)$ and the generated graph as $G' = (V', E')$.
+Many existing methods for comparing ontologies rely on syntactic measures like string edit distance~\cite{Ehrig2005SimilarityFO} as a proxy for semantic similarity or require every concept to be tagged with descriptions or documents for distributional semantics comparison~\cite{Zavitsanos2011GoldSE}. To obtain more robust and general evaluation results, we introduce Fuzzy F1, Continuous F1, Graph F1 and Motif Distance, a suite of novel similarity metrics that use modern methods like text embeddings~\cite{reimers-2019-sentence-bert} for measuring ontology similarity. Multiple metrics are used as they trade off between interpretability and comprehensiveness, and we aim to make them complementary by capturing different aspects of an ontology. In this section, we denote the ground truth ontology as $\O = (\V, \E, r)$ and the generated graph as $\G' = (\V', \E', r')$.
 
 \paragraph{Literal~F1}
-While literal text matching is unreliable, it is also the simplest and the most interpretable. We treat this metric as a reference metric for sanity check. The Literal~F1 metric~\cite{Kashyap2005TaxaMinerAE} is given by the harmonic mean of the precision and recall of the edges:
+While literal text matching is unreliable, it is also the simplest and the most interpretable (\cref{sec:evaluating-ontologies}). We treat this metric as a reference metric for sanity checks. The Literal~F1 metric~\cite{Kashyap2005TaxaMinerAE} is given by the harmonic mean of the precision and recall of the edges:
 \[
-    P_{\text{literal}} = \frac{|E \cap E'|}{|E'|} \qquad
-    R_{\text{literal}} = \frac{|E \cap E'|}{|E|} \qquad
+    P_{\text{literal}} = \frac{|\E \cap \E'|}{|\E'|} \qquad
+    R_{\text{literal}} = \frac{|\E \cap \E'|}{|\E|} \qquad
     \text{Literal~F1} = \left(\frac{1}{P_{\text{literal}}} + \frac{1}{R_{\text{literal}}}\right)^{-1}
 \]
 
 \paragraph{Fuzzy~F1}
-The Literal~F1 metric puts a strong emphasis on using the correct wording, while in practice, we are interested in evaluating the semantics of an ontology. For example, using a synonymous phrase for a concept should not be penalised. The current state-of-the-art for semantic textual similarity tasks are sentence transformers \cite{reimers-2019-sentence-bert,jiang2022improved,jiang2019smart}. On a high level, a sentence transformer is an embedding function $f: \text{string} \to \mathbb{R}^d$ that maps a string to a $d$-dimensional vector space such that semantically similar strings are close in the vector space, usually measured by cosine similarity:
+The Literal~F1 metric puts a strong emphasis on using the correct wording, while in practice, we are interested in evaluating the semantics of an ontology. For example, using a synonymous phrase for a concept should not be penalised. The current state-of-the-art for semantic textual similarity tasks is sentence transformers \cite{reimers-2019-sentence-bert,jiang2022improved,jiang2019smart}. On a high level, a sentence transformer is an embedding function $f: \text{string} \to \mathbb{R}^d$ that maps a string to a $d$-dimensional vector space such that semantically similar strings are close in the vector space, usually measured by cosine similarity:
 \[
     \nodesim(u, u') = \frac{f(u) \cdot f(u')}{\|f(u)\| \|f(u')\|}
 \]
@@ -31,15 +31,15 @@ We consider two nodes $u$ and $u'$ as a fuzzy match if $\nodesim(u, u') > t$, wh
 \begin{equation*}
     \begin{aligned}
         P_{\text{fuzzy}} & = \frac{|
-            \{(u', v') \in E' \mid \exists (u, v) \in E.
+            \{(u', v') \in \E' \mid \exists (u, v) \in \E.
             \nodesim(u, u') > t \land \nodesim(v, v') > t
             \}
-        |}{|E'|}                                                                                       \\
+        |}{|\E'|}                                                                                      \\
         R_{\text{fuzzy}} & = \frac{|
-            \{(u, v) \in E \mid \exists (u', v') \in E'.
+            \{(u, v) \in \E \mid \exists (u', v') \in \E'.
             \nodesim(u, u') > t \land \nodesim(v, v') > t
             \}
-        |}{|E|}                                                                                        \\
+        |}{|\E|}                                                                                       \\
         \text{Fuzzy~F1}  & = \left(\frac{1}{P_{\text{fuzzy}}} + \frac{1}{R_{\text{fuzzy}}}\right)^{-1}
     \end{aligned}
 \end{equation*}
@@ -64,45 +64,81 @@ With fuzzy comparisons, the matches between the edges of the generated and the g
     \end{tikzpicture}
 \end{figure}
 \vspace{-1em}
-where $B$ and $B'$ match fuzzily. This pair of graphs achieves a perfect Fuzzy~F1 score, yet they are clearly different. Additionally, we found that the discrete nature of Fuzzy F1 makes it unable to provide useful signals for hyperparameter tuning, particularly for our baselines where the generated graphs are poor. The Continuous~F1 metric solves these issues by computing the highest-scoring edge matching between the two graphs, where the similarity score between $(u, v)$ and $(u', v')$ is given by $\min(\nodesim(u, u'), \nodesim(v, v'))$. We choose to use $\min(\nodesim(u, u'), \nodesim(v, v'))$ as the similarity score to ensure that only edges where both nodes partially match (i.e. cosine similarity $> 0$) can contribute to the total matching score. Obtaining such matching is equivalent to solving the linear assignment problem~\cite{martello1987linear}, which can be computed by the Hungarian algorithm~\cite{kuhn1955hungarian}. Given the score $s_{\text{cout}}$ achieved by the best edge matching, the Continuous~F1 score is obtained from the continuous precision and recall, given by:
+where $B$ and $B'$ match fuzzily. This pair of graphs achieves a perfect Fuzzy~F1 score, yet they are clearly different. Additionally, we found that the discrete nature of Fuzzy F1 makes it unable to provide useful signals for hyperparameter tuning, particularly for our baselines where the generated graphs are poor. The Continuous~F1 metric solves these issues by enforcing a one-to-one matching between the edges of the two graphs and using the continuous cosine similarity between the nodes for scoring.
+
+Specifically, the highest-scoring edge matching between the two graphs, where the edge similarity score between $(u, v)$ and $(u', v')$ is given by:
 \[
-    P_{\text{cont}} = \frac{s_{\text{cout}}}{|E'|} \qquad
-    R_{\text{cont}} = \frac{s_{\text{cout}}}{|E|} \qquad
+    \edgesim((u, v), (u', v')) = \min(\nodesim(u, u'), \nodesim(v, v'))
+\]
+We choose to use $\min(\nodesim(u, u'), \nodesim(v, v'))$ as the similarity score to ensure that only edges where both nodes at least partially match (i.e. $\nodesim > 0$) can count as a positive partial match. The continuous edge matching score $s_{\text{cont}}$ is defined as:
+\[
+    s_{\text{cont}} = \max_{m \in \matching(\E, \E')} \sum_{(e, e') \in m} \edgesim(e, e')
+\]
+where $\matching(A, B)$ is the set of all matchings between set $A$ and $B$ (i.e. the set of partial bijections between $A$ and $B$). The Continuous~F1 score is obtained from the continuous precision and recall, given by:
+\[
+    P_{\text{cont}} = \frac{s_{\text{cont}}}{|\E'|} \qquad
+    R_{\text{cont}} = \frac{s_{\text{cont}}}{|\E|} \qquad
     \text{Continuous~F1} = \left(\frac{1}{P_{\text{cont}}} + \frac{1}{R_{\text{cont}}}\right)^{-1}
 \]
 
+Finding the best matching is equivalent to solving the linear assignment problem~\cite{martello1987linear}, which can be computed by the Hungarian algorithm~\cite{kuhn1955hungarian}.
+
 \paragraph{Graph~F1}
-Instead of comparing individual edges, this metric aims to capture the wider structure of the two graphs. Intuitively, we want to know how concepts are related to their local neighbourhood. A well known method for capturing graph structure in vectors is node embeddings, as discussed in \cref{sec:node-embeddings}. Concretely, we use simple graph convolutions \cite{wu2019simplifying} with identity weights and $K=2$ as a parameter-free method to compute graph-aware node representations after embedding each node with the pretrained embedder. Such embeddings in $G$ are compared against those in $G'$ by cosine similarity, and the highest-scoring node matching, similar to the Continuous~F1 metric, gives the graph similarity score $s_{\text{graph}}$. The Graph~F1 score is computed from the graph precision and recall, defined as:
+Instead of comparing individual edges, this metric aims to capture the wider structure of the two graphs. Intuitively, we want to know how concepts are related to their local neighbourhood. A well-known method for capturing graph structure in vectors is node embeddings, as discussed in \cref{sec:node-embeddings}. Concretely, we use simple graph convolutions \cite{wu2019simplifying} with identity weights and $K=2$ as a parameter-free method to compute graph-aware node representations after embedding each node with the pretrained embedder. Let the node features from the pretrained embedder be:
 \[
-    P_{\text{graph}} = \frac{s_{\text{graph}}}{|V'|} \qquad
-    R_{\text{graph}} = \frac{s_{\text{graph}}}{|V|} \qquad
+    \m{X} = \begin{bmatrix}
+        f(v_1) \\
+        \vdots \\
+        f(v_{|\V|})
+    \end{bmatrix} \in \R^{|\V| \times d} \qquad
+    \m{X}' = \begin{bmatrix}
+        f(v'_1) \\
+        \vdots  \\
+        f(v'_{|\V'|})
+    \end{bmatrix} \in \R^{|\V'| \times d}
+\]
+By \cref{eq:simple-graph-conv}, the node embeddings after applying a simple graph convolution with $K = 2$ and $\m{W} = \m{I}$ are:
+\[
+    \m{H} = \left(\hat{\m{D}}^{-1/2} \hat{\m{A}} \hat{\m{D}}^{-1/2}\right)^2 \m{X} \qquad
+    \m{H}' = \left(\hat{\m{D}}'^{-1/2} \hat{\m{A}}' \hat{\m{D}}'^{-1/2}\right)^2 \m{X}'
+\]
+The graph matching score $s_{\text{graph}}$ is the score of the best node matching between $\m{H}$ and $\m{H}'$:
+\[
+    s_{\text{graph}} = \max_{m \in \matching(\V, \V')} \sum_{(v, v') \in m} \frac{\m{H}[v] \cdot \m{H}'[v']}{\|\m{H}[v]\| \|\m{H}'[v']\|}
+\]
+Intuitively, such matching can be seen as a soft alignment between the two graphs in sentence embedding space. One can expect the best matching to find correspondences between similar components in the two graphs. Finally, the Graph~F1 score is computed from the graph precision and recall, defined as:
+\[
+    P_{\text{graph}} = \frac{s_{\text{graph}}}{|\V'|} \qquad
+    R_{\text{graph}} = \frac{s_{\text{graph}}}{|\V|} \qquad
     \text{Graph~F1} = \left(\frac{1}{P_{\text{graph}}} + \frac{1}{R_{\text{graph}}}\right)^{-1}
 \]
 
 \paragraph{Motif Distance}
-Taking inspiration from classical network analysis, we use network motifs (\cref{sec:network-motifs}) to evaluate the structural integrity of the generated graphs. Specifically, we compare total variation distance \cite{levin2017markov} between the distribution of all 3-vertex graphlets in the generated and ground truth graphs. There are 12 unique 3-vertex graphlets $\mathcal{M}_1, \ldots, \mathcal{M}_{12}$, and the Motif Distance is given by:
+Taking inspiration from classical network analysis, we use network motifs (\cref{sec:network-motifs}) to evaluate the structural integrity of the generated graphs. Specifically, we compare the total variation distance \cite{levin2017markov} between the distribution of all 3-vertex graphlets in the generated and ground truth graphs. There are 12 unique 3-vertex graphlets $\mathcal{M}_1, \ldots, \mathcal{M}_{12}$, and the Motif Distance is given by:
 \[
     \text{Motif Distance} = \frac{1}{2} \sum_{i=1}^{12} \left|
-    \frac{c(\mathcal{M}_i, G)}{\sum_{j=1}^{12} c(\mathcal{M}_j, G)} -
-    \frac{c(\mathcal{M}_i, G')}{\sum_{j=1}^{12} c(\mathcal{M}_j, G')}
+    \frac{c(\mathcal{M}_i, \O)}{\sum_{j=1}^{12} c(\mathcal{M}_j, \O)} -
+    \frac{c(\mathcal{M}_i, \O')}{\sum_{j=1}^{12} c(\mathcal{M}_j, \O')}
     \right|
 \]
-where $c(\mathcal{M}_i, G)$ is the number of times the motif $\mathcal{M}_i$ occurs in graph $G$. Note that this metric is entirely structural and does not consider the semantics of the nodes and edges. We include this metric to provide a more holistic evaluation of the generated graphs.
+where $c(\mathcal{M}_i, \O)$ is the number of times the motif $\mathcal{M}_i$ occurs in the graph of ontology $\O$. Note that this metric is entirely structural and does not consider the semantics of the nodes and edges. We include this metric to provide a more holistic evaluation of the generated graphs.
 
 
 \section{Experiments}  \label{sec:experiments} \label{sec:implementation}
 
-We design two experiments to answer the research questions stated at the beginning of the chapter (\cref{chap:evaluation}). To test the performance and scalability of \name, we train the model on the Wikipedia dataset and compare it to our baselines to see if \name can appropriately model ontologies with many concepts and relations. Then we transfer the model to arXiv by further finetuning on a small number of arXiv samples to see if \name can be easily adapted to a new domain. This is a challenging task as the arXiv ontology has a distinct style (more simplistic and science-focused) compared to the Wikipedia ontology (more general and diverse). The writing style of the documents in the arXiv dataset is also a lot more technical and academic compared to Wikipedia, which may also affect the transferability of the model.
+We design two experiments to answer the research questions stated at the beginning of the chapter (\cref{chap:evaluation}). To test the performance and scalability of \name, we train the model on the Wikipedia dataset and compare it to our baselines to see if \name can appropriately model ontologies with many concepts and relations. Then, we transfer the model to arXiv by further finetuning on a small number of arXiv samples to see if \name can be easily adapted to a new domain. This is a challenging task as the arXiv ontology has a distinct style (more simplistic and science-focused) compared to the Wikipedia ontology (more general and diverse). The writing style of the documents in the arXiv dataset is also a lot more technical and academic than Wikipedia, which may also affect the transferability of the model.
 
-For the Wikipedia experiment, we attach LoRA adaptors to all attention and feed-forward layers of the base model with parameters $r=32$ and $\alpha=16$. The model is trained for 2 epochs ($\approx$ 17K steps) with batch size 16, context length 2048, and is optimised with Adam using a constant learning rate of 1e-5 with warm-up from zero for the first 100 steps. We include a finetuning baseline without the masked loss objective but otherwise uses the same configuration, denoted as Finetune. During inference, the outputs are generated with temperature 0.1 and nucleus sampling~\cite{holtzman2019curious} top-$p$ of 0.9. We use the vLLM \cite{kwon2023efficient} inference server which achieves a throughput of $\approx 10$ documents per second.
+For the Wikipedia experiment, we attach LoRA adaptors to all attention and feed-forward layers of the base model with parameters $r=32$ and $\alpha=16$. The model is trained for two epochs ($\approx$ 17K steps) with batch size 16, context length 2048, and is optimised with Adam using a constant learning rate of 1e-5 with warm-up from zero for the first 100 steps. We include a finetuning baseline without the masked loss objective but otherwise uses the same configuration, denoted as Finetune. During inference, the outputs are generated with temperature 0.1 and nucleus sampling~\cite{holtzman2019curious} top-$p$ of 0.9. We use the vLLM \cite{kwon2023efficient} inference server which achieves a throughput of $\approx 10$ documents per second.
 
 For the arXiv experiment, we further finetune the model trained on Wikipedia with masked loss objective on 2048 document-subgraph pairs from the arXiv training set. We merge the LoRA adaptors from the Wikipedia experiment and initialise new ones with $r=8$ and $\alpha=8$. The model is trained with batch size 16 and Adam with constant learning rate 3e-6 and warp-up from zero for the first 10 steps. Training terminates when the loss stops improving on the validation set, which happened at step 288. Finetune (transfer) uses the same configuration. Early stopping happened at step 192.
 
 The hyperparameters for the post-processing steps are tuned by grid search on the validation set. We sweep over $\alpha \in 1 - \text{geomspace}(1 / |E_\text{raw}|, 1, 21)$ and $\beta \in \text{geomspace}(0.1, 1, 21) - 0.1$ and use the values that maximise Continuous~F1. For Wikipedia, we choose the subgraph modelling path length $N=4$ as it is the smallest $N$ such that almost all edges ($>99\%$) occur in at least one relevant subgraph. Such criterion is used since smaller $N$ results in smaller subgraphs, which we expect to be easier to model accurately. We choose $N=3$ for arXiv for the same reason.
 
-Our baselines Hearst and REBEL have an additional hyperparameter $r$ for the rank of the low-rank smoothed matrix. We tune $r$ by sweeping over $r \in \{$5, 10, 15, 20, 25, 50, 100, 150, 200, 250$\}$ on the validation set. The smoothing step allows comparison between any two concepts which in tern defines a dense weighted graph as the raw output. Unfortunately, computing Continuous F1 on a dense graph is very slow, especially for Wikipedia. This is because the Hungarian algorithm used for solving the optimal matching between edges has time complexity $O(N^3)$, where $N$ is the number of edges. To bypass this issue, we perform a pre-filtering step of only exporting the top $10|V|$ weighted edges in the smoothed relation matrix, where $|V|$ is the number of nodes in the graph. For the datasets considered, this density of edges is still much higher than that of the ground truth, and thus, we expect this to have minimal impact on the final output after post-processing.
+Our baselines Hearst and REBEL have an additional hyperparameter $r$ for the rank of the low-rank smoothed matrix. We tune $r$ by sweeping over $r \in \{$5, 10, 15, 20, 25, 50, 100, 150, 200, 250$\}$ on the validation set. The smoothing step allows for comparison between any two concepts which in turn defines a dense weighted graph as the raw output. Unfortunately, computing Continuous F1 on a dense graph is very slow, especially for Wikipedia. This is because the Hungarian algorithm used for solving the optimal matching between edges has time complexity $O(N^3)$, where $N$ is the number of edges. To bypass this issue, we perform a pre-filtering step of only exporting the top $10|V|$ weighted edges in the smoothed relation matrix, where $|V|$ is the number of nodes in the graph. For the datasets considered, this density of edges is still much higher than that of the ground truth, and thus, we expect this to have minimal impact on the final output after post-processing.
 
 \section{Results}  \label{sec:results}
+
+In this section, we present the results of our experiments. We perform both quantitative analysis, using our new metrics introduced in \cref{sec:metrics}, and qualitative analysis, by inspecting the generated ontologies, to evaluate the performance of \name against our baselines. The experiments show a clear positive result for our research questions, demonstrating that \name can produce high-quality ontologies at scale and can be easily adapted to new domains.
 
 \input{figures/metrics}
 
@@ -119,17 +155,24 @@ Qualitatively, we observe that \name can adhere to the clear, explicit naming st
 \subsection{arXiv}
 
 The arXiv task differs from the Wikipedia task as it has much fewer relations, and there is even less overlap between the train and test split. This imposes a great challenge on Finetune and \name as they need to generalise with a limited diversity of training samples. Despite such constraints, \name is substantially better than other methods in modelling the semantics of the test graph.
-On the Fuzzy~F1, Continuous~F1, and Graph~F1 metrics, \name performs the best among all methods with 0.570, 0.357, and 0.633, significantly higher than the next-best of 0.460, 0.290 and 0.546 respectively.
+On the Fuzzy~F1, Continuous~F1, and Graph~F1 metrics, \name performs the best among all methods with 0.570, 0.357, and 0.633, significantly higher than the next-best of 0.460, 0.290 and 0.546, respectively. Comparing all our methods, we see a similar trend as in the Wikipedia task, where \name performs the best in Fuzzy~F1, Continuous~F1 and Graph~F1, followed by Finetune and Prompting, and finally Hearst and REBEL. This shows further confirmation that the excellence of \name can be explained by the strong inductive bias of pretrained LLMs combined with finetuning for further adaptation to the target domain. We also observe the same trend that \name does not perform the best in Literal~F1 (0.04 vs 0.072 by One-shot) and Motif Distance (0.097 vs 0.037 by Memorisation), though it is still competitive. This can be explained by the fact that Literal~F1 is sensitive to syntactic differences, while Motif Distance is a purely structural metric that does not consider semantics. We can see that the best methods in Literal~F1 (One-shot) and Motif Distance (Memorisation) clearly perform worse in all the other metrics.
 
 \input{figures/arxiv_qualitative.tex}
 
 Inspecting the generated ontologies (\cref{fig:arxiv-examples}), we observe that prompting baselines tend to produce repetitive concepts such as ``Machine Learning and Artificial Intelligence'' and ''Artificial Intelligence and Machine Learning'' (\cref{fig:arxiv-examples:prompting}), while REBEL puts almost all concepts under the same parent concept(s) (\cref{fig:arxiv-examples:rebel}).
 We also found that \name's output for arXiv contains concepts from Wikipedia, but restructured in a way that fits the arXiv ontology. For example, ``Life sciences'' and ``Biological evolution'' appear in the Wikipedia training set under the same parent category ``Life'' with no direct links between them. On the generated graph for arXiv, ``Life sciences'' is instead promoted to one of the top-level concepts with ``Biological Evolution'' as one of its children, which better fits the ``fields of science'' style of the arXiv ontology (\cref{fig:arxiv-examples:ollm}). This demonstrates that \name can adapt to produce a new type of ontology by restructuring its learned concepts, all using just a small number of training samples.
 
-In summary, \name scores the best or is competitive across all metrics in both tasks, with the notable exception of the Literal~F1 metric. We attribute this to the fact that Literal~F1 is sensitive to factors like casing and choice of words, and generally only measures syntactic similarity. For example, we see that a suboptimal baseline like Memorisation scores the best on this metric with 0.134 on the Wikipedia task. This reflects that syntactic similarity generally does not entail semantic similarity so syntax-based metrics should not be used as stand-alone measures for ontology quality.
-
+In summary, \name scores the best or is competitive across all metrics in both tasks, showing that it can produce high-quality ontologies at scale and can be easily adapted to new domains. The qualitative analysis further confirms that \name can generate ontologies that are semantically and structurally accurate, and can adhere to the styles of target ontologies.
 
 \section{Meta-evaluation}
 
+One of the core contributions of this work is the development of new evaluation metrics for comparing ontologies (\cref{sec:metrics}). While in the previous section we showed that \name outperforms all baselines based on these metrics, we now provide an analysis of the metrics themselves: do our interpretations of the metrics align with what they are actually measuring? Are they truly more robust than existing metrics? In particular, we focus on understanding the Continuous~F1 and Graph~F1 metrics as they are more novel and complex (in terms of computation). By performing qualitative analysis on the intermediate variables of the metrics, we find strong evidence that the behaviour of the metrics does align with our expectations.
+
+We narrow our attention to the best edge and node matchings found by Continuous~F1 and Graph~F1 respectively on the arXiv task, since the ontology is small enough to visualise entirely. In \cref{fig:graph-matching,fig:edge-matching}, we show the best matching between the ontology generated by \name and the ground truth. In both matchings, we see that semantically similar components in the two graphs indeed get matched together. For example, the ``Physics'' and ``Mathematics'' clusters in the generated graph get matched with the ``Mathematics'' cluster in the ground truth, ``Data Analysis'' and ``Information'' get matched with ``Statistics'', ``Economics'' with ``Quantitative Finance'' and ``Life Sciences'' with ``Quantitative Biology''. This suggests that our edge/node matching procedure is capturing some ``fuzzy graph isomorphism'' that allows one to compare similar components in the two graphs, even if they do not share the same concepts.
+
+% with the notable exception of the Literal~F1 metric. We attribute this to the fact that Literal~F1 is sensitive to factors like casing and choice of words, and generally only measures syntactic similarity. For example, we see that a suboptimal baseline like Memorisation scores the best on this metric with 0.134 on the Wikipedia task. This reflects that syntactic similarity generally does not entail semantic similarity so syntax-based metrics should not be used as stand-alone measures for ontology quality.
+
 
 \input{figures/graph_matching.tex}
+
+\input{figures/edge_matching.tex}

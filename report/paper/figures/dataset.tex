@@ -1,16 +1,16 @@
 \begin{figure}
     \centering
-    \begin{subfigure}[t]{0.3\linewidth}
+    \begin{subfigure}[t]{0.36\linewidth}
         \centering
         \includegraphics[width=\linewidth,trim={0.4cm 0.65cm 0.5cm 0.9cm},clip]{media/Wikipedia_train_eval_test_split.pdf}
         \caption{Wikipedia}
     \end{subfigure}%
     \qquad\qquad
-    \begin{subfigure}[t]{0.28\linewidth}
+    \begin{subfigure}[t]{0.30\linewidth}
         \centering
         \includegraphics[width=\linewidth,trim={1cm 1cm 1cm 1.2cm},clip]{media/arXiv_train_eval_test_split.pdf}
         \caption{arXiv}
     \end{subfigure}
-    \caption{Intersection of concepts among the train, validation and test splits of the datasets.}
+    \caption{Intersection of concepts among the train, validation and test splits of the datasets. Our method of creating data splits results in train, validation and test splits with partial overlap but still sufficiently different to evaluate generalisation.}
     \label{fig:dataset-overlap}
 \end{figure}

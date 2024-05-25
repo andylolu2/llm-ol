@@ -71,31 +71,32 @@
     \contentpages~pages
     (pp~\pageref{firstcontentpage}--\pageref{lastcontentpage})
 
-    Main chapters word count: 467\footnote{Computed with \texttt{texcount}.}
+    Main chapters word count: 10000\footnote{Computed with \texttt{texcount}.}
 
 \end{sffamily}
 
 \vspace{\fill}
 \onehalfspacing
-\ifsubmission\else\makeatletter
-    \textbf{\Huge Declaration}
-    \vspace{40pt}
+\makeatletter
+\textbf{\Huge Declaration}
+\vspace{40pt}
 
-    I, \@author\ of \college, being a candidate for the \course, hereby
-    declare that this report and the work described in it are my own work,
-    unaided except as may be specified below, and that the report does not
-    contain material that has already been used to any substantial extent
-    for a comparable purpose.
+\ifsubmission
+    I, [Blind candidate number], being a candidate for Part III of the Computer Science Tripos, hereby declare that this project report and the work described in it are my own work, unaided except as may be specified below, and that the project report does not contain material that has already been used to any substantial extent for a comparable purpose. The project required the use of AI-assisted platform GitHub Copilot in chapter 3 and 4, and such use is acknowledged in the text. I am content for my project report to be made available to the students and staff of the University.
 
-    The code for this project is written with the assistance of GitHub Copilot.
+    \bigskip
+    \textbf{Date:} \today
+\else
+    I, \@author\ of \college, being a candidate for Part III of the Computer Science Tripos, hereby declare that this project report and the work described in it are my own work, unaided except as may be specified below, and that the project report does not contain material that has already been used to any substantial extent for a comparable purpose. The project required the use of AI-assisted platform GitHub Copilot in chapter 3 and 4, and such use is acknowledged in the text. I am content for my project report to be made available to the students and staff of the University.
 
     \bigskip
     \textbf{Signed:} \@author
 
     \bigskip
     \textbf{Date:} \today
-    \vspace{\fill}
-    \makeatother\fi
+\fi
+\vspace{\fill}
+\makeatother
 
 \chapter*{Abstract}
 

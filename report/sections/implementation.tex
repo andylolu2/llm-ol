@@ -8,46 +8,52 @@ One of the goals of this project is to explore the paradigm shift from tradition
 
 \section{Data collection}  \label{sec:implementation:data-collection}
 
-Two datasets are used in this project: Wikipedia categories and the arXiv taxonomy. Wikipedia is chosen as its categorisation metadata is entirely human-annotated by Wiki\-pedia maintainers and authors while simultaneously being large and diverse. This makes it a good candidate base dataset for training and evaluation. The arXiv taxonomy on the other hand is much smaller and simpler than Wikipedia. Ontologies of this size is much easier to manually inspect and understand, making it a good candidate for evaluation. In addition, the papers on arXiv are written in a different style as Wikipedia articles, and so we can evaluate the out-of-domain generalisation ability of our model by testing it on arXiv. While both data sources are in the public domain, there are no readily available datasets that contain both the main text and the categorisation metadata. I therefore have to build the datasets from scratch.
+Two datasets are used in this project: Wikipedia categories and the arXiv taxonomy. Wikipedia is chosen as its categorisation metadata is entirely human-annotated by Wiki\-pedia maintainers and authors while simultaneously being large and diverse. This makes it a good candidate dataset for training and evaluation. The arXiv taxonomy, on the other hand, is much smaller and simpler than Wikipedia. Ontologies of this size are much easier to manually inspect and understand, making it a good candidate for evaluation. In addition, the papers on arXiv are written in a different style from Wikipedia articles, so we can evaluate the out-of-domain generalisation ability of our model by testing it on arXiv. While both data sources are in the public domain, there are no readily available datasets that contain both the main text and the categorisation metadata. We therefore have to build the datasets from scratch.
 
-Given the freedom to design the datasets, I need to first decide on \emph{what} data to collect. Both Wikipedia and arXiv have a wide range of metadata available, such as cross-links in Wikipedia or the citation networks in arXiv. These features might be useful for improving the performance of the model but at the same time make the study more complex and task-specific. The aim of this project is to develop OL methods that are general and domain-agnostic, so I choose to only collect the most basic metadata: the title, a summary, and the parent categories of each document, in addition to the categorisation graph itself.
+Given the freedom to design the datasets, we need to first decide on \emph{what} data to collect. Both Wikipedia and arXiv have a wide range of metadata available, such as cross-links in Wikipedia or the citation networks in arXiv. These features might be useful for improving the performance of the model but at the same time make the study more complex and task-specific. The aim of this project is to develop OL methods that are general and domain-agnostic, so we choose to collect only the most basic metadata: the title, a summary, and the parent categories of each document, in addition to the categorisation graph itself.
 
 \subsection{Wikipedia}
 
-At the time of writing, Wikipedia has 2,351,998 categories and 6,825,439 articles which is far too large, both in terms of engineering overhead and research value, for the scope of this project. Instead, I choose to collect a subset of the Wikipedia categories and articles that are related to higher-level concepts. Using the Wikipedia API\footnote{\url{https://en.wikipedia.org/w/api.php}}, a breadth-first traversal of the categorisation graph is performed, starting at the root category ``Main topic classifications'' up to depth 3. For each category encountered, the titles and summaries (the text before the first section) of up to 5000 pages that belong in that category are retrieved, also using the Wikipedia API. This produced a dataset with 13,886 concepts, 28,375 taxonomic relations and 362,067 documents.
+At the time of writing, Wikipedia has 2,351,998 categories and 6,825,439 articles which is far too large, both in terms of engineering overhead and research value, for the scope of this project. Instead, we choose to collect a subset of Wikipedia categories and articles that are related to higher-level concepts. Using the Wikipedia API\footnote{\url{https://en.wikipedia.org/w/api.php}}, a breadth-first traversal of the categorisation graph is performed, starting at the root category ``Main topic classifications'' up to depth 3. For each category encountered, the titles and summaries (the text before the first section) of up to 5000 pages that belong in that category are retrieved, also using the Wikipedia API. This produced a dataset with 13,886 concepts, 28,375 taxonomic relations and 362,067 documents.
 
 \subsection{arXiv}
 
-The arXiv taxonomy is much simpler and can be obtained from its taxonomy page or its source code directly. To collect the main corpus, I take a subset from the arXiv dataset on Kaggle\footnote{\url{https://www.kaggle.com/datasets/Cornell-University/arxiv}} by selecting all papers uploaded in the years 2020--2022 with more than or equal to 10 citations. The citation count is not part of the metadata available in the arXiv dataset, and instead is taken from the Semantic Scholar API\footnote{\url{https://api.semanticscholar.org/}}. For each paper, the title, abstract and category assignment is taken. The final dataset has 161 concepts, 166 taxonomic relations and 126,001 documents.
+The arXiv taxonomy is much simpler and can be obtained from its taxonomy page or its source code directly. To collect the main corpus, we take a subset from the arXiv dataset on Kaggle\footnote{\url{https://www.kaggle.com/datasets/Cornell-University/arxiv}} by selecting all papers uploaded in the years 2020--2022 with more than or equal to 10 citations. The citation count is not part of the metadata available in the arXiv dataset, and instead is taken from the Semantic Scholar API\footnote{\url{https://api.semanticscholar.org/}}. For each paper, the title, abstract and category assignment is taken. The final dataset has 161 concepts, 166 taxonomic relations and 126,001 documents.
 
 \subsection{Train and test splits}
 
-Generating the train and test splits from the collected datasets is also a non-trivial problem. In most of machine learning, a dataset is considered to be a set of independent and identically distributed samples from the true data distribution. One can then randomly partition this set into two to obtain the train and test splits. However, in end-to-end OL, the task is to build an ontology given a source corpus---to obtain an equivalent dataset one would have to collect many ontologies, which is impractical given the data engineering work required and the limited number of ontologies available. Instead, I propose a strategy to split a single ontology into train, validation, and test ontolgies.
+Generating the train and test splits from the collected datasets is also a non-trivial problem. In typical machine learning, a dataset is considered to be a set of independent and identically distributed samples from the true data distribution. One can then randomly partition this set into two to obtain the train and test splits. However, in end-to-end OL, the task is to build an ontology given a source corpus---to obtain an equivalent dataset, one would have to collect many ontologies, which is impractical given the data engineering work required and the limited number of ontologies available. Instead, we propose a strategy to split a single ontology into train, validation, and test ontologies.
 
+\input{figures/train_test_split.tex}
+
+We want to design a method to split ontologies that maximises the \emph{research value}: our train and test splits should help us distinguish methods that generalise well from those that do not. For example, the naive approach of randomly splitting the edges in the ontology into train and test splits likely leads to data leakage as nodes with multiple incident edges might occur in both train and test splits. A model that memorises the concepts in the training set will perform very well without actually learning the underlying concept distribution. We instead exploit the hierarchical structure of Wikipedia and arXiv to ensure that the test split contains sufficiently many unseen concepts while still being representative of the full ontology.
+
+Given the full ontology $\O = (\V, \E, r)$, we propose the following method to split the ontology into train $\O_{\text{train}}$, validation $\O_{\text{val}}$, and test $\O_{\text{test}}$ splits: let $\mathcal{T}$ be the set of top-level concepts, that is, children of $r$. Randomly partition $\mathcal{T}$ into train $\mathcal{T}^{\text{train}}$, validation $\mathcal{T}^{\text{val}}$, and test $\mathcal{T}^{\text{test}}$ splits in 7:3:10 ratio. Let $d$ be the depth of $\O$, that is, the distance of the furthest node from the root, and $\mathcal{N}(v) \subseteq \V$ be the set of nodes in $\O$ that are within distance $d-1$ from $v$. We define the train ontology as $\O_{\text{train}} = (\V_{\text{train}}, \E_{\text{train}}, r)$, where
+\begin{equation*}
+    \begin{aligned}
+        \V_{\text{train}} & = \bigcup_{v \in \mathcal{T}^{\text{train}}} \mathcal{N}(v) \cup \mathcal{T}^{\text{train}} \cup \{r\} \\
+        \E_{\text{train}} & = \{(u, v) \in \E\ |\ u, v \in \V_{\text{train}}\}
+    \end{aligned}
+\end{equation*}
+Similar definitions apply to $\O_{\text{val}}$ and $\O_{\text{test}}$. The train and test splits are illustrated in \cref{fig:train-test-split}. An illustration of creating the data splits is shown in \cref{fig:train-test-split}.
 \input{figures/dataset}
 
-We want to design a method to split ontologies that maximises the \emph{research value}: our train and test splits should help us distinguish methods that generalise well from those that do not. For example, the naive approach of randomly splitting the edges in the ontology into train and test splits likely leads to data leakage as nodes with multiple incident edges might occur in both train and test splits. A model that memorises the concepts in the training set will perform very well without actually learning the underlying concept distribution. I instead exploit the hierarchical structure of Wikipedia and arXiv to ensures that the test split contains sufficiently many unseen concepts (and thus relations) while still being representative of the full ontology (\cref{fig:dataset-overlap}). The method is as follows:
-\begin{enumerate}[leftmargin=*]
-    \item Let $V^\text{top}$ be the set of top-level nodes, that is, children of the root node. Randomly partition $V^\text{top}$ into train $V^\text{top}_{\text{train}}$, validation $V^\text{top}_{\text{val}}$, and test $V^\text{top}_{\text{test}}$ splits in 7:3:10 ratio.
-    \item Let $d$ be the depth on the full graph, that is, the distance of the furthest node from the root. The nodes of the train graph are taken as the union of all the nodes that are within distance $d - 1$ from any node in $V^\text{top}_\text{train}$, plus $V_\text{train}^\text{top}$ and the root. The edges are all the edges in the full graph that have both endpoints in the train graph. Similar applies for $V^\text{top}_\text{val}$ and $V^\text{top}_\text{test}$.
-\end{enumerate}
-
-\todo{Draw a diagram illustrating the train/val/test split.}
+Applying this method to the Wikipedia and arXiv datasets, we see that only a small fraction of the concepts ($\approx 10\%$) (and thus relations) are shared between the train and test splits (\cref{fig:dataset-overlap}). This means that a model must learn to generalise in order to perform well on the test split.
 
 
 \section{\name}  \label{sec:implementation:core}
 
-This section introduces one of the main contributions of this project: \name, our novel, simple and scalable method for end-to-end OL with LLMs. On a high level, \name uses an LLM to model concept subgraphs of the target ontology by utilising a linearisation scheme to transform subgraphs into string sequences. In contrast to learning individual edges, modelling subgraphs allows the model to learn higher-order structures, such as the interactions between three or more nodes. To create the training dataset, \name relies on the annotations of documents to concepts to generate document-subgraph pairings. Such subgraphs are much smaller than the complete graph, so they can be learned by the model more easily. The generated subgraphs for each document are summed into a weighted graph, and simple post-processing is applied to obtain the final predicted ontology. I would like to emphasise the novelty of \name as it is not a direct extension of any existing methods in OL or machine learning in general, though some inspiration is taken from graph generative modelling \cite{li2018learning} and multitask learning \cite{caruana1997multitask}. Such connections will be discussed in greater detail later in this section.
+This section introduces one of the main contributions of this project: \name, our novel, simple and scalable method for end-to-end OL with LLMs. On a high level, \name uses an LLM to model concept subgraphs of the target ontology by utilising a linearisation scheme to transform subgraphs into string sequences. In contrast to learning individual edges, modelling subgraphs allows the model to learn higher-order structures, such as the interactions between three or more nodes. To create the training dataset, \name relies on the annotations of documents to concepts to generate document-subgraph pairings. Such subgraphs are much smaller than the complete graph, so they can be learned by the model more easily. The generated subgraphs for each document are summed into a weighted graph, and simple post-processing is applied to obtain the final predicted ontology. We would like to emphasise the novelty of \name as it is not a direct extension of any existing methods in OL or machine learning in general, though some inspiration is taken from graph generative modelling \cite{li2018learning} and multitask learning \cite{caruana1997multitask}. Such connections will be discussed in greater detail later in this section.
 
-\subsection{Subgraph modeling}  \label{sec:method:subgraph}
+\subsection{Subgraph modelling}  \label{sec:method:subgraph}
 
 \input{figures/prompt_template}
 
-We first need to create document-subgraph pairs from our dataset to serve as inputs and targets for training our model. Given a document and its associated set of concepts $C$, define the \emph{relevant paths} as the set of paths of at most length $N$ from the root to any of the concepts in $C$. The \emph{relevant subgraph} is the set of nodes (concepts) and edges (taxonomic relations) that occur at least once in the relevant paths. An example is shown in \cref{fig:prompt-example} (left). The choice of $N$ is task-specific and I describe the method for choosing $N$ in \cref{sec:implementation}.
+We first need to create document-subgraph pairs from our dataset to serve as inputs and targets for training our model. Given a document and its associated set of concepts $C$, define the \emph{relevant paths} as the set of paths of at most length $N$ from the root to any of the concepts in $C$. The \emph{relevant subgraph} is the set of nodes (concepts) and edges (taxonomic relations) that occur at least once in the relevant paths. An example is shown in \cref{fig:prompt-example} (left). The choice of $N$ is task-specific and we describe the method for choosing $N$ in \cref{sec:implementation}.
 
 To employ LLMs to model the subgraphs, we must linearise the graph into a string sequence. Existing methods for autoregressive graph generation employ BFS \cite{you2018graphrnn} or DFS \cite{goyal2020graphgen} ordering starting at an arbitrary node. We instead choose to linearise the subgraph as a list of relevant paths that produced the subgraph in the first place. We do so over BFS/DFS ordering for three reasons: 1)~the subgraph is defined from the relevant paths, which makes them the most natural representation; 2)~we hypothesise that the hierarchy of concepts in each path is a desirable inductive bias for the hierarchical nature of an ontology. 3)~the path-based representation is much easier to describe in natural language instructions so that our LLM prompting-based baselines may produce reasonable results without finetuning. The linearisation template can be found in \cref{fig:linearisation-template} in \cref{appendix:training-details}.
 
-To convert the generated paths back into a subgraph, we parse the generated string sequence with regular expressions. Results that do not match the patterns are discarded (this happens $< 0.5\%$ of the time). Note that given that regular expressions define a Deterministic Finite Automaton, it is possible to constrain the generation output such that it is guaranteed to be in valid format. However, we found that existing implementations \cite{willard2023efficient} for regex-constrained generation are 3--10$\times$ slower than vanilla generation. Given that the error rate is low, we choose to use vanilla generation for efficiency.
+To convert the generated paths back into a subgraph, we parse the generated string sequence with regular expressions. Results that do not match the patterns are discarded (this happens $< 0.5\%$ of the time). Note that given that regular expressions define a Deterministic Finite Automaton, it is possible to constrain the generation output such that it is guaranteed to be in a valid format. However, we found that existing implementations \cite{willard2023efficient} for regex-constrained generation are 3--10$\times$ slower than vanilla generation. Given that the error rate is low, we choose to use vanilla generation for efficiency.
 
 \subsection{Masked loss regularisation}
 
@@ -62,29 +68,27 @@ Analysing the per-token loss on some test split sequences reveals that the model
 
 \input{figures/vanilla_vs_masked}
 
-To alleviate this issue, I introduce a new training objective that randomly masks the loss contribution of frequently occurring relations. Suppose a relation $u \to v$ is present $n$ times in the training set. During training, when $u \to v$ appears in one of the relevant paths, we mask the loss contribution of the tokens for $v$ with probability $\max(1 - \nicefrac{M}{n}, 0)$, where $M$ is a constant for the average number of times a relation is present in the training set. Intuitively, this regulariser ensures that relations that are more frequent than the average will only seen $\approx\!M$ times as targets throughout training, while relations less frequent than the average will always be present. This is similar the standard technique of reweighing training objectives in multitask learning \cite{caruana1997multitask}. In our case, the model is learning multiple levels of relations in parallel, so down-weighing the loss on higher-level relations helps to reduce overfitting on those relations while not affecting the learning of lower-level relations. As shown in \cref{fig:vanilla-vs-mask} (bottom), the masked loss objective indeed improves generalisation on the test set.
+To alleviate this issue, we introduce a new training objective that randomly masks the loss contribution of frequently occurring relations. Suppose a relation $u \to v$ is present $n$ times in the training set. During training, when $u \to v$ appears in one of the relevant paths, we mask the loss contribution of the tokens for $v$ with probability $\max(1 - \nicefrac{M}{n}, 0)$, where $M$ is a constant for the average number of times a relation is present in the training set. Intuitively, this regulariser ensures that relations that are more frequent than the average will only seen $\approx\!M$ times as targets throughout training, while relations less frequent than the average will always be present. This is similar to the standard technique of reweighing training objectives in multitask learning \cite{caruana1997multitask}. In our case, the model is learning multiple levels of relations in parallel, so down-weighing the loss on higher-level relations helps to reduce overfitting on those relations while not affecting the learning of lower-level relations. As shown in \cref{fig:vanilla-vs-mask} (bottom), the masked loss objective indeed improves generalisation on the test set.
 
 A concrete masked training sequence can be found in \cref{fig:prompt-example} (right).
 
 \subsection{Post-processing}  \label{sec:method:post-processing}
 
-The final output graph is obtained by summing all generated subgraphs for each document and pruning low-weighted components. Given the generated subgraphs $G_1 = (V_1, E_1), \dots, G_n = (V_n, E_n)$, the raw output graph is defined as $G_\text{raw} = (V_\text{raw}, E_\text{raw})$, where $V_\text{raw} = \cup_{i=1}^n V_n$ and $E_\text{raw} = \cup_{i=1}^n E_n$. Each edge $(u, v) \in E_\text{raw}$ is additionally weighted by the number of times it occurs in the collection of subgraphs: $w(u, v) = \sum_{i=1}^n \mathbbm{1}[(u,v) \in E_n]$. A few simple post-processing steps are then applied to $G_\text{raw}$ in order to prune it:
-\begin{enumerate}[leftmargin=*]
-    \item Self-loop pruning: All edges $(u, u) \in E_\text{raw}$ are removed.
-    \item Inverse-edge pruning: For $(u, v) \in E_\text{raw}$, if $(v, u) \in E_\text{raw}$ and $w(v, u) > w(u, v)$, remove $(u, v)$. That is, bidirectional edges are turned into unidirectional ones.
-    \item Absolute thresholding: Edges in $E_\text{raw}$ with weight below the $\alpha$-th quantile are removed, where $0 \leq \alpha \leq 1$ is a hyperparameter. This removes edges that are globally less important.
-    \item Relative thresholding: For each vertex $u \in V_\text{raw}$, let $e_1, \dots, e_k$ be the outgoing edges from $u$ sorted by weight in ascending order. Let the cumulative weight be $C(e_i) = \sum_{j=1}^i w(e_j) / \sum_{j=1}^k w(e_j)$. The edges $\{e_i\ |\ C(e_i) \leq \beta\}$ are pruned, where $0 \leq \beta \leq 1$ is a hyperparameter. This is similar to top-$p$ sampling \cite{holtzman2019curious} which we use to remove edges that are less important than their neighbours.
-    \item Clean up: After pruning all edges, nodes with no incoming or outgoing edges are removed.
+The final output graph is obtained by summing all generated subgraphs for each document and pruning low-weighted components. Given the generated subgraphs $\G_1 = (\V_1, \E_1), \dots, \G_n = (\V_n, \E_n)$, the raw output graph is defined as $\G_\text{raw} = (\V_\text{raw}, \E_\text{raw})$, where $\V_\text{raw} = \cup_{i=1}^n \V_n$ and $\E_\text{raw} = \cup_{i=1}^n \E_n$. Each edge $(u, v) \in \E_\text{raw}$ is additionally weighted by the number of times it occurs in the collection of subgraphs: $w(u, v) = \sum_{i=1}^n \mathbbm{1}[(u,v) \in \E_n]$. A few simple post-processing steps are then applied to $\G_\text{raw}$ in order to prune it:
+\begin{enumerate}
+    \item \textbf{Self-loop pruning}: All edges $(u, u) \in \E_\text{raw}$ are removed.
+    \item \textbf{Inverse-edge pruning}: For $(u, v) \in \E_\text{raw}$, if $(v, u) \in \E_\text{raw}$ and $w(v, u) > w(u, v)$, remove $(u, v)$. That is, bidirectional edges are turned into unidirectional ones.
+    \item \textbf{Absolute thresholding}: Edges in $\E_\text{raw}$ with weight below the $\alpha$-th quantile are removed, where $0 \leq \alpha \leq 1$ is a hyperparameter. This is equivalent to removing all edges that weigh less than some threshold. We choose to parameterise the threshold as a quantile to make the hyperparameter more interpretable and transferable to the test set.
+    \item \textbf{Relative thresholding}: For each vertex $u \in \V_\text{raw}$, let $e_1, \dots, e_k$ be the outgoing edges from $u$ sorted by weight in ascending order. Let the cumulative weight be $C(e_i) = \sum_{j=1}^i w(e_j) / \sum_{j=1}^k w(e_j)$. The edges $\{e_i\ |\ C(e_i) \leq \beta\}$ are pruned, where $0 \leq \beta \leq 1$ is a hyperparameter. Intuitive, relative thresholding aims to remove as many edges as possible while keeping the total normalised weight mass above $1-\beta$. This is similar to top-$p$ sampling \cite{holtzman2019curious} which we use to remove edges that are less important than their neighbours. We find this pruning strategy to be particularly useful for concepts near the root of the ontology, which tend to have many outgoing edges but only a few are important.
+    \item \textbf{Clean up}: After pruning all edges, nodes with no incoming or outgoing edges are removed.
 \end{enumerate}
 The hyperparameters $\alpha$ and $\beta$ are chosen by tuning on the validation set (\cref{sec:implementation}).
 
-\todo{Draw a diagram explaining each of the 4 rules.}
-
 \subsection{Implementation}
 
-One of the reasons for using LLMs to build ontologies is that pretrained LLMs already have a some understanding of the semantics of the concepts in the target ontology. In fact, as shown later in \cref{sec:results}, pretrained LLMs performs reasonably well in end-to-end OL without any finetuning. To leverage this strong inductive bias, we want to use a powerful pretrained LLM as the base model and perform only a small amount of finetuning to preserve its innate natural language understanding capabilities. I choose to use Mistral 7B v0.2~\cite{jiang2023mistral} as the base model since it is accessible in terms of computational resources and, at the time of the project, is the best model in its size class \cite{chiang2024chatbot}.
+One of the reasons for using LLMs to build ontologies is that pretrained LLMs already have some understanding of the semantics of the concepts in the target ontology. In fact, as shown later in \cref{sec:results}, pretrained LLMs perform reasonably well in end-to-end OL without any finetuning. To leverage this strong inductive bias, we want to use a powerful pretrained LLM as the base model and perform only a small amount of finetuning to preserve its innate natural language understanding capabilities. We choose to use Mistral 7B v0.2~\cite{jiang2023mistral} as the base model since it is accessible in terms of computational resources and, at the time of the project, is the best model in its size class \cite{chiang2024chatbot}.
 
-Instead of training all the weights in the base model, I perform training with Low-Rank Adaptation (LoRA)~\cite{hu2021lora}. LoRA is a method that constrains the updates to the base model to be low-rank, thus enforcing the final trained model to stay similar to the base model. Specifically, for each weight matrix $\m{W} \in \R^{m \times n}$ in the base model, LoRA replaces it with
+Instead of training all the weights in the base model, we perform training with Low-Rank Adaptation (LoRA)~\cite{hu2021lora}. LoRA is a method that constrains the updates to the base model to be low-rank, thus enforcing the final trained model to stay similar to the base model. Specifically, for each weight matrix $\m{W} \in \R^{m \times n}$ in the base model, LoRA replaces it with
 \[
     \m{W}' = \m{W}_{\text{frozen}} + \frac{\alpha}{r} \m{A} \m{B}^\top
 \]
@@ -94,11 +98,11 @@ Other aspects of training (e.g., hyperparameter choices) are experiment-dependen
 
 \section{Baselines}  \label{sec:implementation:baselines}
 
-Given the novelty of the task studied, there are no standard, off-the-shelf baselines. To evaluate the performance of our proposed method, we first need to establish a set of baselines that we know a priori are \emph{reliable} and can serve as a \emph{meaningful} reference point. Our ideal baselines should thus be at least partially validated by existing research and be simple to implement. Since most prior work in OL is based on subtask composition, we design two methods from this paradigm as our baselines: Concept discovery + Hearst patterns \cite{hearst1998automated} and Concept discovery + REBEL \cite{cabot2021rebel}. Both methods follow the general procedure of first discovering the target concepts (nodes) and then finding the relations (edges) between them. This section describes the implementation details of these baselines. For fairness, I design the baselines such that they produce weighted directed graphs as raw outputs. The same post-processing steps as \name (\cref{sec:method:post-processing}) is then applied to obtain the final predicted graph.
+Given the novelty of the task studied, there are no standard, off-the-shelf baselines. To evaluate the performance of our proposed method, we first need to establish a set of baselines that we know a priori are \emph{reliable} and can serve as a \emph{meaningful} reference point. Our ideal baselines should thus be at least partially validated by existing research and be simple to implement. Since most prior work in OL is based on subtask composition, we design two methods from this paradigm as our baselines: Concept discovery + Hearst patterns \cite{hearst1998automated} and Concept discovery + REBEL \cite{cabot2021rebel}. Both methods follow the general procedure of first discovering the target concepts (nodes) and then finding the relations (edges) between them. This section describes the implementation details of these baselines. For fairness, we design the baselines so that they produce weighted directed graphs as raw outputs. The same post-processing steps as \name (\cref{sec:method:post-processing}) are then applied to obtain the final predicted graph.
 
 \subsection{Concept discovery}
 
-The first step in both baselines is to discover the concepts that should be present in the target ontology. Concept discovery is commonly done via entity extraction from the source corpus, such as by identifying noun phrases after dependency parsing. However, I am not aware of any one-size-fits-all entity extraction method that is widely accepted as the standard. Many proposed methods are domain-specific and may utilise custom rules for filtering concepts. \todo{citations!!} To bypass this issue, I decided to \emph{skip concept discovery entirely} and \emph{use the graph truth concepts} as the output of this step. While such data leakage diminishes the applied value of the baselines, it makes them more reliable as we no longer have to worry about the error propagation from the concept discovery step. It also strengthens the research value of this project: Using the ground truth concepts allows us to estimate an upper bound to the performance of our baselines. If we can demonstrate that our proposed methods can outperform the baselines even under the best-case scenario (shown to be true in \cref{sec:results}), we can have strong confidence in the validity of our approach.
+The first step in both baselines is to discover the concepts that should be present in the target ontology. Concept discovery is commonly done via entity extraction from the source corpus, such as by identifying noun phrases after dependency parsing. However, we are not aware of any one-size-fits-all entity extraction method that is widely accepted as the standard. Many proposed methods are domain-specific and may utilise custom rules for filtering concepts. \todo{citations!!} To bypass this issue, we decide to \emph{skip concept discovery entirely} and \emph{use the graph truth concepts} as the output of this step. While such data leakage diminishes the applied value of the baselines, it makes them more reliable as we no longer have to worry about the error propagation from the concept discovery step. It also strengthens the research value of this project: Using the ground truth concepts allows us to estimate an upper bound to the performance of our baselines. If we can demonstrate that our proposed methods can outperform the baselines even under the best-case scenario (shown to be true in \cref{sec:results}), we can have strong confidence in the validity of our approach.
 
 \subsection{Hearst}
 Hearst patterns \cite{hearst1998automated} is one of the most tested methods for relation extraction. As explained in \cref{sec:hearst}, Hearst patterns rely on a set of hand-crafted regular expressions defined on top of part-of-speech and lemmatisation tags to extract taxonomic relations from text. An example of a Hearst pattern is shown below:
@@ -110,52 +114,52 @@ Hearst patterns \cite{hearst1998automated} is one of the most tested methods for
     \caption{A Hearst pattern for matching ``[noun phrase] is a type/example/kind/class/group/form/subgenus of [noun phrase]''. Capitalised characters are Penn Treebank part-of-speech tags~\cite{marcus1993building}, and words in \texttt{[[...]]} denote their lemmatised form.}
 \end{figure}
 
-For the baseline, I reproduce the implementation by \citet{roller2018hearst}. It leverages the tokenization, part-of-speech tagging, lemmatisation, and token regex functionality of the CoreNLP library \cite{manning2014stanford} to extract the relations according to their 28 Hearst patterns. Given the relations $\mathcal{R} = (u_1 \to v_1), \dots, (u_n \to v_n)$ extracted from the source corpus and the ground truth concepts $C = (c_1, \dots, c_k)$, the output graph $G = (V, E)$ is defined as $V = C$ and $E = \{(u, v) \in C \times C \mid (u \to v) \in \mathcal{R}\}$. However, comparing $G$ with the ground truth, we see that Hearst patterns can extract taxonomic relations with relatively high precision but substantially worse recall. On Wikipedia, it achieves a precision of 0.2157 but a recall of only 0.0023.
+For the baseline, we reproduce the implementation by \citet{roller2018hearst}. It leverages the tokenisation, part-of-speech tagging, lemmatisation, and token regex functionality of the CoreNLP library \cite{manning2014stanford} to extract the relations according to their 28 Hearst patterns. Given the relations $\mathcal{R} = (u_1 \to v_1), \dots, (u_n \to v_n)$ extracted from the source corpus and the ground truth concepts $C = (c_1, \dots, c_k)$, the output graph $G = (V, E)$ is defined as $V = C$ and $E = \{(u, v) \in C \times C \mid (u \to v) \in \mathcal{R}\}$. However, comparing $G$ with the ground truth, we see that Hearst patterns can extract taxonomic relations with relatively high precision but substantially worse recall. On Wikipedia, it achieves a precision of 0.2157 but a recall of only 0.0023.
 
-Low recall is a classic issue of Hearst patterns due to the non-exhaustive nature of the set of patterns: concepts in taxonomic relations might appear in the exact formats that the patterns are designed to match. To improve Hearst patterns, one can exploit the structure of the extracted relations to make more informed decisions about the missing relations. For example, the relation $u \to v$ is more likely to be true if $u$ is a parent of many other concepts. To formalise this intuition, \citet{roller2018hearst} proposes to use a low-rank approximation \cite{schmidt1907theorie} (commonly used to handle missing values) of the weighted adjacency matrix to enable comparison between any two concepts even if they are not directly connected. \todo{Either say we omit the details here or link to appendix.}
+Low recall is a classic issue of Hearst patterns due to the non-exhaustive nature of the set of patterns: concepts in taxonomic relations might appear in the exact formats that the patterns are designed to match. To improve Hearst patterns, one can exploit the structure of the extracted relations to make more informed decisions about the missing relations. For example, the relation $u \to v$ is more likely to be true if $u$ is a parent of many other concepts. To formalise this intuition, \citet{roller2018hearst} proposes to use a low-rank approximation \cite{schmidt1907theorie} (commonly used to handle missing values) of the weighted adjacency matrix to enable comparison between any two concepts even if they are not directly connected. We include more implementation details in \cref{appendix:exp-details}.
 
-\begin{figure}
-    \centering
-    % ('Society', 'Government')
-    % ('Humanities', 'Government')
-    % ('History', 'Government')
-    % ('Nazis', 'Suicides')
-    % ('Copernican Revolution', 'Suicides')
-    % ('Philosophers', 'Suicides')
-    % ('Jurisprudence', 'Suicides')
-    % ('Competition', 'Suicides')
-    % ('Information Age', 'Suicides')
-    % ('Home', 'Suicides')
-    \begin{tikzpicture}[
-            >=latex,
-            node distance=0.6cm and 0.6cm
-        ]
-        \sffamily
-        \node (society) {Society};
-        \node[right=of society] (humanities) {Humanities};
-        \node[right=of humanities] (history) {History};
-        \node[below=of humanities] (government) {Government};
-        \draw[->] (history) -- (government);
-        \draw[->] (humanities) -- (government);
-        \draw[->] (society) -- (government);
+% \begin{figure}
+%     \centering
+%     % ('Society', 'Government')
+%     % ('Humanities', 'Government')
+%     % ('History', 'Government')
+%     % ('Nazis', 'Suicides')
+%     % ('Copernican Revolution', 'Suicides')
+%     % ('Philosophers', 'Suicides')
+%     % ('Jurisprudence', 'Suicides')
+%     % ('Competition', 'Suicides')
+%     % ('Information Age', 'Suicides')
+%     % ('Home', 'Suicides')
+%     \begin{tikzpicture}[
+%             >=latex,
+%             node distance=0.6cm and 0.6cm
+%         ]
+%         \sffamily
+%         \node (society) {Society};
+%         \node[right=of society] (humanities) {Humanities};
+%         \node[right=of humanities] (history) {History};
+%         \node[below=of humanities] (government) {Government};
+%         \draw[->] (history) -- (government);
+%         \draw[->] (humanities) -- (government);
+%         \draw[->] (society) -- (government);
 
-        \node[right=of history] (philosophers) {Philosophers};
-        \node[right=of philosophers] (jurisprudence) {Jurisprudence};
-        \node[right=of jurisprudence] (home) {Home};
-        \node[below=of jurisprudence] (suicides) {Suicides};
-        \draw[->] (philosophers) -- (suicides);
-        \draw[->] (jurisprudence) -- (suicides);
-        \draw[->] (home) -- (suicides);
-    \end{tikzpicture}
-    \caption{Example relations extracted by Hearst patterns.}
-    \label{fig:hearst-example}
-\end{figure}
+%         \node[right=of history] (philosophers) {Philosophers};
+%         \node[right=of philosophers] (jurisprudence) {Jurisprudence};
+%         \node[right=of jurisprudence] (home) {Home};
+%         \node[below=of jurisprudence] (suicides) {Suicides};
+%         \draw[->] (philosophers) -- (suicides);
+%         \draw[->] (jurisprudence) -- (suicides);
+%         \draw[->] (home) -- (suicides);
+%     \end{tikzpicture}
+%     \caption{Example relations extracted by Hearst patterns.}
+%     \label{fig:hearst-example}
+% \end{figure}
 
 \subsection{REBEL}
 
-Instead of using hand-crafted patterns, one can use a more data-driven approach to relation extraction. The authors of REBEL~\cite{cabot2021rebel} frame relation extraction task as a neural translation problem: Given the source text (e.g., \texttt{A chihuahua is a kind of dog.}), the authors define the translation target in an invented ``relations language'' (e.g.,\texttt{<triplet> chihuahua <subj> dog <obj> subclass of}.). The author shares the trained model, REBEL-large\footnote{\url{https://huggingface.co/Babelscape/rebel-large}}, an encoder-decoder LLM based on BART-large \cite{lewis2019bart} trained to extract many types of relations from Wikipedia articles. Since we are only interested in taxonomic relations, I only use the ``subclass of'', ``instance of'', ``member of'' and ``part of'' relations that are extracted. Similar to Hearst patterns, I find that it fails to find many direct relations between ground truth concepts. The same low-rank smoothing technique is applied to give a higher recall.
+Instead of using hand-crafted patterns, one can use a more data-driven approach to relation extraction. The authors of REBEL~\cite{cabot2021rebel} frame the relation extraction task as a neural translation problem: Given the source text (e.g., \texttt{A chihuahua is a kind of dog.}), the authors define the translation target in an invented ``relations language'' (e.g.,\texttt{<triplet> chihuahua <subj> dog <obj> subclass of}.). The author shares the trained model, REBEL-large\footnote{\url{https://huggingface.co/Babelscape/rebel-large}}, an encoder-decoder LLM based on BART-large \cite{lewis2019bart} trained to extract many types of relations from Wikipedia articles. Since we are only interested in taxonomic relations, we only use the ``subclass of'', ``instance of'', ``member of'' and ``part of'' relations that are extracted. Similar to Hearst patterns, we find that it fails to find many direct relations between ground truth concepts. The same low-rank smoothing technique is applied to give a higher recall.
 
-\todo{Some qualitative results}
+% \todo{Some qualitative results}
 
 \subsection{Other baselines}
 
@@ -164,6 +168,6 @@ Simply memorising the train graph is a surprisingly strong baseline due to the o
 
 \paragraph{Prompting}
 
-LLMs have demonstrated excellent capabilities to in-context learning \cite{brown2020language}: the ability to learn new tasks given a small number of examples in the prompt. More recent works have also introduced instruction tuning \cite{ouyang2022training,rafailov2024direct} to improve LLMs' ability following instructions without the need of any examples. A natural question to study is to what extent is OLLM's performance explained by the general reasoning abilities of LLMs versus improvements that can only be achieved via our finetuning method.
+LLMs have demonstrated excellent capabilities in in-context learning \cite{brown2020language}: the ability to learn new tasks given a small number of examples in the prompt. More recent works have also introduced instruction tuning \cite{ouyang2022training,rafailov2024direct} to improve LLMs' ability to follow instructions without the need for any examples. A natural question to study is to what extent \name's performance is explained by the general reasoning abilities of LLMs versus improvements that can only be achieved via our finetuning method.
 
 To compare the performance between general and specialised LLMs, we test the zero-shot, one-shot, and three-shot performance of instruction-tuned LLMs on the subgraph modelling task described in \cref{sec:method:subgraph}. To obtain more comparable results, we use Mistral 7B Instruct v0.2, the instruction-tuned version of the base model of \name, as the LLM for our prompting baseline. For One-shot and Three-shot, random examples from the training set are sampled for each query. We perform manual prompt engineering to optimise the model's responses by inspecting individual responses such that the output format matches that described in \cref{sec:method:subgraph} as closely as possible. The prompt template used is shown in \cref{fig:prompt-template} in Appendix~\ref{appendix:exp-details}. Similar to \name, we parse the output of the LLM with regular expressions to obtain the predicted subgraphs. The final ontology is then obtained by summing the subgraphs and applying the same post-processing steps as \name (\cref{sec:method:post-processing}).

@@ -1,0 +1,84 @@
+\begin{figure}[t]
+    \centering
+    \sffamily
+    \newcommand{\dist}{1.5cm}
+    \newcommand{\pad}{0.4}
+    \begin{tikzpicture}[
+            >=latex,
+            concept/.style={
+                    font=\sffamily,
+                    circle,
+                    fill={black!40},
+                    inner sep=2pt,
+                    outer sep=2.5pt,
+                },
+            every path/.append style={
+                    line width=1pt,
+                }
+        ]
+        \node[concept,fill=black] (1) {};
+        \node[concept,fill=orange] (11) at ($(1) + (0:{\dist})$) {};
+        \node[concept,fill=orange] (12) at ($(1) + (120:{\dist})$) {};
+        \node[concept,fill=orange] (13) at ($(1) + (240:{\dist})$) {};
+
+        \node[concept] (111) at ($(11) + (30:{\dist})$) {};
+        \node[concept] (112) at ($(11) + (-30:{\dist})$) {};
+
+        \node[concept] (121) at ($(12) + (30:{\dist})$) {};
+        \node[concept] (122) at ($(12) + (90:{\dist})$) {};
+        \node[concept] (123) at ($(12) + (150:{\dist})$) {};
+        \node[concept] (124) at ($(12) + (210:{\dist})$) {};
+
+        \node[concept] (131) at ($(13) + (160:{\dist})$) {};
+        \node[concept] (132) at ($(13) + (240:{\dist})$) {};
+        \node[concept] (133) at ($(13) + (320:{\dist})$) {};
+
+        \node (train) at ($(111) + (30:1)$) {Train};
+        \node (test) at ($(123) + (150:1)$) {Test};
+        \node (val) at ($(132) + (180:1.8)$) {Validation};
+
+        \draw[->] (1) -- (11);
+        \draw[->] (1) -- (12);
+        \draw[->] (1) -- (13);
+        \draw[->] (1) -- (121);
+        \draw[->] (11) -- (111);
+        \draw[->] (11) -- (112);
+        \draw[->] (12) -- (121);
+        \draw[->] (12) -- (122);
+        \draw[->] (12) -- (123);
+        \draw[->] (12) -- (124);
+        \draw[->] (13) -- (131);
+        \draw[->] (13) -- (132);
+        \draw[->] (13) -- (133);
+        \draw[->] (11) -- (121);
+        \draw[->] (11) -- (133);
+        \draw[->] (12) -- (131);
+
+        \draw[color=red] plot [smooth cycle] coordinates {
+        ($(111) + (30:{\pad})$)
+        ($(121) + (90:{\pad})$)
+        ($(1) + (180:{\pad})$)
+        ($(133) + (240:{\pad})$)
+        ($(112) + (-30:{\pad})$)
+        };
+
+        \draw[color=blue] plot [smooth cycle] coordinates {
+        ($(121) + (30:{\pad})$)
+        ($(122) + (90:{\pad})$)
+        ($(123) + (150:{\pad})$)
+        % ($(124) + (210:{\pad})$)
+        ($(131) + (240:{\pad})$)
+        ($(1) + (0:{\pad})$)
+        };
+
+        \draw[color=green] plot [smooth cycle] coordinates {
+        ($(131) + (160:{\pad})$)
+        ($(132) + (240:{\pad})$)
+        ($(133) + (320:{\pad})$)
+        ($(1) + (60:{\pad})$)
+        };
+
+    \end{tikzpicture}
+    \caption{Illustration of creating train, validation and test splits from the full ontology. For demonstration purposes, the top-level concepts (coloured in orange) are split in 1:1:1 ratio instead of 7:3:10 for our real datasets. The root (centre) node is coloured in black. The depth $d$ of this graph is 2.}
+    \label{fig:train-test-split}
+\end{figure}
