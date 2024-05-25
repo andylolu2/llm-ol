@@ -1,16 +1,24 @@
 \chapter{Conclusion}
 
-\section{Contributions}
+\section{Achievements}
 
-In this paper, we introduce a general method for building ontologies in an end-to-end fashion. We propose a set of metrics for end-to-end OL that measures the semantic and structural similarity between arbitrary labelled graphs. Our model, \name, outperforms traditional subtask composition methods in reconstructing the Wikipedia categories, and can be transferred to build ontologies for arXiv after finetuning on a small number of examples.
+This project is successful and has met all of its project goals (\cref{chap:introduction}). Our contributions are in two main directions. First, we propose and study the novel task of end-to-end OL, where the only goal is to build a high-quality ontology from scratch. To facilitate this paradigm shift, we contribute the foundational elements for a new task, including two new datasets (Wikipedia and arXiv), a series of baselines (Hearst, REBEL, and Prompting), and a novel suite of evaluation metrics (Fuzzy F1, Continuous F1, Graph F1, and Motif Distance). Second, we introduce \name, a general, scalable, and performant method that leverages LLMs to build ontologies from scratch. \name outperforms traditional subtask composition methods in reconstructing the Wikipedia categories, and can be transferred to build ontologies for arXiv after finetuning on a small number of examples. In the process, we overcome several challenges:
+\begin{enumerate}
+    \item \textbf{Overfitting}: Through in-depth analysis of the per-token test loss of a naively finetuned LLM, we discover the root cause of poor generalisation to be overfitting to high-frequency concepts. With this insight, we propose a custom regulariser tailored for our problem setup that reweights each concept based on its frequency of occurrence, which substantially improves generalisation.
+    \item \textbf{Lack of references}: The lack of prior works on end-to-end OL means that are no standard approaches to many components of the project, such as how to create train-test splits for ontologies. This leaves us with numerous design decisions which we approach by first principles and draw as many connections to other areas of machine learning as possible, including classical graph analysis, graph neural networks, text embeddings, multitask learning, and transfer learning.
+\end{enumerate}
 
-\section{Limitations and future directions}
+
+\section{Limitations and future work}
 
 % More types of inputs
 % More types of relations
 % Strict outputs (transitivity constraints)
 % More niche domains
-
-We only study and evaluate the construction of simple ontologies with only concepts and taxonomic relations. A potential approach to extend \name to produce non-taxonomic relations is to add tags indicating the relation type to each edge when linearising the subgraphs for sequence modelling. New evaluation metrics might also be required to handle multiple types of relations. Another limitation is that the taxonomic relations in the generated ontologies are not necessarily transitive due to the existence of cycles. This is a general problem for many OL methods and there are existing works on cycle removal algorithms for cleaning hierarchies~\cite{sun2017breaking,zesch2007analysis}. We were also unable to fully control for data contamination as the pretraining dataset of Mistral 7B is not publically known. We do, however, observe that the generated ontologies are sufficiently different from the ground truth, indicating that \name is not directly remembering samples from its pretraining stage. Using LLMs as the backbone for subgraph modelling opens up exciting avenues for future research. For example, one may generate ontologies from corpora with images using vision language models~\cite{donahue2015long}.
-
-\section{Reflection}
+There are several factors that we did not address as they are beyond the scope of this project, but are interesting directions for future work:
+\begin{enumerate}
+    \item \textbf{More complex ontologies}: We only study and evaluate the construction of ontologies with only concepts and taxonomic relations. A potential approach to extend \name to produce non-taxonomic relations is to add tags indicating the relation type to each edge when linearising the subgraphs for sequence modelling. New evaluation metrics might also be required to handle multiple types of relations.
+    \item \textbf{Transitivity constraints}: The taxonomic relations in the generated ontologies are not necessarily transitive due to the possible existence of cycles. We relaxed the transitivity constraints for simplicity, though the formal semantics may be important for some applications. This is a common problem for many OL methods and there are existing works on cycle removal algorithms for cleaning hierarchies~\cite{sun2017breaking,zesch2007analysis}.
+    \item \textbf{Data contamination}: We were unable to fully control for data leakage as the pretraining dataset of Mistral 7B is not publicly known. We do, however, observe that the generated ontologies are sufficiently different from the ground truth, indicating that \name is not directly remembering samples from its pretraining stage. One can further investigate the impact of pretraining data contamination by using base models such as OLMo \cite{OLMo} that has open-source pretraining data.
+    \item \textbf{Other types of inputs}: We only use the text of the Wikipedia and arXiv articles as input to the model, both of which covers concepts that are quite general. Future work should investigate whether the approach is also applicable to more niche domains, such as protein types or chemical compounds. Using LLMs as the backbone for subgraph modelling opens up possibilities to handle other kinds of inputs. For example, one may generate ontologies from corpora with images using vision language models~\cite{donahue2015long}.
+\end{enumerate}
