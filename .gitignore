@@ -18,6 +18,7 @@ out
 # Core latex build outputs
 report/build
 report/paper/media
+report/paper/build
 *.zip
 *.log
 
@@ -26,3 +27,8 @@ wandb/
 
 # corenlp
 corenlp/
+
+# report
+*.pdf
+*.aux
+*.gz
