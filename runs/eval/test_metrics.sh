@@ -14,5 +14,5 @@ dataset=wikipedia/v2
 dataset_name=$(echo $dataset | sed 's/\//_/g')
 
 python llm_ol/eval/test_metrics.py \
-    --output_file out/eval/$dataset_name/test_metrics.jsonl \
+    --output_file out/eval/$dataset_name/test_metrics_w_link_pred.jsonl \
     --dataset $dataset

@@ -90,7 +90,7 @@ def main(_):
 
     exps = [
         query(exp="memorisation", dataset=FLAGS.dataset),
-        # query(exp="link_prediction", dataset=FLAGS.dataset),
+        query(exp="link_prediction", dataset=FLAGS.dataset),
         query(exp="hearst", dataset=FLAGS.dataset),
         query(exp="rebel", dataset=FLAGS.dataset),
         query(exp="prompting", k_shot=0, dataset=FLAGS.dataset),

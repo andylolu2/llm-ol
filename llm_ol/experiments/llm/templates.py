@@ -43,6 +43,27 @@ Use the format described above.
 {% endif %}"""
 PROMPT_TEMPLATE_FULL = load_template(_PROMPT_TEMPLATE_FULL)
 
+_COT_ROUND_ONE_TEMPLATE = """The following is an article's title and abstract. \
+Briefly break down the topics (both specific and general concepts) relevant to this article. Explain your reasoning step by step.
+
+### ARTICLE ###
+Title: {{ title }}
+{{ abstract }}
+### END ARTICLE ###
+"""
+COT_ROUND_ONE_TEMPLATE = load_template(_COT_ROUND_ONE_TEMPLATE)
+_COT_ROUND_TWO_TEMPLATE = """Your task now is to assign this article to suitable category hierarchy. \
+A category is typically represented by a word or a short phrase, representing broader topics/concepts that the article is about. \
+A category hierarchy is represented by a collection of paths from the generic root category "Main topic classifications" \
+to a specific category suitable for the article. The topics titles should become more and more specific as you move from the root to the leaf. \
+
+You must answer in the format of:
+Main topic classifications -> Broad topic 1 -> Subtopic 1 -> ... -> Most specific topic 1
+Main topic classifications -> Borad topic 2 -> Subtopic 2 -> ... -> Most specific topic 2
+...
+"""
+COT_ROUND_TWO_TEMPLATE = load_template(_COT_ROUND_TWO_TEMPLATE)
+
 _RESPONSE_TEMPLATE = """{% for path in paths %}
 {{ path | join(" -> ") }}
 {% endfor %}"""

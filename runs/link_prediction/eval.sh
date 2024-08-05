@@ -14,5 +14,5 @@ exp_dir=out/experiments/link_prediction/v1/$split
 python llm_ol/eval/hp_search.py \
     --graph $exp_dir/graph_filtered.json \
     --graph_true out/data/$dataset/train_${split}_split/test_graph.json \
-    --num_samples 11 \
+    --num_samples 21 \
     --output_dir $exp_dir \
