@@ -10,7 +10,7 @@ from llm_ol.dataset import data_model
 from llm_ol.utils import setup_logging
 
 FLAGS = flags.FLAGS
-flags.DEFINE_string(
+flags.DEFINE_multi_string(
     "hierarchy_file", None, "Path to the hierarchy directory", required=True
 )
 flags.DEFINE_string("output_dir", None, "Path to the output directory", required=True)
@@ -45,8 +45,9 @@ def main(_):
     setup_logging(out_dir, "export_graph", flags=FLAGS)
 
     results = []
-    with open(FLAGS.hierarchy_file, "r") as f:
-        results = [json.loads(line) for line in f.readlines()]
+    for hierarchy_file in FLAGS.hierarchy_file:
+        with open(hierarchy_file, "r") as f:
+            results += [json.loads(line) for line in f.readlines()]
 
     hypernyms = defaultdict(int)
     num_samples = len(results)

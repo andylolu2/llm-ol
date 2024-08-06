@@ -71,7 +71,7 @@ def main(_):
     tokenizer = llm.get_tokenizer()
     pbar = textpbar(len(test_pages))
 
-    for pages in batch(test_pages, 5000):
+    for pages in batch(test_pages, 2000):
         few_shot_examples = [random.sample(examples, FLAGS.k_shot) for _ in pages]
         messages = []
         for page, few_shot in zip(pages, few_shot_examples):

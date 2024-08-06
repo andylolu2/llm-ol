@@ -74,6 +74,8 @@ def query_multiple(exp: str = "all", **kwargs):
         experiments = link_prediction_experiments
     elif exp == "prompting":
         experiments = prompting_experiments
+    elif exp == "cot":
+        experiments = cot_experiments
     elif exp == "finetune":
         experiments = finetune_experiments
     elif exp == "all":
@@ -290,6 +292,20 @@ prompting_experiments = [
     ),
 ]
 
+cot_experiments = [
+    PromptingExperiment(
+        name="0 shot (CoT)",
+        dataset="wikipedia/v2",
+        k_shot=0,
+        eval_output="out/experiments/cot/wikipedia/v2/eval/graph.json",
+        test_output="out/experiments/cot/wikipedia/v2/test/graph.json",
+        train_input="out/data/wikipedia/v2/train_eval_split/train_graph.json",
+        eval_ground_truth="out/data/wikipedia/v2/train_eval_split/test_graph.json",
+        test_ground_truth="out/data/wikipedia/v2/train_test_split/test_graph.json",
+        eval_hp_result="out/experiments/cot/wikipedia/v2/eval/hp_search.jsonl",
+    ),
+]
+
 finetune_experiments = [
     FinetuneExperiment(
         name="Finetune",
@@ -375,5 +391,6 @@ all_experiments = (
     + hearst_experiments
     + rebel_experiments
     + prompting_experiments
+    + cot_experiments
     + finetune_experiments
 )

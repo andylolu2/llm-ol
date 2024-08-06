@@ -64,6 +64,20 @@ Main topic classifications -> Borad topic 2 -> Subtopic 2 -> ... -> Most specifi
 """
 COT_ROUND_TWO_TEMPLATE = load_template(_COT_ROUND_TWO_TEMPLATE)
 
+_PRED_CONCEPT_TEMPLATE = """The following is an article's title and abstract. \
+Suggest the categories that this article belongs to. \
+A category is typically represented by a word or a short phrase, representing broader topics/concepts that the article is about. \
+You should include both general and specific categories.
+
+### ARTICLE ###
+Title: {{ title }}
+{{ abstract }}
+### END ARTICLE ###
+
+Give your answer as a comma-separated string.
+"""
+PRED_CONCEPT_TEMPLATE = load_template(_PRED_CONCEPT_TEMPLATE)
+
 _RESPONSE_TEMPLATE = """{% for path in paths %}
 {{ path | join(" -> ") }}
 {% endfor %}"""
