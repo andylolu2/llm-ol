@@ -115,15 +115,25 @@ memorisation_experiments = [
 ]
 
 link_prediction_experiments = [
+    # Experiment(
+    #     name="Link prediction",
+    #     dataset="wikipedia/v2",
+    #     eval_output="out/experiments/link_prediction/v1/eval/graph_filtered.json",
+    #     test_output="out/experiments/link_prediction/v1/test/graph_filtered.json",
+    #     train_input="out/data/wikipedia/v2/train_eval_split/train_graph.json",
+    #     eval_ground_truth="out/data/wikipedia/v2/train_eval_split/test_graph.json",
+    #     test_ground_truth="out/data/wikipedia/v2/train_test_split/test_graph.json",
+    #     eval_hp_result="out/experiments/link_prediction/v1/eval/hp_search.jsonl",
+    # ),
     Experiment(
         name="Link prediction",
         dataset="wikipedia/v2",
-        eval_output="out/experiments/link_prediction/v1/eval/graph_filtered.json",
-        test_output="out/experiments/link_prediction/v1/test/graph_filtered.json",
+        eval_output="out/experiments/llms4ol/wikipedia/v1/eval/graph_pruned.json",
+        test_output="out/experiments/llms4ol/wikipedia/v1/test/graph_pruned.json",
         train_input="out/data/wikipedia/v2/train_eval_split/train_graph.json",
         eval_ground_truth="out/data/wikipedia/v2/train_eval_split/test_graph.json",
         test_ground_truth="out/data/wikipedia/v2/train_test_split/test_graph.json",
-        eval_hp_result="out/experiments/link_prediction/v1/eval/hp_search.jsonl",
+        eval_hp_result="out/experiments/llms4ol/wikipedia/v1/eval/hp_search.jsonl",
     ),
 ]
 

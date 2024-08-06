@@ -7,8 +7,8 @@ if [ -f .env ]; then
 fi
 
 dataset=v2
-split=eval
-# split=test
+# split=eval
+split=test
 
 python llm_ol/experiments/llm/llms4ol/predict_concepts.py \
     --test_dataset out/experiments/llm/$dataset/${split}_dataset.jsonl \

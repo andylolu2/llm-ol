@@ -8,11 +8,11 @@ fi
 
 dataset=v2
 split=eval
-top_k=$((2973 * 2))
+top_k=2973
 
 # dataset=v2
 # split=test
-# top_k=$((8033 * 2))
+# top_k=8033 
 
 python llm_ol/experiments/llm/llms4ol/export_concepts.py \
     --raw_prediction_file out/experiments/llms4ol/wikipedia/v1/${split}/categorised_pages.jsonl \

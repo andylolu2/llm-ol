@@ -47,7 +47,7 @@ def main(_):
         ).to(model.device)
         output = model(**inputs)
         probs = torch.softmax(output.logits, dim=1)
-        weights.append(probs[:, 1])
+        weights.append(probs[:, 1].to("cpu", non_blocking=True))
     weights = torch.cat(weights).reshape(len(node_names), len(node_names))
     weights = weights.float().cpu().numpy()
 

@@ -8,6 +8,7 @@ fi
 
 dataset=v2
 split=eval
+# split=test
 exp_dir=out/experiments/llms4ol/wikipedia/v1
 root="Main topic classifications"
 
